@@ -46,9 +46,15 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
   const [conflictingEntryIds, setConflictingEntryIds] = useState<string[]>([])
   const [showExpenseEditor, setShowExpenseEditor] = useState(false)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const justSubmittedRef = useRef(false)
 
-  // Check for time overlaps
+  // Check for time overlaps — skip one render cycle after submit to avoid
+  // false alarm when startTime is chained but existingEntries hasn't updated yet
   useEffect(() => {
+    if (justSubmittedRef.current) {
+      justSubmittedRef.current = false
+      return
+    }
     if (!startTime || !duration) return
     const start = timeToDecimal(startTime)
     const dur = otisDurationToStandard(duration)
@@ -317,6 +323,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
       location_anlagenummer: selectedLocation?.anlagenummer || searchQuery || undefined,
       location_project_id: selectedProjectId || undefined,
       location_address: selectedAddress || undefined,
+      location_zone: selectedLocation ? (selectedLocation.manual_zone ?? selectedLocation.zone) : undefined,
       activity_code_id: selectedActivityCode?.id || null,
       activity_code: selectedActivityCode?.code || null,
       is_lunch: isLunch,
@@ -346,6 +353,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
     setSelectedActivityCode(null)
     setOverlapWarning(null)
     setConflictingEntryIds([])
+    justSubmittedRef.current = true
   }
 
   const todayStr = new Date(date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })

@@ -153,18 +153,19 @@ def generate_excel(
     # SECOND BLOCK HEADER (rows 28-29) — same info as first block
     # This is a second copy of the form on the same sheet for printing
     # ========================
-    # B28 = Personnel Number
-    ws["B28"] = personnel_number
-    # E28 = Last Name (E28:F28 merged)
-    # H28 = First Name (H28:J28 merged)
+    # C28 = Personnel Number (B28 has the label "No. Pers. / Nr. Pers. / No. Pers.")
+    ws["C28"] = personnel_number
+    # E28 = Last Name (D28 has label, E28:F28 is the value area — not merged)
+    # H28 = First Name (G28 has label, H28:J28 is merged for the value)
     if len(name_parts) == 2:
         ws["E28"] = name_parts[0]  # Last name
         ws["H28"] = name_parts[1]  # First name
     else:
         ws["E28"] = full_name
-    # K28 = Month, M28 = Year
-    ws["K28"] = week_monday.month
-    ws["M28"] = year
+    # L28 = Month (K28 has the label "Mois:/Monat:/Mese:")
+    ws["L28"] = week_monday.month
+    # N28 = Year (M28 has the label "Année:/Jahr:/Anno:")
+    ws["N28"] = year
     # L29 = week reference (same as L3)
     ws["L29"] = week_number
 
@@ -309,9 +310,9 @@ def generate_excel(
     # ========================
     # FOOTER: Datum + Unterschrift (Spesenrapport bottom)
     # ========================
-    # C36 = Date / Datum / Data :
+    # D36 = Date value (C36 has the label "Date / Datum / Data :")
     today = datetime.now()
-    ws2["C36"] = today.strftime("%d.%m.%Y")
+    ws2["D36"] = today.strftime("%d.%m.%Y")
 
     # Save to bytes
     from io import BytesIO
