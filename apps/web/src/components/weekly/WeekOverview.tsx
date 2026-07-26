@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { WeekSummary, TimeEntry } from '@/lib/types'
 import { DayCard } from './DayCard'
-import { WeeklyExpenses } from './WeeklyExpenses'
 import { ExpenseEditor } from './ExpenseEditor'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -116,13 +115,6 @@ export function WeekOverview({ weekSummary, onPrevWeek, onNextWeek, onDeleteEntr
           />
         </div>
       </Card>
-
-      {/* Weekly Expenses summary — only actual active expenses */}
-      <WeeklyExpenses
-        year={weekSummary.year}
-        weekNumber={weekSummary.weekNumber}
-        dailyExpenses={dailyExpenses}
-      />
 
       {/* Day cards with Spesen button */}
       <div className="space-y-3">

@@ -1,32 +1,21 @@
-# ===== Build Stage =====
-FROM python:3.12-slim AS builder
-
-WORKDIR /app
-
-# Install build dependencies if needed (none for this project)
-COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
-
-# ===== Runtime Stage =====
+# Minimal Python runtime — no C-ext deps needed (openpyxl removed)
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy installed packages from builder
-COPY --from=builder /root/.local /root/.local
+# Install Python dependencies (pure Python packages, no compilation needed)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && rm -rf /root/.cache/pip
 
-# Ensure local binaries are in PATH
-ENV PATH=/root/.local/bin:$PATH
-
-# Copy application code
+# Copy application code only (not requirements.txt, not tests)
 COPY src/ ./src/
 COPY templates/ ./templates/
 
-# Default environment variables
+# Runtime configuration
 ENV PORT=8000
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-# Run with uvicorn (no --reload in production)
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

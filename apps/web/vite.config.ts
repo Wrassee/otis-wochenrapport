@@ -14,7 +14,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'templates/template.xlsx'],
       manifest: {
         name: 'OTIS Wochenrapport',
         short_name: 'OTIS Rapport',

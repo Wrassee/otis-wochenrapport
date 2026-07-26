@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type FormEvent, useMemo } from 'react'
+import { useState, useEffect, useRef, type FormEvent } from 'react'
 import type { Location, FavoriteLocation, ActivityCode, TimeEntry } from '@/lib/types'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -13,10 +13,7 @@ import { decimalToTime, timeToDecimal, standardToOtis, otisToStandard, formatOti
 import { REFERENCE_LAT, REFERENCE_LON } from '@/lib/constants'
 import { geocodeAddress } from '@/lib/geocode'
 import { useTranslation } from '@/lib/useTranslation'
-import { DAY_NAMES } from '@/lib/translations'
-import type { Language } from '@/lib/translations'
-import { ExpenseEditor } from '@/components/weekly/ExpenseEditor'
-import { Plus, UtensilsCrossed, AlertTriangle, MapPin, Search, ChevronDown, PenLine, Clock, Euro } from 'lucide-react'
+import { Plus, UtensilsCrossed, AlertTriangle, MapPin, Search, ChevronDown, PenLine, Clock } from 'lucide-react'
 
 interface TimeEntryFormProps {
   date: string
@@ -28,7 +25,7 @@ interface TimeEntryFormProps {
 
 export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave, onOverlapClick }: TimeEntryFormProps) {
   const { t } = useTranslation()
-  const { locations, favoriteLocations, addRecentLocation, setLocations, setFavoriteLocations, activityCodes, searchLocations, dailyExpenses, language } = useAppStore()
+  const { locations, favoriteLocations, addRecentLocation, setLocations, setFavoriteLocations, activityCodes, searchLocations } = useAppStore()
 
   const [startTime, setStartTime] = useState(decimalToTime(defaultStartTime ?? 7.5))
   const [duration, setDuration] = useState('1.00')
@@ -44,7 +41,6 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
   const [isLunch, setIsLunch] = useState(false)
   const [overlapWarning, setOverlapWarning] = useState<string | null>(null)
   const [conflictingEntryIds, setConflictingEntryIds] = useState<string[]>([])
-  const [showExpenseEditor, setShowExpenseEditor] = useState(false)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const justSubmittedRef = useRef(false)
 
@@ -378,13 +374,6 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
   }
 
   const todayStr = new Date(date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
-  const expenseDayName = useMemo(() => {
-    const dayIdx = new Date(date + 'T12:00:00').getDay()
-    // getDay(): 0=Sun, 1=Mon ... 6=Sat → convert to 0=Mon index
-    const idx = Math.min(dayIdx === 0 ? 6 : dayIdx - 1, 4)
-    const names = DAY_NAMES[language as Language] ?? DAY_NAMES.de
-    return names[idx]
-  }, [date, language])
 
   return (
     <div className="space-y-4">
@@ -594,19 +583,6 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
             </button>
           )}
 
-          {/* Quick Spesen link — opens daily ExpenseEditor popup */}
-          {!isLunch && (
-            <button
-              type="button"
-              onClick={() => setShowExpenseEditor(true)}
-              className="flex items-center justify-center gap-2 h-12 rounded-2xl border-2 border-dashed border-amber-300/40 dark:border-amber-600/30 text-amber-600 dark:text-amber-400 text-sm font-semibold hover:bg-amber-50/80 dark:hover:bg-amber-900/20 hover:border-amber-400/60 transition-all active:scale-95 w-full"
-            >
-              <Euro className="w-4 h-4" />
-              {t('entry.spesen')}
-              <span className="text-[10px] opacity-60">&rarr; {t('day.spesen')}</span>
-            </button>
-          )}
-
           <Button type="submit" fullWidth size="lg" variant="primary">
             <Plus className="w-5 h-5" />
             {isLunch ? t('entry.lunch.save') : t('entry.save')}
@@ -626,14 +602,6 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
         selectedCode={selectedActivityCode?.code}
       />
 
-      {/* Daily Expense Editor Popup */}
-      <ExpenseEditor
-        open={showExpenseEditor}
-        onClose={() => setShowExpenseEditor(false)}
-        date={date}
-        dayName={expenseDayName}
-        dailyExpenses={dailyExpenses}
-      />
     </div>
   )
 }
