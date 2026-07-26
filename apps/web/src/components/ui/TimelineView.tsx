@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useEffect } from 'react'
 import type { TimeEntry } from '@/lib/types'
 import { decimalToTime, formatOtisDuration } from '@/lib/utils'
 import { cn } from '@/lib/cn'
@@ -10,13 +10,58 @@ interface TimelineViewProps {
   onEditEntry?: (entry: TimeEntry) => void
   onDeleteEntry?: (entryId: string) => void
   showActions?: boolean
+  conflictEntryIds?: string[]
 }
 
 const ROW_HEIGHT = 52 // px — touch-friendly tap target
 const MIN_BAR_WIDTH_PCT = 2.5 // minimum % width so 15-min bars are visible
 
-export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions = true }: TimelineViewProps) {
+export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions = true, conflictEntryIds = [] }: TimelineViewProps) {
   const { t } = useTranslation()
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const prevConflictRef = useRef<string[]>([])
+
+  // Scroll to and highlight conflicting entries when conflictEntryIds changes
+  useEffect(() => {
+    if (conflictEntryIds.length === 0) {
+      prevConflictRef.current = []
+      return
+    }
+    // Only act if the set of conflict IDs actually changed
+    const sameIds =
+      prevConflictRef.current.length === conflictEntryIds.length &&
+      prevConflictRef.current.every((id) => conflictEntryIds.includes(id))
+    if (sameIds) return
+
+    prevConflictRef.current = conflictEntryIds
+
+    // Small delay to let the DOM settle after re-render
+    const timer = setTimeout(() => {
+      const firstId = conflictEntryIds[0]
+      const el = document.getElementById(`timeline-entry-${firstId}`)
+      if (!el) return
+
+      // Scroll the page so the entry row is visible
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+      // Also scroll the horizontal container to show the time bar
+      const scrollContainer = scrollContainerRef.current
+      if (scrollContainer) {
+        const rowEl = el.querySelector('[data-timeline-bar]')
+        if (rowEl) {
+          const rowRect = rowEl.getBoundingClientRect()
+          const containerRect = scrollContainer.getBoundingClientRect()
+          // If the time bar is outside the visible area, scroll to it
+          if (rowRect.left < containerRect.left || rowRect.right > containerRect.right) {
+            scrollContainer.scrollLeft += rowRect.left - containerRect.left - 16
+          }
+        }
+      }
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [conflictEntryIds])
+
   if (entries.length === 0) return null
 
   // Calculate dynamic time range from entries
@@ -54,11 +99,11 @@ export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions 
 
   return (
     <div className="select-none overflow-hidden">
-      {/* Single scrollable container: ruler + content scroll together */}
-      <div
-        className="overflow-x-auto overscroll-x-contain"
-        style={{ WebkitOverflowScrolling: 'touch' }}
-      >
+      {/* Single scrollable container: ruler + content scroll together */}        <div
+          ref={scrollContainerRef}
+          className="overflow-x-auto overscroll-x-contain"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
         <div style={{ minWidth: `${totalHours * 112}px` }}>
           {/* ⏱ Hour ruler */}
           <div className="h-7 flex items-end px-3 border-b border-otis-100/20 dark:border-white/5">
@@ -95,13 +140,17 @@ export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions 
                 const isLunch = entry.is_lunch
                 const endTime = entry.start_time + entry.duration
                 const bar = barStyle(entry.start_time, entry.duration)
+                const isConflict = conflictEntryIds.includes(entry.id)
                 return (
                 <div
                   key={entry.id}
+                  id={`timeline-entry-${entry.id}`}
+                  onClick={() => onEditEntry?.(entry)}
                   className={cn(
-                    'relative flex items-center px-3 transition-colors duration-150',
+                    'relative flex items-center px-3 transition-colors duration-150 cursor-pointer',
                     !isLunch && 'hover:bg-otis-50/30 dark:hover:bg-white/[0.015]',
-                    isLunch && 'hover:bg-amber-50/40 dark:hover:bg-amber-900/10'
+                    isLunch && 'hover:bg-amber-50/40 dark:hover:bg-amber-900/10',
+                    isConflict && '!bg-red-50/50 dark:!bg-red-950/30'
                   )}
                   style={{ minHeight: ROW_HEIGHT }}
                 >
@@ -111,7 +160,11 @@ export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions 
                       'absolute rounded-full transition-all duration-150 shadow-sm',
                       isLunch
                         ? 'bg-gradient-to-r from-amber-400/85 to-amber-500/70 dark:from-amber-500/55 dark:to-amber-600/45'
-                        : 'bg-gradient-to-r from-otis-500/85 to-otis-400/75 dark:from-otis-400/65 dark:to-otis-500/55'
+                        : 'bg-gradient-to-r from-otis-500/85 to-otis-400/75 dark:from-otis-400/65 dark:to-otis-500/55',
+                      conflictEntryIds.includes(entry.id) &&
+                        (isLunch
+                          ? 'from-red-400/90 to-red-500/80 dark:from-red-500/65 dark:to-red-600/55 ring-2 ring-red-300 dark:ring-red-600'
+                          : 'from-red-400/90 to-red-500/80 dark:from-red-500/65 dark:to-red-600/55 ring-2 ring-red-300 dark:ring-red-600')
                     )}
                     style={{
                       left: bar.left,
@@ -120,6 +173,7 @@ export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions 
                       top: '50%',
                       transform: 'translateY(-50%)',
                     }}
+                    data-timeline-bar
                   />
 
                   {/* Entry info: icon + label + time + duration + actions — all inline */}

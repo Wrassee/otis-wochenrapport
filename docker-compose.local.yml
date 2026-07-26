@@ -1,0 +1,68 @@
+# ============================================================
+# Full offline development stack — EXTENDS docker-compose.yml
+# ============================================================
+# This file configures frontend + backend to use a LOCAL Supabase
+# instance (started via `npx supabase start` on the HOST machine).
+#
+# Usage (from project root):
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+#
+# IMPORTANT — localhost trap:
+#   When services run INSIDE Docker containers, "localhost" refers
+#   to the container, NOT the host machine. Since `npx supabase start`
+#   runs ON THE HOST, the containers cannot reach host:54321 via
+#   "localhost".
+#
+#   This file is therefore a REFERENCE for the environment variables
+#   needed. For practical use, set these in your local .env files
+#   (not in Docker Compose) and run the frontend/backend NATIVELY:
+#
+#   Terminal 1:  cd apps/web && npx supabase start
+#   Terminal 2:  cd apps/web && npm run dev
+#
+#   The .env.development file will then be picked up by Vite.
+#   See apps/web/.env.supabase for the values to use.
+# ============================================================
+
+services:
+  # React + Vite frontend (PWA)
+  frontend:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: otis-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_RENDER_URL=http://backend:8000
+      - VITE_SUPABASE_URL=http://host.docker.internal:54321
+      - NODE_ENV=development
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./apps/web/src:/app/src
+      - ./apps/web/public:/app/public
+      - ./apps/web/index.html:/app/index.html
+      - ./apps/web/vite.config.ts:/app/vite.config.ts
+    depends_on:
+      - backend
+    restart: unless-stopped
+    init: true
+
+  # Python FastAPI backend (Excel generation)
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: otis-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    volumes:
+      - ./apps/backend/src:/app/src
+      - ./apps/backend/templates:/app/templates
+    command: >-
+      uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    init: true

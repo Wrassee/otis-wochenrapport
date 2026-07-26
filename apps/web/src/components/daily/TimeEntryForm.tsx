@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type FormEvent } from 'react'
+import { useState, useEffect, useRef, type FormEvent, useMemo } from 'react'
 import type { Location, FavoriteLocation, ActivityCode, TimeEntry } from '@/lib/types'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -13,7 +13,9 @@ import { decimalToTime, timeToDecimal, standardToOtis, otisToStandard, formatOti
 import { REFERENCE_LAT, REFERENCE_LON } from '@/lib/constants'
 import { geocodeAddress } from '@/lib/geocode'
 import { useTranslation } from '@/lib/useTranslation'
-import { Link } from 'react-router-dom'
+import { DAY_NAMES } from '@/lib/translations'
+import type { Language } from '@/lib/translations'
+import { ExpenseEditor } from '@/components/weekly/ExpenseEditor'
 import { Plus, UtensilsCrossed, AlertTriangle, MapPin, Search, ChevronDown, PenLine, Clock, Euro } from 'lucide-react'
 
 interface TimeEntryFormProps {
@@ -21,11 +23,12 @@ interface TimeEntryFormProps {
   defaultStartTime?: number
   existingEntries: TimeEntry[]
   onSave: (entry: Omit<TimeEntry, 'id' | 'created_at' | 'updated_at' | 'synced'> & { is_lunch?: boolean }) => Promise<void>
+  onOverlapClick?: (conflictingIds: string[]) => void
 }
 
-export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave }: TimeEntryFormProps) {
+export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave, onOverlapClick }: TimeEntryFormProps) {
   const { t } = useTranslation()
-  const { locations, favoriteLocations, addRecentLocation, setLocations, setFavoriteLocations, activityCodes, searchLocations } = useAppStore()
+  const { locations, favoriteLocations, addRecentLocation, setLocations, setFavoriteLocations, activityCodes, searchLocations, dailyExpenses, language } = useAppStore()
 
   const [startTime, setStartTime] = useState(decimalToTime(defaultStartTime ?? 7.5))
   const [duration, setDuration] = useState('1.00')
@@ -40,6 +43,8 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave 
   const [searchQuery, setSearchQuery] = useState('')
   const [isLunch, setIsLunch] = useState(false)
   const [overlapWarning, setOverlapWarning] = useState<string | null>(null)
+  const [conflictingEntryIds, setConflictingEntryIds] = useState<string[]>([])
+  const [showExpenseEditor, setShowExpenseEditor] = useState(false)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Check for time overlaps
@@ -60,8 +65,10 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave 
           .map((e) => `${decimalToTime(e.start_time)}-${decimalToTime(e.start_time + e.duration)}`)
           .join(', ')}`
       )
+      setConflictingEntryIds(conflicting.map((e) => e.id))
     } else {
       setOverlapWarning(null)
+      setConflictingEntryIds([])
     }
   }, [startTime, duration, existingEntries])
 
@@ -338,9 +345,17 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave 
     setIsLunch(false)
     setSelectedActivityCode(null)
     setOverlapWarning(null)
+    setConflictingEntryIds([])
   }
 
   const todayStr = new Date(date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
+  const expenseDayName = useMemo(() => {
+    const dayIdx = new Date(date + 'T12:00:00').getDay()
+    // getDay(): 0=Sun, 1=Mon ... 6=Sat → convert to 0=Mon index
+    const idx = Math.min(dayIdx === 0 ? 6 : dayIdx - 1, 4)
+    const names = DAY_NAMES[language as Language] ?? DAY_NAMES.de
+    return names[idx]
+  }, [date, language])
 
   return (
     <div className="space-y-4">
@@ -531,26 +546,36 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave 
             </div>
           )}
 
-          {/* Overlap warning */}
+          {/* Overlap warning — clickable, scrolls to conflicting entries */}
           {overlapWarning && (
-            <div className="flex items-start gap-2.5 p-3.5 bg-red-50/80 dark:bg-red-900/20 backdrop-blur border-2 border-red-200/60 dark:border-red-700/40 rounded-2xl">
+            <button
+              type="button"
+              onClick={() => onOverlapClick?.(conflictingEntryIds)}
+              className="w-full flex items-start gap-2.5 p-3.5 bg-red-50/80 dark:bg-red-900/20 backdrop-blur border-2 border-red-200/60 dark:border-red-700/40 rounded-2xl hover:bg-red-100/80 dark:hover:bg-red-900/30 hover:border-red-300/80 dark:hover:border-red-600/60 transition-all active:scale-[0.98] text-left cursor-pointer"
+            >
               <div className="w-6 h-6 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <AlertTriangle className="w-4 h-4 text-red-500" />
               </div>
-              <p className="text-sm text-red-600 dark:text-red-300 font-medium">{overlapWarning}</p>
-            </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-red-600 dark:text-red-300 font-medium">{overlapWarning}</p>
+                <p className="text-[10px] text-red-400/70 dark:text-red-400/50 mt-0.5">
+                  Zum Eintrag springen &rarr;
+                </p>
+              </div>
+            </button>
           )}
 
-          {/* Quick Spesen link — opens Spesen tab */}
+          {/* Quick Spesen link — opens daily ExpenseEditor popup */}
           {!isLunch && (
-            <Link
-              to="/spesen"
-              className="flex items-center justify-center gap-2 h-12 rounded-2xl border-2 border-dashed border-amber-300/40 dark:border-amber-600/30 text-amber-600 dark:text-amber-400 text-sm font-semibold hover:bg-amber-50/80 dark:hover:bg-amber-900/20 hover:border-amber-400/60 transition-all active:scale-95"
+            <button
+              type="button"
+              onClick={() => setShowExpenseEditor(true)}
+              className="flex items-center justify-center gap-2 h-12 rounded-2xl border-2 border-dashed border-amber-300/40 dark:border-amber-600/30 text-amber-600 dark:text-amber-400 text-sm font-semibold hover:bg-amber-50/80 dark:hover:bg-amber-900/20 hover:border-amber-400/60 transition-all active:scale-95 w-full"
             >
               <Euro className="w-4 h-4" />
               {t('entry.spesen')}
-              <span className="text-[10px] opacity-60">{t('day.spesen')} &rarr;</span>
-            </Link>
+              <span className="text-[10px] opacity-60">&rarr; {t('day.spesen')}</span>
+            </button>
           )}
 
           <Button type="submit" fullWidth size="lg" variant="primary">
@@ -570,6 +595,15 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave 
         }}
         codes={activityCodes}
         selectedCode={selectedActivityCode?.code}
+      />
+
+      {/* Daily Expense Editor Popup */}
+      <ExpenseEditor
+        open={showExpenseEditor}
+        onClose={() => setShowExpenseEditor(false)}
+        date={date}
+        dayName={expenseDayName}
+        dailyExpenses={dailyExpenses}
       />
     </div>
   )

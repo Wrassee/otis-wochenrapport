@@ -12,7 +12,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from excel_generator import generate_excel
+from src.excel_generator import generate_excel
 
 load_dotenv()
 

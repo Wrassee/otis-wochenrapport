@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ExportSummary } from '@/components/export/ExportSummary'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
 import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/lib/useTranslation'
 import { getWeekDates, formatDateShort } from '@/lib/utils'
 import { cn } from '@/lib/cn'
-import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
+import { Calendar, FileSpreadsheet, Info, Zap, Loader2, CheckCircle2 } from 'lucide-react'
 
 export function ExportPage() {
   const { t } = useTranslation()
@@ -14,6 +15,28 @@ export function ExportPage() {
   const [exporting, setExporting] = useState(false)
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  const [warming, setWarming] = useState(false)
+  const [isWarm, setIsWarm] = useState(false)
+
+  const handleWarmup = useCallback(async () => {
+    if (warming || isWarm) return
+    setWarming(true)
+    const renderUrl = import.meta.env.VITE_RENDER_URL || 'http://localhost:8000'
+    try {
+      // Longer timeout for cold start (up to 30s)
+      const hc = await fetch(`${renderUrl}/health`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(30000),
+      })
+      if (hc.ok) {
+        setIsWarm(true)
+      }
+    } catch {
+      // Silent — user will see full error on export
+    } finally {
+      setWarming(false)
+    }
+  }, [warming, isWarm])
 
   useEffect(() => {
     loadWeekEntries()
@@ -22,6 +45,11 @@ export function ExportPage() {
   useEffect(() => {
     calculateWeekSummary()
   }, [timeEntries, calculateWeekSummary])
+
+  // Auto-warmup: fire when the user navigates to the Export page
+  useEffect(() => {
+    handleWarmup()
+  }, [handleWarmup])
 
   const handleExport = async () => {
     setExporting(true)
@@ -198,6 +226,50 @@ export function ExportPage() {
           </div>
         </Card>
       )}
+
+      {/* Backend warm-up card */}
+      <Card variant={isWarm ? 'success' : 'outline'}>
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-500',
+            isWarm
+              ? 'bg-emerald-500/10'
+              : warming
+                ? 'bg-amber-500/10 animate-pulse'
+                : 'bg-otis-50 dark:bg-white/5'
+          )}>
+            {isWarm ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+            ) : warming ? (
+              <Loader2 className="w-5 h-5 text-amber-500 animate-spin" />
+            ) : (
+              <Zap className="w-5 h-5 text-otis-400 dark:text-otis-500" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={cn(
+              'text-sm font-semibold',
+              isWarm ? 'text-emerald-600 dark:text-emerald-400' : 'text-otis-700 dark:text-gray-300'
+            )}>
+              {isWarm ? t('common.backend.warm') : warming ? t('common.backend.warming') : t('common.backend.warmup')}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+              {t('common.backend.warmup.desc')}
+            </p>
+          </div>
+          {!isWarm && !warming && (
+            <Button
+              onClick={handleWarmup}
+              variant="outline"
+              size="sm"
+              className="flex-shrink-0"
+            >
+              <Zap className="w-4 h-4" />
+              {t('common.backend.warmup')}
+            </Button>
+          )}
+        </div>
+      </Card>
 
       {/* Export summary */}
       <ExportSummary

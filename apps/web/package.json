@@ -5,11 +5,21 @@
   "type": "module",
   "scripts": {
     "dev:frontend": "vite",
-    "dev:backend": "cd ../backend && uvicorn src.main:app --reload --port 8000",
+    "dev:backend": "cd ../backend && python -m uvicorn src.main:app --reload --port 8000",
     "dev": "concurrently -n vite,backend -c cyan,yellow \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:docker": "cd .. && docker compose up -d",
+    "dev:docker:stop": "cd .. && docker compose down",
+    "dev:docker:backend": "cd .. && docker compose -f docker-compose.backend.yml up -d",
+    "dev:docker:backend:stop": "cd .. && docker compose -f docker-compose.backend.yml down",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "supabase:start": "npx supabase start",
+    "supabase:stop": "npx supabase stop",
+    "supabase:status": "npx supabase status",
+    "supabase:reset": "npx supabase db reset",
+    "supabase:studio": "npx supabase status",
+    "dev:docker:full": "cd .. && docker compose -f docker-compose.yml -f docker-compose.local.yml up -d"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",

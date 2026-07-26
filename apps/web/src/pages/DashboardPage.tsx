@@ -31,9 +31,12 @@ export function DashboardPage() {
   const [editStart, setEditStart] = useState('')
   const [editDuration, setEditDuration] = useState('')
   const [editIsSaving, setEditIsSaving] = useState(false)
+  const [conflictEntryIds, setConflictEntryIds] = useState<string[]>([])
 
   useEffect(() => {
     loadWeekEntries()
+    // Reset conflict highlights when day changes
+    setConflictEntryIds([])
   }, [currentDate, loadWeekEntries])
 
   const todayEntries = useMemo(
@@ -220,6 +223,7 @@ export function DashboardPage() {
               onEditEntry={handleEditEntry}
               onDeleteEntry={handleDeleteEntry}
               showActions={true}
+              conflictEntryIds={conflictEntryIds}
             />
           </div>
         </div>
@@ -314,6 +318,7 @@ export function DashboardPage() {
         defaultStartTime={defaultStartTime}
         existingEntries={todayEntries}
         onSave={handleSaveEntry}
+        onOverlapClick={(ids) => setConflictEntryIds(ids)}
       />
     </div>
   )

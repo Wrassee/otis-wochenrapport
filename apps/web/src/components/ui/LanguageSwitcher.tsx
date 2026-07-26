@@ -33,7 +33,7 @@ export function LanguageSwitcher() {
                 : 'bg-white/50 dark:bg-white/5 border-gray-200/50 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-otis-200/50 hover:text-otis-600'
             )}
           >
-            <span className="text-lg leading-none">{lang.code === 'de' ? '🇩🇪' : lang.code === 'fr' ? '🇫🇷' : '🇮🇹'}</span>
+            <span className="text-lg leading-none">{lang.code === 'de' ? '🇩🇪' : lang.code === 'fr' ? '🇫🇷' : lang.code === 'it' ? '🇮🇹' : '🇭🇺'}</span>
             <span className="text-xs">{lang.nativeLabel}</span>
           </button>
         ))}
