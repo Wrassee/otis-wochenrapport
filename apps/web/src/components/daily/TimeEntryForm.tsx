@@ -58,11 +58,16 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
     if (!startTime || !duration) return
     const start = timeToDecimal(startTime)
     const dur = otisDurationToStandard(duration)
+    if (dur <= 0) return
     const end = start + dur
     const conflicting = existingEntries.filter((e) => {
       if (e.is_lunch) return false
       const eEnd = e.start_time + e.duration
-      return start < eEnd && e.start_time < end
+      // Boundary case: if the new entry starts exactly where an existing entry ends,
+      // it is NOT an overlap (e.g. 07:30-11:30 then 11:30-15:00 is valid)
+      if (start >= eEnd) return false
+      if (end <= e.start_time) return false
+      return true
     })
 
     if (conflicting.length > 0) {
@@ -266,6 +271,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
         latitude: fav.latitude,
         longitude: fav.longitude,
         zone: fav.zone,
+        manual_zone: fav.manual_zone,
         created_at: '',
       })
     }
@@ -314,6 +320,21 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
 
     if (dur <= 0) return
 
+    // Resolve zone: selectedLocation → manual_zone override → zone → look up from saved locations/favorites
+    let resolvedZone: number | undefined
+    if (selectedLocation) {
+      resolvedZone = selectedLocation.manual_zone ?? selectedLocation.zone
+    } else if (searchQuery) {
+      const key = searchQuery.toUpperCase()
+      const loc = locations.find((l) => l.anlagenummer.toUpperCase() === key)
+      if (loc) {
+        resolvedZone = loc.manual_zone ?? loc.zone
+      } else {
+        const fav = favoriteLocations.find((f) => f.anlagenummer.toUpperCase() === key)
+        resolvedZone = fav?.manual_zone ?? fav?.zone
+      }
+    }
+
     const entry: Omit<TimeEntry, 'id' | 'created_at' | 'updated_at' | 'synced'> & { is_lunch?: boolean } = {
       user_id: '',
       date,
@@ -323,7 +344,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
       location_anlagenummer: selectedLocation?.anlagenummer || searchQuery || undefined,
       location_project_id: selectedProjectId || undefined,
       location_address: selectedAddress || undefined,
-      location_zone: selectedLocation ? (selectedLocation.manual_zone ?? selectedLocation.zone) : undefined,
+      location_zone: resolvedZone,
       activity_code_id: selectedActivityCode?.id || null,
       activity_code: selectedActivityCode?.code || null,
       is_lunch: isLunch,

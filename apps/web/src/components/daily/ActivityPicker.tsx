@@ -112,7 +112,7 @@ export function ActivityPicker({ open, onClose, onSelect, codes, selectedCode }:
 
   return (
     <BottomSheet open={open} onClose={onClose} title={t('entry.activity.picker.title')}>
-      <div className="space-y-2 pb-4">
+      <div className="space-y-2 pb-8">
         {categories.map((category) => {
           const config = categoryConfig[category]
           const groups = CODE_GROUPS[category] || []

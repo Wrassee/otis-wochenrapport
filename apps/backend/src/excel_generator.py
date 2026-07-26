@@ -310,9 +310,9 @@ def generate_excel(
     # ========================
     # FOOTER: Datum + Unterschrift (Spesenrapport bottom)
     # ========================
-    # D36 = Date value (C36 has the label "Date / Datum / Data :")
+    # E36 = Date value (C36 has the label "Date / Datum / Data :")
     today = datetime.now()
-    ws2["D36"] = today.strftime("%d.%m.%Y")
+    ws2["E36"] = today.strftime("%d.%m.%Y")
 
     # Save to bytes
     from io import BytesIO
