@@ -1,0 +1,145 @@
+name: CI/CD — Build & Deploy
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  # ─── Frontend: TypeScript check + build ───
+  frontend:
+    name: Frontend (TypeScript + Vite)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # npm run build runs: tsc -b && vite build (includes type-check)
+      - name: Build (TypeScript + Vite + PWA)
+        run: npm run build
+
+  # ─── Backend: Python syntax + dependencies ───
+  backend:
+    name: Backend (Python + Uvicorn)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: apps/backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify imports
+        run: python -c "
+          from src.excel_generator import generate_excel;
+          from src.main import app;
+          print('All imports OK')
+        "
+
+  # ─── Deploy: Vercel (frontend) ───
+  deploy-frontend:
+    name: Deploy → Vercel
+    if: github.ref_name == 'main' || github.ref_name == 'master'
+    needs: [frontend]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npx vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+          npx vercel build --prod --token=$VERCEL_TOKEN
+          npx vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
+
+  # ─── Deploy: Render (backend) via Deploy Hook ───
+  #   Render provides a unique Deploy Hook URL per service.
+  #   Get yours: Render Dashboard → otis-wochenrapport-api → Deploy Hooks → Create Hook
+  #   Then set RENDER_DEPLOY_HOOK_URL in GitHub repo Secrets.
+  deploy-backend:
+    name: Deploy → Render
+    if: github.ref_name == 'main' || github.ref_name == 'master'
+    needs: [backend]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Deploy Hook
+        env:
+          HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK_URL" ]; then
+            echo "⚠️  RENDER_DEPLOY_HOOK_URL not set — skipping backend deploy"
+            echo "   Get it: Render Dashboard → otis-wochenrapport-api → Deploy Hooks"
+            exit 0
+          fi
+          echo "Triggering Render deploy..."
+          HTTP_CODE=$(curl -s -o /tmp/render-response.txt -w "%{http_code}" -X POST "$HOOK_URL")
+          echo "HTTP status: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "202" ] || [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ];
+          then
+            echo "✅ Render deploy triggered successfully!"
+            echo "📋 Check deploy log: Render Dashboard → otis-wochenrapport-api → Deploys"
+          else
+            echo "❌ Trigger failed"
+            cat /tmp/render-response.txt 2>/dev/null || true
+          fi
+
+  notify:
+    name: Notify — Deploy complete
+    if: always() && (github.ref_name == 'main' || github.ref_name == 'master')
+    needs: [deploy-frontend, deploy-backend]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check deployment status
+        run: |
+          echo "┌─────────────────────────────────────┐"
+          echo "│         Deployment Summary          │"
+          echo "└─────────────────────────────────────┘"
+          echo ""
+          echo "📦 Frontend (Vercel): ${{ needs.deploy-frontend.result }}"
+          echo "   🔗 https://otis-wochenrapport.vercel.app"
+          echo ""
+          echo "⚙️  Backend (Render): ${{ needs.deploy-backend.result }}"
+          echo "   🔗 https://otis-wochenrapport.onrender.com/health"
+          echo ""
+          echo "📱 APK: update via npx cap sync && cd android && ./gradlew assembleDebug"

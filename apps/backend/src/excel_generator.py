@@ -64,6 +64,17 @@ def _num_str(value: float) -> str:
     return s[:-1] if s.endswith(".") else s
 
 
+def _standard_to_otis(decimal_hours: float) -> float:
+    """
+    Convert standard decimal hours to OTIS format.
+    Standard: 4.5 (4h30m)  →  OTIS: 4.30
+    Standard: 7.25 (7h15m)  →  OTIS: 7.15
+    """
+    hours = int(decimal_hours)
+    minutes = int(round((decimal_hours - hours) * 60))
+    return hours + minutes / 100
+
+
 def _get_cell_style(xml: str, ref: str) -> str:
     """Extract the style attribute from an existing cell element."""
     m = re.search(rf'<c\s+r="{ref}"\s+s="(\d+)"', xml)
@@ -178,15 +189,15 @@ def _fill_stundenrapport(
         if addr:
             xml = _set_cell_str(xml, f"F{row}", addr)
 
-        # Start time (H)
+        # Start time (H) — OTIS format (7.30 = 7h30m)
         start_time = entry.get("start_time", 0)
         if start_time is not None:
-            xml = _set_cell_num(xml, f"H{row}", float(start_time))
+            xml = _set_cell_num(xml, f"H{row}", _standard_to_otis(float(start_time)))
 
-        # Duration (I)
+        # Duration (I) — OTIS format (4.30 = 4h30m)
         duration = entry.get("duration", 0)
         if duration is not None:
-            xml = _set_cell_num(xml, f"I{row}", float(duration))
+            xml = _set_cell_num(xml, f"I{row}", _standard_to_otis(float(duration)))
 
         # Activity code marker (J-R)
         activity_code = entry.get("activity_code", "")
@@ -228,8 +239,9 @@ def _fill_spesenrapport(
             wk = dt.weekday()
         except (ValueError, TypeError):
             continue
-        zone = entry.get("zone", 0) or entry.get("location_zone", 0)
-        if zone and zone > day_zones.get(wk, 0):
+        zone_raw = entry.get("zone") or entry.get("location_zone") or 0
+        zone = int(zone_raw)
+        if zone > 0 and zone > day_zones.get(wk, 0):
             day_zones[wk] = zone
 
     # --- Fill zone marks ---

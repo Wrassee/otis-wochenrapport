@@ -22,6 +22,7 @@ interface AppState {
 
   // Localisation
   language: Language
+  theme: 'system' | 'light' | 'dark'
 
   // UI State
   currentDate: string
@@ -31,6 +32,7 @@ interface AppState {
   isLoading: boolean
 
   // Actions
+  setTheme: (theme: 'system' | 'light' | 'dark') => void
   setLanguage: (lang: Language) => void
   setUser: (user: { id: string; email: string } | null) => void
   setProfile: (profile: Profile | null) => void
@@ -83,6 +85,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoading: false,
   dailyExpenses: {},
   language: (localStorage.getItem('otis_language') as Language) || 'de',
+  theme: (localStorage.getItem('otis_theme') as 'system' | 'light' | 'dark') || 'system',
+
+  setTheme: (theme) => {
+    localStorage.setItem('otis_theme', theme)
+    set({ theme })
+    // Immediately apply the theme class
+    const root = document.documentElement
+    if (theme === 'dark') {
+      root.classList.add('dark')
+    } else if (theme === 'light') {
+      root.classList.remove('dark')
+    } else {
+      // 'system' — follow OS preference
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      root.classList.toggle('dark', prefersDark)
+    }
+  },
 
   setLanguage: async (lang) => {
     localStorage.setItem('otis_language', lang)

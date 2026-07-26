@@ -52,7 +52,34 @@ function AppNavigator() {
 
 export default function App() {
   const [initializing, setInitializing] = useState(true)
-  const { setUser, initialize, setSyncStatus, setLocations, setActivityCodes } = useAppStore()
+  const { setUser, initialize, setSyncStatus, setLocations, setActivityCodes, theme } = useAppStore()
+
+  // Apply the selected theme on mount and when it changes
+  useEffect(() => {
+    const root = document.documentElement
+
+    const applyTheme = (t: 'system' | 'light' | 'dark') => {
+      if (t === 'dark') {
+        root.classList.add('dark')
+      } else if (t === 'light') {
+        root.classList.remove('dark')
+      } else {
+        // 'system' — follow OS preference
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        root.classList.toggle('dark', prefersDark)
+      }
+    }
+
+    applyTheme(theme)
+
+    // Listen for OS theme changes (only when mode is 'system')
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      const handler = (e: MediaQueryListEvent) => root.classList.toggle('dark', e.matches)
+      mq.addEventListener('change', handler)
+      return () => mq.removeEventListener('change', handler)
+    }
+  }, [theme])
 
   useEffect(() => {
     async function init() {

@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { OtisDurationSelect } from '@/components/ui/OtisDurationSelect'
+import { ActivityPicker } from '@/components/daily/ActivityPicker'
 import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/lib/useTranslation'
-import type { TimeEntry } from '@/lib/types'
+import type { TimeEntry, ActivityCode } from '@/lib/types'
 import { decimalToTime, timeToDecimal, otisToStandard, formatOtisDuration, snapToQuarter } from '@/lib/utils'
-import { Save, Building2 } from 'lucide-react'
+import { Save, Building2, ChevronDown } from 'lucide-react'
 
 export function WeeklyPage() {
   const { t } = useTranslation()
@@ -21,6 +22,7 @@ export function WeeklyPage() {
     calculateWeekSummary,
     deleteTimeEntry,
     updateTimeEntry,
+    activityCodes,
     isLoading,
   } = useAppStore()
 
@@ -28,6 +30,8 @@ export function WeeklyPage() {
   const [editEntry, setEditEntry] = useState<TimeEntry | null>(null)
   const [editStart, setEditStart] = useState('')
   const [editDuration, setEditDuration] = useState('')
+  const [editActivityCode, setEditActivityCode] = useState<ActivityCode | null>(null)
+  const [showEditActivityPicker, setShowEditActivityPicker] = useState(false)
   const [editIsSaving, setEditIsSaving] = useState(false)
 
   useEffect(() => {
@@ -71,6 +75,8 @@ export function WeeklyPage() {
     setEditEntry(entry)
     setEditStart(decimalToTime(entry.start_time))
     setEditDuration(formatOtisDuration(entry.duration))
+    const code = activityCodes.find((c) => c.code === entry.activity_code)
+    setEditActivityCode(code || null)
   }
 
   const handleSaveEdit = async () => {
@@ -84,6 +90,8 @@ export function WeeklyPage() {
         ...editEntry,
         start_time: start,
         duration: Math.max(standardDur, 0.25),
+        activity_code: editActivityCode?.code || editEntry.activity_code,
+        activity_code_id: editActivityCode?.id || editEntry.activity_code_id,
       }
       await updateTimeEntry(updatedEntry)
       await loadWeekEntries()
@@ -173,6 +181,32 @@ export function WeeklyPage() {
               required
             />
 
+            {/* Activity code (not for lunch entries) */}
+            {!editEntry.is_lunch && (
+              <div>
+                <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
+                  {t('entry.activity')}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowEditActivityPicker(true)}
+                  className="w-full flex items-center justify-between h-14 px-4 rounded-2xl glass-input dark:glass-input-dark text-otis-900 dark:text-white hover:border-otis-400/40 transition-all"
+                >
+                  {editActivityCode ? (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="info">{editActivityCode.code}</Badge>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {editActivityCode.description_de}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">{t('entry.activity.select')}</span>
+                  )}
+                  <ChevronDown className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+            )}
+
             {/* Action buttons */}
             <div className="flex gap-3 pt-2">
               <Button
@@ -195,6 +229,18 @@ export function WeeklyPage() {
               </Button>
             </div>
           </div>
+        )}
+        {editEntry && (
+          <ActivityPicker
+            open={showEditActivityPicker}
+            onClose={() => setShowEditActivityPicker(false)}
+            onSelect={(code) => {
+              setEditActivityCode(code)
+              setShowEditActivityPicker(false)
+            }}
+            codes={activityCodes}
+            selectedCode={editActivityCode?.code}
+          />
         )}
       </BottomSheet>
     </>

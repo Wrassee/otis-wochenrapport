@@ -47,6 +47,13 @@ export const translations: TranslationDict = {
   'auth.name.required':   { de: 'Bitte geben Sie Ihren Namen ein', fr: 'Veuillez entrer votre nom', it: 'Inserisci il tuo nome', hu: 'K\u00e9rj\u00fck, adja meg a nev\u00e9t' },
   'auth.personnel.required':{ de: 'Bitte geben Sie Ihre Personalnummer ein', fr: 'Veuillez entrer votre num\u00e9ro de personnel', it: 'Inserisci il tuo numero di matricola', hu: 'K\u00e9rj\u00fck, adja meg a szem\u00e9lyi sz\u00e1m\u00e1t' },
 
+  // ─── Theme settings ───
+  'theme.title':          { de: 'Darstellung',       fr: 'Affichage',          it: 'Aspetto',        hu: 'Megjelen\u00edt\u00e9s' },
+  'theme.subtitle':       { de: 'Hell / Dunkel Modus', fr: 'Mode clair / sombre', it: 'Modalit\u00e0 chiara / scura', hu: 'Vil\u00e1gos / S\u00f6t\u00e9t m\u00f3d' },
+  'theme.system':         { de: 'System folgen',    fr: 'Suivre le syst\u00e8me',  it: 'Segui sistema',  hu: 'Rendszer k\u00f6vet\u00e1se' },
+  'theme.light':          { de: 'Hell',              fr: 'Clair',               it: 'Chiaro',          hu: 'Vil\u00e1gos' },
+  'theme.dark':           { de: 'Dunkel',            fr: 'Sombre',              it: 'Scuro',           hu: 'S\u00f6t\u00e9t' },
+
   // ─── Profile Setup ───
   'profile.title':        { de: 'Profil Einstellungen', fr: 'Param\u00e8tres du profil', it: 'Impostazioni profilo', hu: 'Profil be\u00e1ll\u00edt\u00e1sok' },
   'profile.subtitle':     { de: 'Pers\u00f6nliche Informationen verwalten', fr: 'G\u00e9rer les informations personnelles', it: 'Gestisci informazioni personali', hu: 'Szem\u00e9lyes adatok kezel\u00e9se' },

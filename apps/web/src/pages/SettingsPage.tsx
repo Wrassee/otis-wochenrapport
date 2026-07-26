@@ -7,7 +7,7 @@ import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/lib/useTranslation'
 import { upsertProfile } from '@/db/supabase'
 import * as localDb from '@/db/indexeddb'
-import { LogOut, Wifi, WifiOff, Smartphone, RefreshCw, Clock, Shield, Info, Settings, Bell, BellOff, Calendar, MapPin, Pencil, Check, X, Search, Trash2, AlertTriangle, Plus, Languages } from 'lucide-react'
+import { LogOut, Wifi, WifiOff, Smartphone, RefreshCw, Clock, Shield, Info, Settings, Bell, BellOff, Calendar, MapPin, Pencil, Check, X, Search, Trash2, AlertTriangle, Plus, Languages, Sun, Moon, Monitor } from 'lucide-react'
 import { forceSync } from '@/db/sync'
 import { useNavigate } from 'react-router-dom'
 import { signOut } from '@/db/supabase'
@@ -174,6 +174,9 @@ export function SettingsPage() {
       {/* Language Switcher */}
       <LanguageSwitcher />
 
+      {/* Theme Switcher */}
+      <ThemeSwitcher />
+
       {/* Lift Zone Manager */}
       <LiftZoneManager />
 
@@ -255,6 +258,59 @@ export function SettingsPage() {
         Abmelden
       </Button>
     </div>
+  )
+}
+
+function ThemeSwitcher() {
+  const { t } = useTranslation()
+  const { theme, setTheme } = useAppStore()
+
+  const options: { value: 'system' | 'light' | 'dark'; label: string; icon: typeof Sun }[] = [
+    { value: 'system', label: t('theme.system'), icon: Monitor },
+    { value: 'light', label: t('theme.light'), icon: Sun },
+    { value: 'dark', label: t('theme.dark'), icon: Moon },
+  ]
+
+  return (
+    <Card>
+      <div className="flex items-center gap-2.5 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+          {theme === 'dark' ? (
+            <Moon className="w-4 h-4 text-white" />
+          ) : theme === 'light' ? (
+            <Sun className="w-4 h-4 text-white" />
+          ) : (
+            <Monitor className="w-4 h-4 text-white" />
+          )}
+        </div>
+        <div>
+          <CardTitle>{t('theme.title')}</CardTitle>
+          <p className="text-[10px] text-gray-400">{t('theme.subtitle')}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {options.map((opt) => {
+          const Icon = opt.icon
+          const isActive = theme === opt.value
+          return (
+            <button
+              key={opt.value}
+              onClick={() => setTheme(opt.value)}
+              className={cn(
+                'flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-2xl border-2 transition-all duration-200 active:scale-95',
+                isActive
+                  ? 'bg-otis-500/10 dark:bg-otis-500/20 border-otis-400/40 dark:border-otis-500/40 text-otis-700 dark:text-otis-300'
+                  : 'bg-otis-50/50 dark:bg-white/3 border-transparent text-gray-500 dark:text-gray-400 hover:border-otis-300/30 dark:hover:border-white/10 hover:text-otis-600 dark:hover:text-otis-300'
+              )}
+            >
+              <Icon className={cn('w-5 h-5', isActive && 'text-otis-500')} />
+              <span className="text-[11px] font-semibold leading-tight text-center">{opt.label}</span>
+            </button>
+          )
+        })}
+      </div>
+    </Card>
   )
 }
 

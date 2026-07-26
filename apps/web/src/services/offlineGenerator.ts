@@ -63,6 +63,17 @@ function numStr(value: number): string {
   return s
 }
 
+/**
+ * Convert standard decimal hours to OTIS format.
+ * Standard: 4.5 (4h30m)  →  OTIS: 4.30
+ * Standard: 7.25 (7h15m)  →  OTIS: 7.15
+ */
+function standardToOtis(decimalHours: number): number {
+  const hours = Math.floor(decimalHours)
+  const minutes = Math.round((decimalHours - hours) * 60)
+  return hours + minutes / 100
+}
+
 /** Get the ISO week Monday for a given year+week */
 function getMondayOfWeek(year: number, weekNumber: number): Date {
   const jan4 = new Date(year, 0, 4)
@@ -230,14 +241,14 @@ function fillStundenrapport(
       xml = setCellStr(xml, `F${row}`, entry.address)
     }
 
-    // Start time (H)
+    // Start time (H) — OTIS format (7.30 = 7h30m)
     if (entry.start_time != null) {
-      xml = setCellNum(xml, `H${row}`, entry.start_time)
+      xml = setCellNum(xml, `H${row}`, standardToOtis(entry.start_time))
     }
 
-    // Duration (I)
+    // Duration (I) — OTIS format (4.30 = 4h30m)
     if (entry.duration != null) {
-      xml = setCellNum(xml, `I${row}`, entry.duration)
+      xml = setCellNum(xml, `I${row}`, standardToOtis(entry.duration))
     }
 
     // Activity code marker (J-R)
