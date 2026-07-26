@@ -1,0 +1,43 @@
+services:
+  # React + Vite frontend (PWA)
+  frontend:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: otis-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_RENDER_URL=http://backend:8000
+      - NODE_ENV=development
+    volumes:
+      # Mount entire src/ for HMR (hot module replacement) during development
+      - ./apps/web/src:/app/src
+      - ./apps/web/public:/app/public
+      - ./apps/web/index.html:/app/index.html
+      - ./apps/web/vite.config.ts:/app/vite.config.ts
+    depends_on:
+      - backend
+    restart: unless-stopped
+    init: true
+
+  # Python FastAPI backend (Excel generation)
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: otis-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./apps/backend/.env
+    environment:
+      - PORT=8000
+    volumes:
+      # Mount source code for hot-reload during development
+      - ./apps/backend/src:/app/src
+      - ./apps/backend/templates:/app/templates
+    command: >-
+      uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    init: true

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small notification status bar icon for Capacitor Local Notifications
+     Must be a flat, monochromatic white silhouette on transparent background.
+     The Android system renders it as a solid white icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Calendar silhouette with checkmark -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M19,3h-1V1h-2v2H8V1H6v2H5c-1.1,0 -2,0.9 -2,2v14c0,1.1 0.9,2 2,2h14c1.1,0 2,-0.9 2,-2V5c0,-1.1 -0.9,-2 -2,-2zm0,16H5V8h14v11z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M17.3,10.3l-5.3,5.3l-2.7,-2.7l-1.4,1.4l4.1,4.1l6.7,-6.7z" />
+</vector>

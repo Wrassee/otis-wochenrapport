@@ -1,0 +1,17 @@
+{
+  "name": "otis-wochenrapport",
+  "private": true,
+  "version": "1.0.0",
+  "description": "OTIS Wochenrapport PWA - Weekly report app for elevator technicians",
+  "scripts": {
+    "dev:web": "cd apps/web && npm run dev",
+    "dev:backend": "cd apps/backend && uvicorn src.main:app --reload --port 8000",
+    "build:web": "cd apps/web && npm run build",
+    "build:backend": "cd apps/backend && pip install -r requirements.txt",
+    "start:backend": "cd apps/backend && uvicorn src.main:app --host 0.0.0.0 --port 8000",
+    "preview": "cd apps/web && npm run preview",
+    "setup": "cd apps/web && npm install && cd ../.. && cd apps/backend && pip install -r requirements.txt"
+  },
+  "keywords": ["otis", "wochenrapport", "pwa", "offline-first"],
+  "license": "MIT"
+}

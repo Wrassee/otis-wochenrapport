@@ -1,0 +1,23 @@
+# Render deployment configuration for OTIS Wochenrapport API
+# More info: https://render.com/docs/yaml-spec
+services:
+  - type: web
+    name: otis-wochenrapport-api
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.main:app --host 0.0.0.0 --port $PORT
+    # Free tier: service spins down after 15min inactivity.
+    # Health check keeps it alive but consumes monthly hours faster.
+    # Remove this line if you prefer the service to sleep when idle.
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: FRONTEND_URL
+        value: https://deine-vercel-app.vercel.app
+      - key: PYTHON_VERSION
+        value: 3.13.0

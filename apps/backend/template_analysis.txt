@@ -1,0 +1,200 @@
+
+============================================================
+=== Stundenrapport ===
+Dimensions: A1:R51
+Max row: 51, Max col: 18
+
+  R1: A=OTIS | B=Field Rapport
+  R2: A=O | NK | MOD | B=No. Pers.  | Nr.  Pers. | No. Pers.  | D=Nom:  | Name:  | Cognome: | G=Prénom: | Vorname: | Nome:  | K=Mois: | Monat: | Mese: | M=Année: | Jahr: | Anno: | O=Signature:  | Unterschrift: | Firma: 
+  R3: L=2
+  R4: H=Time As | O=SCOTT
+  R5: H=Heure-Zeit-Ore | J= Activité - Tätigkeit - Attività  | O=sans - ohne - senza SWISSTOOL
+  R6: A=Rap. No. | Rap. Nr. | Rap. No. | H=Début | Anfang | Inizio | I=Durée | Dauer | Durata | J=NK | S | T | K=T | Clot | L=O | M=QI | (QI =< 515) | N=Improductif | Unproduktiv | Improduttivo | O=VM | P=VP | Q=Maintenance | Wartung | Manutenzione | R=QI | (SCOTT | QI >= 516)
+  R7: A=Jour | Tag | Giorno | B=No. Appareil | Anlagen Nr.  | No. Impianto | D=No. Projet NK+S+T | Projekt Nr. NK+S+T | No. Progetto NK+S+T | F=Adresse | Adresse | Indirizzo | H=Heure | Zeit | Ore | I=Heure | Zeit | Ore | J=ü | K=ü | L=ü | M=No. QI | QI-Nr. | No. QI | N=Phase | Phase | Fase | O=ü | P=ü | Q=NM - NTC - NF - VC  | P1 - P2 - P3 | R=No. QI | QI-Nr. | No. QI
+  R23: F= 
+  R24: A=ü NK, S, T = Projet / Projekt / Progetto | ü T Clot  = Clôture T / Abschluss T / | G=Absence / Abwesenheit / Assenza : | A01 = Vacances / Ferien / Vacanze | A02 = Se | L=Improductif / Unproduktiv / Improduttivo : | I04 = Administration / Administrati | R=Saisi:  | Eingegeben: | Registrato: 
+  R25: A=sans-ohne-senza SWISSTOOL | ü VM  =  Visite / Besuch / Visita  | ü    VP  =  Ess
+  R26: M=4
+  R27: A=OTIS | B=Field Rapport
+  R28: A=O | NK | MOD | B=No. Pers.  | Nr.  Pers. | No. Pers.  | D=Nom:  | Name:  | Cognome: | G=Prénom: | Vorname: | Nome:  | K=Mois: | Monat: | Mese: | M=Année: | Jahr: | Anno: | O=Signature:  | Unterschrift: | Firma: 
+  R29: L=6
+  R30: H=Time As | O=SCOTT
+  R31: H=Heure-Zeit-Ore | J= Activité - Tätigkeit - Attività  | O=sans - ohne - senza SWISSTOOL
+  R32: A=Rap. No. | Rap. Nr. | Rap. No. | H=Début | Anfang | Inizio | I=Durée | Dauer | Durata | J=NK | S | T | K=T | Clot | L=O | M=QI | (QI =< 515) | N=Improductif | Unproduktiv | Improduttivo | O=VM | P=VP | Q=Maintenance | Wartung | Manutenzione | R=QI | (SCOTT | QI >= 516)
+  R33: A=Jour | Tag | Giorno | B=No. Appareil | Anlagen Nr.  | No. Impianto | D=No. Projet NK+S+T | Projekt Nr. NK+S+T | No. Progetto NK+S+T | F=Adresse | Adresse | Indirizzo | H=Heure | Zeit | Ore | I=Heure | Zeit | Ore | J=ü | K=ü | L=ü | M=No. QI | QI-Nr. | No. QI | N=Phase | Phase | Fase | O=ü | P=ü | Q=NM - NTC - NF - VC  | P1 - P2 - P3 | R=No. QI | QI-Nr. | No. QI
+  R50: A=ü NK, S, T = Projet / Projekt / Progetto | ü T Clot  = Clôture T / Abschluss T / | G=Absence / Abwesenheit / Assenza : | A01 = Vacances / Ferien / Vacanze | A02 = Se | L=Improductif / Unproduktiv / Improduttivo : | I04 = Administration / Administrati | R=Saisi:  | Eingegeben: | Registrato: 
+
+Merged cells:
+  A24:F24
+  A25:F25
+  A50:F50
+  A51:F51
+  B10:C10
+  B11:C11
+  B12:C12
+  B13:C13
+  B14:C14
+  B15:C15
+  B16:C16
+  B17:C17
+  B18:C18
+  B19:C19
+  B1:R1
+  B20:C20
+  B21:C21
+  B22:C22
+  B27:R27
+  B32:G32
+  B33:C33
+  B34:C34
+  B35:C35
+  B36:C36
+  B37:C37
+  B38:C38
+  B39:C39
+  B40:C40
+  B41:C41
+  B42:C42
+  B43:C43
+  B44:C44
+  B45:C45
+  B46:C46
+  B47:C47
+  B48:C48
+  B6:G6
+  B7:C7
+  B8:C8
+  B9:C9
+  D10:E10
+  D11:E11
+  D12:E12
+  D13:E13
+  D14:E14
+  D15:E15
+  D16:E16
+  D17:E17
+  D18:E18
+  D19:E19
+  D20:E20
+  D21:E21
+  D22:E22
+  D33:E33
+  D34:E34
+  D35:E35
+  D36:E36
+  D37:E37
+  D38:E38
+  D39:E39
+  D40:E40
+  D41:E41
+  D42:E42
+  D43:E43
+  D44:E44
+  D45:E45
+  D46:E46
+  D47:E47
+  D48:E48
+  D7:E7
+  D8:E8
+  D9:E9
+  E28:F28
+  E2:F2
+  F10:G10
+  F11:G11
+  F12:G12
+  F13:G13
+  F14:G14
+  F15:G15
+  F16:G16
+  F17:G17
+  F18:G18
+  F19:G19
+  F20:G20
+  F21:G21
+  F22:G22
+  F33:G33
+  F34:G34
+  F35:G35
+  F36:G36
+  F37:G37
+  F38:G38
+  F39:G39
+  F40:G40
+  F41:G41
+  F42:G42
+  F43:G43
+  F44:G44
+  F45:G45
+  F46:G46
+  F47:G47
+  F48:G48
+  F7:G7
+  F8:G8
+  F9:G9
+  G24:K25
+  G50:K51
+  H28:J28
+  H2:J2
+  H30:N30
+  H31:I31
+  H4:N4
+  H5:I5
+  J31:N31
+  J5:N5
+  L24:Q25
+  L50:Q51
+  O28:R28
+  O2:R2
+  O30:R30
+  O31:R31
+  O4:R4
+  O5:R5
+  R24:R25
+  R50:R51
+
+============================================================
+=== Spesenrapport ===
+Dimensions: A1:K47
+Max row: 47, Max col: 11
+
+  R1: A=OTIS  | I=F13-140HR
+  R2: A=Rapport hebdomadaire des frais / Wöchentliche Spesenabrechnung / Rapporto settim
+  R5: D=du / von / dal :   | H=au / bis / al :  
+  R7: A=N° Pers.  /  Pers. Nr.  /  N° Pers. :   | F=Nom / Name / Nome  : 
+  R9: C=code | D=LU | E=MA | F=ME | G=JE  | H=VE  | I=SA | J=DI
+  R10: A=Zone 1 : rayon de / Umkreis bis / raggio di | B=10 km | C=Z1
+  R12: A=Zone 2a : rayon de / Umkreis bis / raggio di | B=30 km | C=Z2
+  R13: A= (formation / Ausbildung / formazione  - HQ Fribourg)         Zone 2b : rayon de | B=30 km | C=ZB
+  R15: A=Zone 3a : rayon de / Umkreis bis / raggio di | B=60 km | C=Z3
+  R16: A=(formation / Ausbildung / formazione  - HQ Fribourg)         Zone 3b : rayon de  | B=60 km | C=ZC
+  R18: A=Zone 4a (1) : au-delà de / Umkreis über / oltre | B=60 km | C=Z4
+  R19: A=(formation / Ausbildung / formazione  - HQ Fribourg)      Zone 4b (1) : au-delà  | B=60 km | C=ZD
+  R21: A=Zone 5a (2) : au-delà de / Umkreis über / oltre | B=60 km | C=Z5
+  R22: A=    (formation / Ausbildung / formazione  - HQ Fribourg)       Zone 5b (2) : au- | B=60 km | C=ZE
+  R24: A=Zone 4 + 5 (variable / variabel / variabile )  :  nombre de km / Kilometeranzahl | B=CHF -.10  / km | C=26
+  R26: A=Dédommagement / Entschädigung / Supplemento >= 10h | B=CHF 15.- | C=2
+  R27: A=Hôtel / Hotel / Hotel | C=3
+  R28: A=Transport (3) / Transport (3) / Trasporti (3) | C=4
+  R29: A=Piquet / Pikettdienst / Servizio di picchetto | B=CHF 30.- / 55.- | C=5
+  R30: A=Dédommagement piquet/ Entschädigung Pikett / Supplemento picchetto >= 5h | B=CHF 20.- | C=6
+  R31: A=Matériel / Material / Materiale | C=7
+  R33: A=Véhicule privé / Privatfahrzeug  / Veicolo Privato Zone 1 - 5 | B=CHF -.70  / km | C=28
+  R36: A=(1)  Zone 4  : forfait 1 jour / Pauschalbetrag für 1 Tag / forfait di 1 giorno | C=Date / Datum / Data :
+  R37: A=(2)  Zone 5  : forfait 2 jours ou plus  / Pauschalbetrag für 2 Tage oder mehr  /
+  R38: A=(3)  Transport : + Frais de parcage + Nettoyage vehicule  | C=Signature / Unterschrift / Firma :
+  R39: A=(3)  Transport : + Parkgebühren + Fahrzeugpflege
+  R40: A=(3)  Trasporti  : + Spese di parcheggio + Pulizia veicolo | C=Saisie / Eingegeben / Registrato :
+  R43: A=Voir l'Instruction / Siehe Instruktion / Vedi Istruzione | B=I13-140HR-f
+  R44: B=I13-140HR-d
+  R45: A=Pour les codes commençant par Z (Z1, Z2, etc.), merci de saisir le chiffre 1 | B=I13-140HR-i
+  R46: A=Alle Code welche mit Z beginnen (Z1, Z2, usw.), geben Sie bitte die Ziffer 1 ein
+  R47: A=Per i codici che iniziano con Z (Z1, Z2, ecc.) vogliate iscrivere la cifra 1 nel
+
+Merged cells:
+  A2:J2
+  E5:F5
+  G7:J7
+  I1:J1
+  I5:J5
+
+Done.

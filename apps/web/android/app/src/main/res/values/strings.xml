@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">OTIS Wochenrapport</string>
+    <string name="title_activity_main">OTIS Wochenrapport</string>
+    <string name="package_name">com.otis.wochenrapport</string>
+    <string name="custom_url_scheme">com.otis.wochenrapport</string>
+</resources>
