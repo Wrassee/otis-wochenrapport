@@ -1,0 +1,76 @@
+# ==========================================
+# OTIS Wochenrapport — Root .gitignore
+# ==========================================
+
+# ---- Environment files (contain secrets!) ----
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.*.local
+.env.supabase
+
+# ---- Freebuff Desktop database (machine-specific) ----
+.freebuff/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ---- Python build artifacts ----
+.eggs/
+*.egg-info/
+dist/
+*.egg
+
+# ---- Node ----
+node_modules/
+.pnp/
+.pnp.js
+
+# ---- Build outputs ----
+dist/
+build/
+*.tsbuildinfo
+
+# ---- IDE / Editor ----
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*.swo
+*.swn
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---- OS files ----
+*.bak
+*.orig
+*.tmp
+
+# ---- Logs ----
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---- Generated Excel test files ----
+apps/backend/test_*.xlsx
+apps/backend/template_analysis.txt
+
+# ---- Docker ----
+.docker/
