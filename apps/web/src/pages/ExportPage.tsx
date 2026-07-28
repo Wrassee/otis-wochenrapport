@@ -9,6 +9,8 @@ import { cn } from '@/lib/cn'
 import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
 import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
+import { Share as CapacitorShare } from '@capacitor/share'
+import { Filesystem, Directory } from '@capacitor/filesystem'
 
 export function ExportPage() {
   const { t } = useTranslation()
@@ -66,11 +68,26 @@ export function ExportPage() {
     return all
   }
 
+  /** Convert a Blob to a base64 data URL (for Capacitor Filesystem). */
+  const blobToBase64 = (b: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const result = reader.result as string
+        // data:application/...;base64,xxxx → keep only the base64 part
+        resolve(result.split(',')[1])
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(b)
+    })
+  }
+
   /**
-   * Save a Blob to the device. Tries three methods in order:
-   * 1. Web Share API (mobile, native share sheet with the file)
-   * 2. window.open(blobUrl) (fallback — might work in WebView)
-   * 3. Visible manual download link (ALWAYS works — real user tap)
+   * Save a Blob to the device. Tries methods in order:
+   * 1. Capacitor native Share (most reliable on mobile)
+   * 2. Web Share API (fallback — modern browsers)
+   * 3. window.open(blobUrl) (fallback — desktop / some WebViews)
+   * 4. Visible manual download link (ultimate fallback)
    */
   const saveBlob = async (blob: Blob, filename: string) => {
     // Clean up any previous download URL
@@ -82,9 +99,29 @@ export function ExportPage() {
     // Create the blob URL (sync, no gesture issues)
     const url = window.URL.createObjectURL(blob)
 
-    // 1. Try Share API (mobile) — best UX, user chooses where to save.
-    //    Note: canShare() is NOT checked because it can throw on some WebViews.
-    //    We just try navigator.share() directly — if it fails, we fall through.
+    // 1. Try Capacitor native Share (most reliable on mobile)
+    const isCapacitor = !!(window as any).Capacitor?.isNative
+    if (isCapacitor) {
+      try {
+        // Write blob to cache directory first, then share via native plugin
+        const base64 = await blobToBase64(blob)
+        const saved = await Filesystem.writeFile({
+          path: filename,
+          data: base64,
+          directory: Directory.Cache,
+        })
+        await CapacitorShare.share({
+          title: `Wochenrapport KW${currentWeek.week}`,
+          files: [saved.uri],
+        })
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+        return
+      } catch {
+        // Capacitor share failed — fall through to Web Share API
+      }
+    }
+
+    // 2. Try Web Share API (mobile) — best UX on modern browsers
     if (typeof navigator.share !== 'undefined') {
       try {
         const file = new File([blob], filename, {
@@ -94,21 +131,17 @@ export function ExportPage() {
           title: `Wochenrapport KW${currentWeek.week}`,
           files: [file],
         })
-        // Share succeeded — user either saved it or sent it
         setTimeout(() => window.URL.revokeObjectURL(url), 1000)
         return
       } catch {
-        // User cancelled share or API not supported — fall through
+        // User cancelled or API not supported — fall through
       }
     }
 
-    // 2. Try window.open — might work in some WebViews or desktop browsers.
+    // 3. Try window.open — might work in some WebViews / desktop
     window.open(url, '_blank')
 
-    // 3. ALWAYS provide a visible manual download link.
-    //    The user can tap it — real gesture, always works.
-    //    The blob URL stays alive until the user taps the link
-    //    (10s cleanup in onClick) or a new export replaces it.
+    // 4. ALWAYS provide a visible manual download link.
     setDownloadUrl(url)
     setDownloadFilename(filename)
   }
