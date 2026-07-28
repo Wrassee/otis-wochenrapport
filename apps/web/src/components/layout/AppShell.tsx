@@ -78,7 +78,7 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Bottom navigation - Glassmorphism */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 glass-nav dark:glass-nav-dark safe-area-bottom">
-        <div className="max-w-lg mx-auto flex justify-around h-16">
+        <div className="max-w-lg mx-auto flex justify-around h-16 pt-1.5">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path
             const Icon = item.icon

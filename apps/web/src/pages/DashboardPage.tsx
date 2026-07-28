@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { OtisDurationSelect } from '@/components/ui/OtisDurationSelect'
+import { ActivityPicker } from '@/components/daily/ActivityPicker'
 import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/lib/useTranslation'
-import type { TimeEntry } from '@/lib/types'
+import type { TimeEntry, ActivityCode } from '@/lib/types'
 import { getWeekInfo, decimalToTime, timeToDecimal, formatOtisDuration, otisToStandard, snapToQuarter } from '@/lib/utils'
-import { Clock, ChevronLeft, ChevronRight, CheckCircle2, UtensilsCrossed, Building2, Save, Euro, Wifi, WifiOff, RefreshCw } from 'lucide-react'
+import { Clock, ChevronLeft, ChevronRight, ChevronDown, CheckCircle2, UtensilsCrossed, Building2, Save, Euro, Wifi, WifiOff, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { TimelineView } from '@/components/ui/TimelineView'
 import { useExpensesSync } from '@/hooks/useExpensesSync'
@@ -25,6 +26,7 @@ export function DashboardPage() {
     setCurrentDate,
     syncStatus,
     setSyncStatus,
+    activityCodes,
   } = useAppStore()
   const { timeEntries, addEntry, updateEntry, deleteEntry, quickAdd, loadWeek } = useTimeEntries()
   const handleSync = async () => {
@@ -36,6 +38,8 @@ export function DashboardPage() {
   const [editStart, setEditStart] = useState('')
   const [editDuration, setEditDuration] = useState('')
   const [editIsSaving, setEditIsSaving] = useState(false)
+  const [editActivityCode, setEditActivityCode] = useState<ActivityCode | null>(null)
+  const [showEditActivityPicker, setShowEditActivityPicker] = useState(false)
   const [conflictEntryIds, setConflictEntryIds] = useState<string[]>([])
   const [showExpenseEditor, setShowExpenseEditor] = useState(false)
   const syncExpensesOnClose = useExpensesSync()
@@ -99,6 +103,8 @@ export function DashboardPage() {
     setEditEntry(entry)
     setEditStart(decimalToTime(entry.start_time))
     setEditDuration(formatOtisDuration(entry.duration))
+    const foundCode = activityCodes.find((c) => c.code === entry.activity_code)
+    setEditActivityCode(foundCode || null)
   }
 
   const handleSaveEdit = async () => {
@@ -112,6 +118,8 @@ export function DashboardPage() {
         ...editEntry,
         start_time: start,
         duration: standardDur,
+        activity_code: editActivityCode?.code || editEntry.activity_code,
+        activity_code_id: editActivityCode?.id || editEntry.activity_code_id,
       }
       await updateEntry(updatedEntry)
       await loadWeek()
@@ -334,6 +342,28 @@ export function DashboardPage() {
               </div>
             </div>
 
+            {/* Tätigkeit — Activity code picker */}
+            <div className="space-y-1.5">
+              <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200">
+                Tätigkeit
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowEditActivityPicker(true)}
+                className="w-full flex items-center justify-between p-3.5 rounded-xl border transition-all duration-150 bg-white/50 dark:bg-white/5 border-otis-200/30 dark:border-white/10 hover:border-otis-300/50"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-otis-100/50 dark:bg-otis-800/30 flex items-center justify-center">
+                    <Building2 className="w-3.5 h-3.5 text-otis-500 dark:text-otis-400" />
+                  </div>
+                  <span className={`text-sm font-medium ${editActivityCode ? 'text-otis-800 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+                    {editActivityCode ? editActivityCode.code : '— Keine Auswahl —'}
+                  </span>
+                </div>
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+
             {/* Start time */}
             <Input
               id="dash-edit-start"
@@ -382,6 +412,18 @@ export function DashboardPage() {
           </div>
         )}
       </BottomSheet>
+
+      {/* Edit Activity Picker */}
+      <ActivityPicker
+        open={showEditActivityPicker}
+        onClose={() => setShowEditActivityPicker(false)}
+        onSelect={(code) => {
+          setEditActivityCode(code)
+          setShowEditActivityPicker(false)
+        }}
+        codes={activityCodes}
+        selectedCode={editActivityCode?.code}
+      />
 
       {/* Spesen ExpenseEditor */}
       {showExpenseEditor && (
