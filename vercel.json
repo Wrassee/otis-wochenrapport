@@ -1,4 +1,7 @@
 {
   "outputDirectory": "apps/web/dist",
-  "buildCommand": "cd apps/web && npm ci --no-audit --no-fund && npm run build"
+  "buildCommand": "cd apps/web && npm ci --no-audit --no-fund && npm run build",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
