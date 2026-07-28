@@ -1,0 +1,4 @@
+{
+  "outputDirectory": "apps/web/dist",
+  "buildCommand": "cd apps/web && npm ci --no-audit --no-fund && npm run build"
+}
