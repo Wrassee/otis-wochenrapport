@@ -8,6 +8,7 @@
     "dev:web": "cd apps/web && npm run dev",
     "dev:backend": "cd apps/backend && python -m uvicorn src.main:app --reload --port 8000",
     "build": "cd apps/web && npm run build",
+    "vercel-build": "cd apps/web && npm ci --no-audit --no-fund && npm run build",
     "build:web": "cd apps/web && npm run build",
     "build:backend": "cd apps/backend && pip install -r requirements.txt",
     "start:backend": "cd apps/backend && python -m uvicorn src.main:app --host 0.0.0.0 --port 8000",
