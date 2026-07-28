@@ -64,28 +64,53 @@ export function ExportPage() {
     return all
   }
 
-  const triggerDownload = (blob: Blob, usedOffline: boolean) => {
+  /**
+   * Save a Blob to the device. On mobile, prefers the Web Share API
+   * (share sheet) so the user can decide where to save. Falls back to
+   * a delayed anchor download when share is unavailable or cancelled.
+   */
+  const saveBlob = async (blob: Blob, filename: string) => {
+    // On mobile: try Share API first — always triggered by user gesture
+    if (typeof navigator.share !== 'undefined') {
+      const file = new File([blob], filename, {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
+      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ title: `Wochenrapport KW${currentWeek.week}`, files: [file] })
+          return // Share completed successfully
+        } catch {
+          // User cancelled share or API failed — fall through to anchor
+        }
+      }
+    }
+    // Desktop / WebView fallback
+    downloadViaAnchor(blob, filename)
+  }
+
+  /** Download via hidden anchor + delayed URL cleanup */
+  const downloadViaAnchor = (blob: Blob, filename: string) => {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
+    a.download = filename
+    a.style.display = 'none'
     document.body.appendChild(a)
     a.click()
-    document.body.removeChild(a)
-    window.URL.revokeObjectURL(url)
+    // Keep the URL alive for 3s so the browser can start the download
+    setTimeout(() => {
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    }, 3000)
+  }
 
+  const triggerDownload = async (blob: Blob, usedOffline: boolean) => {
+    const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
+    await saveBlob(blob, filename)
     setStatus(usedOffline
       ? `${t('export.success')} (${t('export.offline.generated')})`
       : t('export.success'),
     )
-
-    // Share sheet
-    if (typeof navigator.share !== 'undefined' && navigator.canShare({ files: [new File([blob], 'report.xlsx')] })) {
-      navigator.share({
-        title: `Wochenrapport KW${currentWeek.week}`,
-        files: [new File([blob], `Wochenrapport_KW${currentWeek.week}.xlsx`)],
-      }).catch(() => {})
-    }
   }
 
   const handleExport = async () => {
@@ -136,13 +161,30 @@ export function ExportPage() {
         usedOffline = true
       }
 
-      triggerDownload(blob, usedOffline)
+      await triggerDownload(blob, usedOffline)
     } catch (err: any) {
       const msg = err?.message || t('export.failed')
       setStatus(`${t('common.error')}: ${msg}`)
     } finally {
       setExporting(false)
     }
+  }
+
+  /** Generate Excel offline and save via Share API / anchor */
+  const generateAndSaveLocally = async (
+    entriesData: OfflineEntry[],
+    allExpenses: OfflineExpense[],
+  ) => {
+    const blob = await generateExcelOffline({
+      year: currentWeek.year,
+      week_number: currentWeek.week,
+      personnel_number: profile?.personnel_number || '',
+      full_name: profile?.full_name || '',
+      entries: entriesData,
+      expenses: allExpenses,
+    })
+    const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
+    await saveBlob(blob, filename)
   }
 
   const handleSendEmail = async () => {
@@ -174,43 +216,13 @@ export function ExportPage() {
         })
 
         if (!response.ok) throw new Error(t('export.email.failed'))
+
+        // Email sent via backend — still save a local copy on the device
+        await generateAndSaveLocally(entriesData, allExpenses)
       } catch {
-        // Backend unreachable — generate offline + open mailto:
-        const blob = await generateExcelOffline({
-          year: currentWeek.year,
-          week_number: currentWeek.week,
-          personnel_number: state.profile?.personnel_number || '',
-          full_name: state.profile?.full_name || '',
-          entries: entriesData,
-          expenses: allExpenses,
-        })
+        // Backend unreachable — generate offline and share via native Share API
+        await generateAndSaveLocally(entriesData, allExpenses)
         usedOffline = true
-
-        // Download the generated file
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        window.URL.revokeObjectURL(url)
-
-        // Open mailto: link with pre-filled details
-        const supervisorEmail = profile?.supervisor_email || ''
-        const subject = encodeURIComponent(`Wochenrapport KW${currentWeek.week}/${currentWeek.year} - ${state.profile?.full_name || ''}`)
-        const body = encodeURIComponent(
-          `Hallo,\n\n` +
-          `anbei der Wochenrapport für KW${currentWeek.week}/${currentWeek.year}.\n` +
-          `Bitte die heruntergeladene Excel-Datei manuell anhängen.\n\n` +
-          `Vielen Dank.\n` +
-          `${state.profile?.full_name || ''}`
-        )
-        if (supervisorEmail) {
-          window.open(`mailto:${supervisorEmail}?subject=${subject}&body=${body}`, '_blank')
-        } else {
-          window.open(`mailto:?subject=${subject}&body=${body}`, '_blank')
-        }
       }
 
       setStatus(usedOffline

@@ -116,12 +116,12 @@ export function SettingsPage() {
               }
             </div>
             <div>
-              <CardTitle>Montag Erinnerung</CardTitle>
-              <p className="text-[10px] text-gray-400">Wöchentliche Benachrichtigung</p>
+              <CardTitle>{t('settings.reminder')}</CardTitle>
+              <p className="text-[10px] text-gray-400">{t('settings.reminder.subtitle')}</p>
             </div>
           </div>
           <Badge variant={notificationEnabled ? 'success' : 'default'} size="sm">
-            {notificationEnabled ? 'Aktiv' : 'Inaktiv'}
+            {notificationEnabled ? t('settings.reminder.active') : t('settings.reminder.inactive')}
           </Badge>
         </div>
 
@@ -130,11 +130,10 @@ export function SettingsPage() {
             <Calendar className="w-4 h-4 text-otis-400 mt-0.5 flex-shrink-0" />
             <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
               <p className="font-medium text-otis-600 dark:text-otis-300">
-                Jeden Montag um 07:00 Uhr
+                {t('settings.reminder.desc')}
               </p>
               <p>
-                Erinnert dich daran, den Wochenrapport an deinen Supervisor zu senden.
-                Die Benachrichtigung erscheint als Popup auf deinem Telefon.
+                {t('settings.reminder.detail')}
               </p>
             </div>
           </div>
@@ -161,12 +160,12 @@ export function SettingsPage() {
           ) : notificationEnabled ? (
             <span className="flex items-center gap-2">
               <BellOff className="w-4 h-4" />
-              Erinnerung deaktivieren
+              {t('settings.reminder.deactivate')}
             </span>
           ) : (
             <span className="flex items-center gap-2">
               <Bell className="w-4 h-4" />
-              Montag Erinnerung aktivieren
+              {t('settings.reminder.activate')}
             </span>
           )}
         </Button>
@@ -189,8 +188,8 @@ export function SettingsPage() {
               <Smartphone className="w-4 h-4 text-white" />
             </div>
             <div>
-              <CardTitle>Synchronisation</CardTitle>
-              <p className="text-[10px] text-gray-400">Datenabgleich mit Server</p>
+              <CardTitle>{t('settings.sync')}</CardTitle>
+              <p className="text-[10px] text-gray-400">{t('settings.sync.subtitle')}</p>
             </div>
           </div>
           <Badge variant={syncStatus.online ? 'success' : 'danger'}>
@@ -256,7 +255,7 @@ export function SettingsPage() {
       {/* Logout */}
       <Button onClick={handleLogout} variant="danger" fullWidth size="lg">
         <LogOut className="w-5 h-5" />
-        Abmelden
+        {t('settings.logout')}
       </Button>
     </div>
   )
@@ -324,6 +323,7 @@ interface LiftItem {
 }
 
 function LiftZoneManager() {
+  const { t } = useTranslation()
   const { locations, setLocations, setFavoriteLocations } = useAppStore()
   const [liftList, setLiftList] = useState<LiftItem[]>([])
   const [filteredList, setFilteredList] = useState<LiftItem[]>([])
@@ -543,9 +543,9 @@ function LiftZoneManager() {
             <MapPin className="w-4 h-4 text-white" />
           </div>
           <div>
-            <CardTitle>Meine Lifte</CardTitle>
+            <CardTitle>{t('lifts.title')}</CardTitle>
             <p className="text-[10px] text-gray-400">
-              {liftList.length} Anlagen {filteredList.length < liftList.length ? `(${filteredList.length} gefiltert)` : ''}
+              {t('lifts.count', { n: liftList.length })} {filteredList.length < liftList.length ? t('lifts.filtered', { n: filteredList.length }) : ''}
             </p>
           </div>
         </div>

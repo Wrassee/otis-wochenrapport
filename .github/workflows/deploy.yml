@@ -107,8 +107,8 @@ jobs:
           HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
           if [ -z "$HOOK_URL" ]; then
-            echo "⚠️  RENDER_DEPLOY_HOOK_URL not set — skipping backend deploy"
-            echo "   Get it: Render Dashboard → otis-wochenrapport-api → Deploy Hooks"
+            echo "! RENDER_DEPLOY_HOOK_URL not set - skipping backend deploy"
+            echo "  Get it: Render Dashboard > otis-wochenrapport-api > Deploy Hooks"
             exit 0
           fi
           echo "Triggering Render deploy..."
@@ -116,10 +116,10 @@ jobs:
           echo "HTTP status: $HTTP_CODE"
           if [ "$HTTP_CODE" = "202" ] || [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ];
           then
-            echo "✅ Render deploy triggered successfully!"
-            echo "📋 Check deploy log: Render Dashboard → otis-wochenrapport-api → Deploys"
+            echo "[OK] Render deploy triggered"
+            echo "  Check: Render Dashboard > otis-wochenrapport-api > Deploys"
           else
-            echo "❌ Trigger failed"
+            echo "[FAIL] Trigger failed"
             cat /tmp/render-response.txt 2>/dev/null || true
           fi
 

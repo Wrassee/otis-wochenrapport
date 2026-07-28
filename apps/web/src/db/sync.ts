@@ -72,10 +72,20 @@ export async function performSync() {
     lastSync: null,
   })
 
+  // Timeout guard: if sync takes longer than 25s, force-reset isSyncing
+  const timeoutId = setTimeout(() => {
+    isSyncing = false
+    notifyListeners({
+      online: navigator.onLine,
+      syncing: false,
+      pending: 0,
+      lastSync: null,
+    })
+  }, 25000)
+
   try {
     const unsyncedEntries = await getUnsyncedEntries()
     const queue = await getSyncQueue()
-
     if (unsyncedEntries.length > 0) {
       // Sync entries to Supabase
       const synced = await syncEntries(unsyncedEntries)
@@ -118,6 +128,7 @@ export async function performSync() {
     // Clear sync queue
     await clearSyncQueue()
 
+    clearTimeout(timeoutId)
     const now = new Date().toISOString()
     notifyListeners({
       online: true,
@@ -134,6 +145,7 @@ export async function performSync() {
       lastSync: null,
     })
   } finally {
+    clearTimeout(timeoutId)
     isSyncing = false
   }
 }

@@ -101,12 +101,12 @@ export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions 
     <div className="select-none overflow-hidden">
       {/* Single scrollable container: ruler + content scroll together */}        <div
           ref={scrollContainerRef}
-          className="overflow-x-auto overscroll-x-contain"
+          className="overflow-x-auto overscroll-x-contain timeline-scrollbar"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
         <div style={{ minWidth: `${totalHours * 112}px` }}>
           {/* ⏱ Hour ruler */}
-          <div className="h-7 flex items-end px-3 border-b border-otis-100/20 dark:border-white/5">
+          <div className="h-7 flex items-end px-3 border-b border-otis-100/20 dark:border-white/5 flex-shrink-0">
             {hourLabels.map((hour) => (
               <div
                 key={hour}
@@ -202,8 +202,8 @@ export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions 
                       className={cn(
                         'text-sm font-semibold truncate leading-none max-w-[80px]',
                         isLunch
-                          ? 'text-amber-700 dark:text-amber-300'
-                          : 'text-otis-700 dark:text-otis-300'
+                          ? 'text-amber-700 dark:text-amber-200'
+                          : 'text-otis-700 dark:text-white'
                       )}
                     >
                       {isLunch ? t('timeline.lunch') : (entry.location_anlagenummer || '—')}
@@ -213,8 +213,8 @@ export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions 
                     <span className={cn(
                       'text-[11px] font-medium whitespace-nowrap ml-1',
                       isLunch
-                        ? 'text-amber-500 dark:text-amber-400'
-                        : 'text-gray-400 dark:text-gray-500'
+                        ? 'text-amber-500 dark:text-amber-300'
+                        : 'text-gray-400 dark:text-white'
                     )}>
                       {decimalToTime(entry.start_time)}–{decimalToTime(endTime)}
                     </span>
@@ -223,8 +223,8 @@ export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions 
                     <span className={cn(
                       'text-[11px] font-bold whitespace-nowrap px-2 py-0.5 rounded-md',
                       isLunch
-                        ? 'bg-amber-100/40 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400'
-                        : 'bg-otis-100/40 dark:bg-otis-800/20 text-otis-500 dark:text-otis-400'
+                        ? 'bg-amber-100/40 dark:bg-amber-900/20 text-amber-600 dark:text-amber-200'
+                        : 'bg-otis-100/40 dark:bg-otis-800/20 text-otis-500 dark:text-white'
                     )}>
                       {isLunch ? `${(entry.duration * 60).toFixed(0)} Min.` : formatOtisDuration(entry.duration)}
                     </span>

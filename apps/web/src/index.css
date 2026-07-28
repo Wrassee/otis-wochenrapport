@@ -99,6 +99,33 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Thicker horizontal scrollbar for the TimelineView */
+  .timeline-scrollbar::-webkit-scrollbar {
+    height: 8px;
+  }
+  .timeline-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .timeline-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 55, 166, 0.15);
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .dark .timeline-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(77, 163, 255, 0.15);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .timeline-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 55, 166, 0.3);
+    border: 0px solid transparent;
+  }
+  .dark .timeline-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(77, 163, 255, 0.3);
+    border: 0px solid transparent;
+  }
 }
 
 /* ── Ambient Backgrounds ── */
