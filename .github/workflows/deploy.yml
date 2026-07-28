@@ -57,14 +57,14 @@ jobs:
           python -c "from src.excel_generator import generate_excel; from src.main import app; print('All imports OK')"
 
   # ─── Deploy: Vercel (frontend) ───
+  # Note: Vercel project Root Directory is set to 'apps/web' in the
+  # Vercel Dashboard, so we CANNOT use working-directory here (would
+  # double the path). Run everything from the repo root instead.
   deploy-frontend:
     name: Deploy → Vercel
     if: github.ref_name == 'main' || github.ref_name == 'master'
     needs: [frontend]
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
 
     steps:
       - uses: actions/checkout@v4
@@ -76,7 +76,7 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: cd apps/web && npm ci --no-audit --no-fund
 
       - name: Check Vercel secrets
         id: check-vercel
@@ -95,6 +95,8 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        # Run from repo root — Vercel project.json already knows
+        # Root Directory = 'apps/web' and resolves it relative to CWD.
         run: |
           npx vercel pull --yes --environment=production --token=$VERCEL_TOKEN
           npx vercel build --prod --token=$VERCEL_TOKEN
