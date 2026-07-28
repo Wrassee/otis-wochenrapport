@@ -8,6 +8,23 @@ import { DAY_NAMES } from '@/lib/translations'
 import { supabase, upsertFavorite, getFavorites, syncExpensesToSupabase, getExpenses } from '@/db/supabase'
 import { syncExpenses as queueExpensesSync } from '@/lib/syncExpenses'
 
+/**
+ * Collect all expenses from the dailyExpenses map into a flat array
+ * and queue a background sync to Supabase (debounced 2 s).
+ */
+function queueAllExpensesSync(
+  dailyExpenses: Record<string, DailyExpense[]>,
+  userId: string,
+): void {
+  const all: Array<{ date: string; expense_type: string; value: number }> = []
+  for (const [d, exps] of Object.entries(dailyExpenses)) {
+    for (const exp of exps) {
+      all.push({ date: d, expense_type: exp.expense_type, value: exp.value })
+    }
+  }
+  queueExpensesSync(all, userId)
+}
+
 interface AppState {
   // Auth
   user: { id: string; email: string } | null
@@ -116,8 +133,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           .from('profiles')
           .update({ language: lang })
           .eq('id', user.id)
-      } catch {
-        // Silently fail — language is still saved locally
+      } catch (e) {
+        console.warn('Failed to sync language to Supabase:', e)
       }
     }
   },
@@ -325,18 +342,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     })()
     set(newState)
     // Persist to IndexedDB
-    localDb.saveDailyExpenses(newState.dailyExpenses).catch(() => {})
+    localDb.saveDailyExpenses(newState.dailyExpenses).catch((e) =>
+      console.warn('Failed to persist expenses to IndexedDB:', e)
+    )
 
     // Queue background sync to Supabase
     const { user } = get()
     if (user) {
-      const all: Array<{ date: string; expense_type: string; value: number }> = []
-      for (const [d, exps] of Object.entries(newState.dailyExpenses)) {
-        for (const exp of exps) {
-          all.push({ date: d, expense_type: exp.expense_type, value: exp.value })
-        }
-      }
-      queueExpensesSync(all, user.id)
+      queueAllExpensesSync(newState.dailyExpenses, user.id)
     }
   },
 
@@ -358,18 +371,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     })()
     set(newState)
     // Persist to IndexedDB
-    localDb.saveDailyExpenses(newState.dailyExpenses).catch(() => {})
+    localDb.saveDailyExpenses(newState.dailyExpenses).catch((e) =>
+      console.warn('Failed to persist expenses to IndexedDB:', e)
+    )
 
     // Queue background sync to Supabase
     const { user } = get()
     if (user) {
-      const all: Array<{ date: string; expense_type: string; value: number }> = []
-      for (const [d, exps] of Object.entries(newState.dailyExpenses)) {
-        for (const exp of exps) {
-          all.push({ date: d, expense_type: exp.expense_type, value: exp.value })
-        }
-      }
-      queueExpensesSync(all, user.id)
+      queueAllExpensesSync(newState.dailyExpenses, user.id)
     }
   },
 
@@ -404,8 +413,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           zone: location.zone,
           use_count: fav?.use_count ?? 1,
         })
-      } catch {
-        // Silently fail — local is sufficient
+      } catch (e) {
+        console.warn('Failed to sync favorite to Supabase:', e)
       }
     }
   },
@@ -445,8 +454,8 @@ export const useAppStore = create<AppState>((set, get) => ({
             localDb.saveLocalProfile(updatedProfile)
           }
         }
-      } catch {
-        // Silently fail — local profile is sufficient
+      } catch (e) {
+        console.warn('Failed to fetch profile from Supabase:', e)
       }
     }
 
@@ -495,8 +504,8 @@ export const useAppStore = create<AppState>((set, get) => ({
             await localDb.addFavoriteLocation(fav)
           }
         }
-      } catch {
-        // Fall through to local only
+      } catch (e) {
+        console.warn('Failed to sync favorites from Supabase:', e)
       }
     }
     if (mergedFavorites.length === 0) {
@@ -523,8 +532,8 @@ export const useAppStore = create<AppState>((set, get) => ({
             mergedExpenses[re.date].push(re)
           }
         }
-      } catch {
-        // Fall through to local only
+      } catch (e) {
+        console.warn('Failed to sync expenses from Supabase:', e)
       }
     }
     // Merge local expenses (local-only items preserved, remote wins conflicts)
@@ -545,7 +554,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (Object.keys(mergedExpenses).length > 0) {
       set({ dailyExpenses: mergedExpenses })
       // Save merged back to IndexedDB
-      localDb.saveDailyExpenses(mergedExpenses).catch(() => {})
+      localDb.saveDailyExpenses(mergedExpenses).catch((e) =>
+        console.warn('Failed to save merged expenses to IndexedDB:', e)
+      )
     } else if (Object.keys(localExpenses).length > 0) {
       set({ dailyExpenses: localExpenses })
     }

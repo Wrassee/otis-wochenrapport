@@ -44,23 +44,4 @@ export const ACTIVITY_CODES: ActivityCode[] = [
   { id: 'A07', code: 'A07', category: 'absence', description_de: 'A07 - Kompensation', description_fr: 'A07 - Compensation', description_it: 'A07 - Compensazione', excel_column: 'N', sort_order: 35 },
 ]
 
-/** Required daily hours */
-export const DAILY_REQUIREMENTS = {
-  MON_THU: 8.5,
-  FRI: 8.0,
-} as const
 
-/** Lunch break validation */
-export const LUNCH = {
-  MIN_MINUTES: 30,
-  MAX_MINUTES: 60,
-} as const
-
-/** Week day mapping (JS getDay(): 0=Sunday) */
-export const DAY_MAP: Record<number, string> = {
-  1: 'monday',
-  2: 'tuesday',
-  3: 'wednesday',
-  4: 'thursday',
-  5: 'friday',
-} as const

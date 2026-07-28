@@ -40,8 +40,8 @@ export function syncExpenses(
       userId,
       expenses: all,
       timestamp: Date.now(),
-    }).catch(() => {
-      // Silently fail — local IndexedDB is the source of truth.
+    }).catch((e) => {
+      console.warn('Failed to add expense sync to queue:', e)
     })
   }, ms)
 }

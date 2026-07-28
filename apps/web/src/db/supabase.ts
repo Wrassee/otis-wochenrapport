@@ -95,11 +95,13 @@ export async function getLocations() {
  * Get time entries for a specific week
  */
 export async function getWeekEntries(userId: string, startDate: string, endDate: string) {
+  // Use LEFT join so entries without a location (manual entries, deleted locations)
+  // are still returned — location fields will be null.
   const { data, error } = await supabase
     .from('time_entries')
     .select(`
       *,
-      locations!inner(anlagenummer, project_id, full_address, zone)
+      locations!left(anlagenummer, project_id, full_address, zone)
     `)
     .eq('user_id', userId)
     .gte('date', startDate)

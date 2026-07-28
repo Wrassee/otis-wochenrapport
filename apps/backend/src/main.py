@@ -30,11 +30,10 @@ frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:4173",
-        "https://otis-wochenrapport.vercel.app",
-        "https://otis-wochenrapport.pages.dev",
-        frontend_url,
+        "http://localhost:5173",        # Vite dev server
+        "http://localhost:4173",        # Vite preview / production test
+        "https://otis-wochenrapport.vercel.app",  # Production (Vercel)
+        frontend_url,                   # Custom domain (env var)
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -238,8 +237,10 @@ async def _fetch_entries_from_supabase(user_id: str, year: int, week_number: int
         end_date = friday.strftime("%Y-%m-%d")
 
         # Fetch entries
+        # Use LEFT join so entries without a location (manual entries, deleted locations)
+        # are still returned — location fields will be null.
         response = client.table("time_entries").select(
-            "*, locations!inner(anlagenummer, project_id, full_address, zone)"
+            "*, locations!left(anlagenummer, project_id, full_address, zone)"
         ).eq("user_id", user_id).gte("date", start_date).lte("date", end_date).order("date").order("start_time").execute()
 
         entries = []

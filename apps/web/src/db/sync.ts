@@ -92,7 +92,7 @@ export async function performSync() {
         try {
           await deleteRemoteEntry(item.entryId)
         } catch (e) {
-          // Ignore errors for deletes - entry might not exist on server
+          console.warn('Delete sync failed for', item.entryId, e)
         }
       } else if (item.type === 'location_upsert' && item.locationData) {
         try {
