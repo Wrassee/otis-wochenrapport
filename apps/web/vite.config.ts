@@ -14,7 +14,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'templates/template.xlsx'],
+      includeAssets: ['favicon.svg', 'icons.svg', 'templates/template.xlsx'],
       manifest: {
         name: 'OTIS Wochenrapport',
         short_name: 'OTIS Rapport',
@@ -25,9 +25,8 @@ export default defineConfig({
         orientation: 'portrait',
         start_url: '/',
         icons: [
-          { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: '/favicon.svg', sizes: '192x192', type: 'image/svg+xml' },
+          { src: '/favicon.svg', sizes: '512x512', type: 'image/svg+xml' },
         ],
       },
       workbox: {
