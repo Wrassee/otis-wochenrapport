@@ -172,6 +172,7 @@ export const translations: TranslationDict = {
   'export.email.btn':     { de: 'Wochenrapport per E-Mail senden', fr: 'Envoyer par e-mail', it: 'Invia per email', hu: 'K\u00fcld\u00e9s e-mailben' },
   'export.email.loading': { de: 'Wird gesendet...',   fr: 'Envoi...',           it: 'Invio...',       hu: 'K\u00fcld\u00e9s...' },
   'export.success':       { de: 'Excel erfolgreich exportiert!', fr: 'Excel export\u00e9 avec succ\u00e8s!', it: 'Excel esportato con successo!', hu: 'Excel sikeresen export\u00e1lva!' },
+  'export.download.manual':{ de: 'Download nicht automatisch gestartet? Hier klicken', fr: 'T\u00e9l\u00e9chargement pas automatique? Cliquez ici', it: 'Download non avviato? Clicca qui', hu: 'Nem indul a let\u00f6lt\u00e9s? Kattintson ide' },
   'export.offline.generated': { de: 'Offline generiert (kein Backend)', fr: 'G\u00e9n\u00e9r\u00e9 hors ligne (pas de backend)', it: 'Generato offline (nessun backend)', hu: 'Offline gener\u00e1lva (nincs backend)' },
   'export.email.success': { de: 'Wochenrapport erfolgreich per E-Mail gesendet!', fr: 'Rapport envoy\u00e9 par e-mail!', it: 'Rapporto inviato per email!', hu: 'Wochenrapport sikeresen elk\u00fcldve e-mailben!' },
   'export.failed':        { de: 'Export fehlgeschlagen', fr: '\u00c9chec de l\'export', it: 'Esportazione fallita', hu: 'Export\u00e1l\u00e1s sikertelen' },

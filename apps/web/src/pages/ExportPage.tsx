@@ -16,6 +16,8 @@ export function ExportPage() {
   const [exporting, setExporting] = useState(false)
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
+  const [downloadFilename, setDownloadFilename] = useState<string>('')
 
   useEffect(() => {
     loadWeekEntries()
@@ -65,12 +67,22 @@ export function ExportPage() {
   }
 
   /**
-   * Save a Blob to the device. On mobile, prefers the Web Share API
-   * (share sheet) so the user can decide where to save. Falls back to
-   * a delayed anchor download when share is unavailable or cancelled.
+   * Save a Blob to the device. Tries three methods in order:
+   * 1. Web Share API (mobile, native share sheet with the file)
+   * 2. window.open(blobUrl) (fallback — might work in WebView)
+   * 3. Visible manual download link (ALWAYS works — real user tap)
    */
   const saveBlob = async (blob: Blob, filename: string) => {
-    // On mobile: try Share API first — always triggered by user gesture
+    // Clean up any previous download URL
+    if (downloadUrl) {
+      window.URL.revokeObjectURL(downloadUrl)
+      setDownloadUrl(null)
+    }
+
+    // Create the blob URL (sync, no gesture issues)
+    const url = window.URL.createObjectURL(blob)
+
+    // 1. Try Share API (mobile) — best UX, user chooses where to save
     if (typeof navigator.share !== 'undefined') {
       const file = new File([blob], filename, {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -78,30 +90,24 @@ export function ExportPage() {
       if (!navigator.canShare || navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({ title: `Wochenrapport KW${currentWeek.week}`, files: [file] })
-          return // Share completed successfully
+          // Share completed — user either saved it or sent it
+          setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+          return
         } catch {
-          // User cancelled share or API failed — fall through to anchor
+          // User cancelled share or API failed — fall through
         }
       }
     }
-    // Desktop / WebView fallback
-    downloadViaAnchor(blob, filename)
-  }
 
-  /** Download via hidden anchor + delayed URL cleanup */
-  const downloadViaAnchor = (blob: Blob, filename: string) => {
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.style.display = 'none'
-    document.body.appendChild(a)
-    a.click()
-    // Keep the URL alive for 3s so the browser can start the download
-    setTimeout(() => {
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
-    }, 3000)
+    // 2. Try window.open (might work in some WebViews / desktop)
+    window.open(url, '_blank')
+
+    // 3. ALWAYS provide a visible manual download link.
+    //    The user can tap it — real gesture, always works.
+    //    The blob URL stays alive until the user taps the link
+    //    (10s cleanup in onClick) or a new export replaces it.
+    setDownloadUrl(url)
+    setDownloadFilename(filename)
   }
 
   const triggerDownload = async (blob: Blob, usedOffline: boolean) => {
@@ -286,6 +292,36 @@ export function ExportPage() {
         exporting={exporting}
         sending={sending}
       />
+
+      {/* Manual download link — shown when auto-download fails */}
+      {downloadUrl && (
+        <Card className="!border-amber-200/60 dark:!border-amber-700/40 !bg-amber-50/80 dark:!bg-amber-900/20">
+          <a
+            href={downloadUrl}
+            download={downloadFilename}
+            className="flex items-center gap-3 py-1"
+            onClick={() => {
+              // Revoke after user taps the link
+              setTimeout(() => {
+                window.URL.revokeObjectURL(downloadUrl!)
+                setDownloadUrl(null)
+              }, 10000)
+            }}
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-500/20">
+              <FileSpreadsheet className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                {t('export.download.manual')}
+              </p>
+              <p className="text-[10px] text-amber-600/70 dark:text-amber-400/70 truncate">
+                {downloadFilename}
+              </p>
+            </div>
+          </a>
+        </Card>
+      )}
 
       {/* Info tip */}
       <Card variant="outline">
