@@ -82,24 +82,27 @@ export function ExportPage() {
     // Create the blob URL (sync, no gesture issues)
     const url = window.URL.createObjectURL(blob)
 
-    // 1. Try Share API (mobile) — best UX, user chooses where to save
+    // 1. Try Share API (mobile) — best UX, user chooses where to save.
+    //    Note: canShare() is NOT checked because it can throw on some WebViews.
+    //    We just try navigator.share() directly — if it fails, we fall through.
     if (typeof navigator.share !== 'undefined') {
-      const file = new File([blob], filename, {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      })
-      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({ title: `Wochenrapport KW${currentWeek.week}`, files: [file] })
-          // Share completed — user either saved it or sent it
-          setTimeout(() => window.URL.revokeObjectURL(url), 1000)
-          return
-        } catch {
-          // User cancelled share or API failed — fall through
-        }
+      try {
+        const file = new File([blob], filename, {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+        await navigator.share({
+          title: `Wochenrapport KW${currentWeek.week}`,
+          files: [file],
+        })
+        // Share succeeded — user either saved it or sent it
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+        return
+      } catch {
+        // User cancelled share or API not supported — fall through
       }
     }
 
-    // 2. Try window.open (might work in some WebViews / desktop)
+    // 2. Try window.open — might work in some WebViews or desktop browsers.
     window.open(url, '_blank')
 
     // 3. ALWAYS provide a visible manual download link.
