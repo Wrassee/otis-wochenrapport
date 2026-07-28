@@ -8,6 +8,7 @@
  */
 
 import JSZip from 'jszip'
+import TEMPLATE_BASE64 from './templateBase64'
 
 // ====== CONSTANTS (mirrored from Python excel_generator.py) ======
 
@@ -343,26 +344,24 @@ function fillSpesenrapport(
 /**
  * Generate an OTIS Wochenrapport XLSX entirely in the browser.
  *
- * Fetches the template file (cached by the service worker),
- * fills it with entry data using raw XML manipulation,
- * and returns the file as a Blob.
+ * Uses the template embedded as base64 in the JavaScript bundle,
+ * so no network fetch is required. Works offline and in Capacitor.
  *
  * @param options - Generation options (year, week, entries, etc.)
- * @param templateUrl - URL to the template XLSX (default: /templates/template.xlsx)
  * @returns A Promise resolving to the XLSX Blob
  */
 export async function generateExcelOffline(
   options: OfflineGenerateOptions,
-  templateUrl: string = '/templates/template.xlsx',
 ): Promise<Blob> {
   const { year, week_number, personnel_number, full_name, entries, expenses } = options
 
-  // 1. Fetch the template
-  const response = await fetch(templateUrl)
-  if (!response.ok) {
-    throw new Error(`Template not found: ${templateUrl}`)
+  // 1. Decode the embedded template from base64
+  const templateBinary = atob(TEMPLATE_BASE64)
+  const uint8 = new Uint8Array(templateBinary.length)
+  for (let i = 0; i < templateBinary.length; i++) {
+    uint8[i] = templateBinary.charCodeAt(i)
   }
-  const templateData = await response.arrayBuffer()
+  const templateData = uint8.buffer
 
   // 2. Open as ZIP
   const zip = await JSZip.loadAsync(templateData)
