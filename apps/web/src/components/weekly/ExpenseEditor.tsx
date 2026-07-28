@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import type { DailyExpensesMap, ExpenseType } from '@/lib/types'
+import type { ExpenseType } from '@/lib/types'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Badge } from '@/components/ui/Badge'
-import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/lib/useTranslation'
+import { useDailyExpenses } from '@/hooks/useDailyExpenses'
 import { cn } from '@/lib/cn'
 import { Euro, CheckCircle2 } from 'lucide-react'
 
@@ -15,12 +15,11 @@ interface ExpenseEditorProps {
   onClose: () => void
   date: string
   dayName: string
-  dailyExpenses: DailyExpensesMap
 }
 
-export function ExpenseEditor({ open, onClose, date, dayName, dailyExpenses }: ExpenseEditorProps) {
+export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorProps) {
   const { t } = useTranslation()
-  const { toggleExpense, setExpenseValue } = useAppStore()
+  const { dailyExpenses, toggleExpense, setExpenseValue, refreshFromLocalDB, syncExpenses } = useDailyExpenses([date], { refreshOnMount: false })
   const dayExp = dailyExpenses[date] || []
 
   // Local value buffers for Material (CHF) and Privatfahrzeug (km)
@@ -32,6 +31,13 @@ export function ExpenseEditor({ open, onClose, date, dayName, dailyExpenses }: E
   const [saveStatus, setSaveStatus] = useState<'saved' | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Refresh expenses from IndexedDB each time the sheet opens
+  // — catches changes made on SpesenPage or Dashboard.
+  useEffect(() => {
+    if (!open) return
+    refreshFromLocalDB()
+  }, [open, refreshFromLocalDB])
 
   // Reset local state when the sheet opens or date changes
   // The cleanup function captures the OLD date, so pending values
@@ -61,6 +67,7 @@ export function ExpenseEditor({ open, onClose, date, dayName, dailyExpenses }: E
       }
       setLocalValues({})
       setSaveStatus('saved')
+      syncExpenses()
 
       // Clear the "saved" indicator after a moment
       if (savedTimer.current) clearTimeout(savedTimer.current)
@@ -98,6 +105,7 @@ export function ExpenseEditor({ open, onClose, date, dayName, dailyExpenses }: E
     }
     localValuesRef.current = {}
     setLocalValues({})
+    syncExpenses()
   }
 
   const handleClose = () => {
@@ -108,6 +116,7 @@ export function ExpenseEditor({ open, onClose, date, dayName, dailyExpenses }: E
 
   const handleToggle = (itemType: ExpenseType) => {
     toggleExpense(date, itemType)
+    syncExpenses()
     setSaveStatus(null)
   }
 

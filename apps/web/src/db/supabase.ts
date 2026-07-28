@@ -166,3 +166,112 @@ export async function deleteLocationByAnlagenummer(anlagenummer: string) {
     .eq('anlagenummer', anlagenummer)
   if (error) throw error
 }
+
+/**
+ * Upsert a favorite (recently used) location for the current user.
+ * Uses anlagenummer as the conflict key so each lift keeps one row.
+ */
+export async function upsertFavorite(favorite: {
+  user_id: string
+  anlagenummer: string
+  project_id: string
+  full_address: string
+  latitude: number
+  longitude: number
+  zone: number
+  manual_zone?: number
+  use_count: number
+}) {
+  const { data, error } = await supabase
+    .from('user_favorites')
+    .upsert(favorite, { onConflict: 'user_id,anlagenummer' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get all favorites for a user.
+ */
+export async function getFavorites(userId: string) {
+  const { data, error } = await supabase
+    .from('user_favorites')
+    .select('*')
+    .eq('user_id', userId)
+    .order('last_used', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Delete a favorite by user_id and anlagenummer.
+ */
+export async function deleteFavorite(userId: string, anlagenummer: string) {
+  const { error } = await supabase
+    .from('user_favorites')
+    .delete()
+    .eq('user_id', userId)
+    .eq('anlagenummer', anlagenummer)
+  if (error) throw error
+}
+
+/**
+ * Sync daily expenses to Supabase: delete all for the user's tracked dates,
+ * then insert fresh records. This is a full-replace strategy — simpler than
+ * per-row upserts and avoids stale-data issues.
+ */
+export async function syncExpensesToSupabase(
+  userId: string,
+  expenses: Array<{ date: string; expense_type: string; value: number }>,
+): Promise<void> {
+  if (expenses.length === 0) return
+
+  // Collect all distinct dates involved
+  const dates = [...new Set(expenses.map((e) => e.date))]
+
+  // Delete all existing rows for those dates
+  await supabase
+    .from('daily_expenses')
+    .delete()
+    .eq('user_id', userId)
+    .in('date', dates)
+
+  // Insert fresh rows
+  const rows = expenses.map((e) => ({
+    user_id: userId,
+    date: e.date,
+    expense_type: e.expense_type,
+    value: e.value,
+  }))
+
+  const { error } = await supabase
+    .from('daily_expenses')
+    .insert(rows)
+  if (error) throw error
+}
+
+/**
+ * Get all expenses for a user, optionally filtered by date range.
+ */
+export async function getExpenses(
+  userId: string,
+  startDate?: string,
+  endDate?: string,
+): Promise<Array<{ date: string; expense_type: string; value: number }>> {
+  let query = supabase
+    .from('daily_expenses')
+    .select('date, expense_type, value')
+    .eq('user_id', userId)
+
+  if (startDate) {
+    query = query.gte('date', startDate)
+  }
+  if (endDate) {
+    query = query.lte('date', endDate)
+  }
+
+  const { data, error } = await query.order('date')
+  if (error) throw error
+  return data || []
+}

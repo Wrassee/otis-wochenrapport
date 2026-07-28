@@ -1,5 +1,5 @@
 import { getUnsyncedEntries, markEntrySynced, getSyncQueue, clearSyncQueue } from './indexeddb'
-import { syncEntries, deleteEntry as deleteRemoteEntry, upsertLocation, deleteLocationByAnlagenummer } from './supabase'
+import { syncEntries, deleteEntry as deleteRemoteEntry, upsertLocation, deleteLocationByAnlagenummer, syncExpensesToSupabase } from './supabase'
 
 let syncInterval: ReturnType<typeof setInterval> | null = null
 let isSyncing = false
@@ -105,6 +105,12 @@ export async function performSync() {
           await deleteLocationByAnlagenummer(item.locationDeleteAnlagenummer)
         } catch (e) {
           console.warn('Location delete sync failed for', item.locationDeleteAnlagenummer, e)
+        }
+      } else if (item.type === 'expenses_sync' && item.expenses && item.userId) {
+        try {
+          await syncExpensesToSupabase(item.userId, item.expenses)
+        } catch (e) {
+          console.warn('Expenses sync to Supabase failed:', e)
         }
       }
     }

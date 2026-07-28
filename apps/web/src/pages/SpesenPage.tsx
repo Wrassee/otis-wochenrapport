@@ -1,8 +1,8 @@
-import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/lib/useTranslation'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/cn'
+import { useDailyExpenses } from '@/hooks/useDailyExpenses'
 import { getWeekDates, getToday, getWeekInfo } from '@/lib/utils'
 import { Euro, Check, X } from 'lucide-react'
 
@@ -18,12 +18,13 @@ const EXPENSE_ITEMS = [
 
 export function SpesenPage() {
   const { t } = useTranslation()
-  const { dailyExpenses, toggleExpense, setExpenseValue } = useAppStore()
 
   const today = getToday()
   const weekInfo = getWeekInfo(today)
   const dates = getWeekDates(weekInfo.year, weekInfo.week)
   const dayNames = t('week.days').split(' | ')
+
+  const { dailyExpenses, toggleExpense, setExpenseValue, syncExpenses } = useDailyExpenses(dates)
 
   const totalActive = Object.values(dailyExpenses).reduce((sum, exps) => sum + exps.length, 0)
 
@@ -92,11 +93,24 @@ export function SpesenPage() {
                 const exp = dayExp.find((e) => e.expense_type === item.type)
                 const isActive = !!exp
 
+                const handleToggle = () => {
+                  toggleExpense(date, item.type)
+                  syncExpenses()
+                }
+
+                const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+                  const val = item.valueUnit === 'CHF'
+                    ? parseFloat(e.target.value) || 0
+                    : parseInt(e.target.value) || 0
+                  setExpenseValue(date, item.type, Math.max(0, val))
+                  syncExpenses()
+                }
+
                 return (
                   <div key={item.type} className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => toggleExpense(date, item.type)}
+                      onClick={handleToggle}
                       className={cn(
                         'flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-sm font-medium transition-all duration-150 border min-h-[48px]',
                         'flex-1 text-left',
@@ -122,12 +136,7 @@ export function SpesenPage() {
                           min="0"
                           step={item.valueUnit === 'CHF' ? '0.50' : '1'}
                           value={exp?.value ?? (item.valueUnit === 'km' ? 10 : 0)}
-                          onChange={(e) => {
-                            const val = item.valueUnit === 'CHF'
-                              ? parseFloat(e.target.value) || 0
-                              : parseInt(e.target.value) || 0
-                            setExpenseValue(date, item.type, Math.max(0, val))
-                          }}
+                          onChange={handleValueChange}
                           className="w-full h-[48px] px-3 rounded-xl text-sm glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none text-center font-mono"
                           placeholder={item.valueUnit === 'CHF' ? '0.00' : '0'}
                         />

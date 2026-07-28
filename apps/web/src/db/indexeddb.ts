@@ -335,6 +335,23 @@ export async function clearSyncQueue(): Promise<void> {
   await db.clear('sync_queue')
 }
 
+/**
+ * Add an arbitrary item to the sync queue.
+ * Used by the standalone syncExpenses lib to queue expense-sync operations.
+ */
+export async function addToSyncQueue(item: {
+  type: string
+  userId?: string
+  entryId?: string
+  expenses?: Array<{ date: string; expense_type: string; value: number }>
+  locationData?: any
+  locationDeleteAnlagenummer?: string
+  timestamp: number
+}): Promise<void> {
+  const db = await getDb()
+  await db.add('sync_queue', item)
+}
+
 export async function getUnsyncedEntries(): Promise<TimeEntry[]> {
   const db = await getDb()
   const all = await db.getAll('time_entries')

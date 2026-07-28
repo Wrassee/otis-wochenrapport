@@ -11,20 +11,16 @@ import { useTranslation } from '@/lib/useTranslation'
 import type { TimeEntry, ActivityCode } from '@/lib/types'
 import { decimalToTime, timeToDecimal, otisToStandard, formatOtisDuration, snapToQuarter } from '@/lib/utils'
 import { Save, Building2, ChevronDown } from 'lucide-react'
+import { useTimeEntries } from '@/hooks/useTimeEntries'
 
 export function WeeklyPage() {
   const { t } = useTranslation()
   const {
     currentWeek,
     setCurrentWeek,
-    weekSummary,
-    loadWeekEntries,
-    calculateWeekSummary,
-    deleteTimeEntry,
-    updateTimeEntry,
     activityCodes,
-    isLoading,
   } = useAppStore()
+  const { timeEntries, weekSummary, isLoading, updateEntry, deleteEntry, loadWeek, recalculate } = useTimeEntries()
 
   // Edit state
   const [editEntry, setEditEntry] = useState<TimeEntry | null>(null)
@@ -35,12 +31,12 @@ export function WeeklyPage() {
   const [editIsSaving, setEditIsSaving] = useState(false)
 
   useEffect(() => {
-    loadWeekEntries()
+    loadWeek()
   }, [currentWeek])
 
   useEffect(() => {
-    calculateWeekSummary()
-  }, [useAppStore.getState().timeEntries])
+    recalculate()
+  }, [timeEntries, recalculate])
 
   const handlePrevWeek = () => {
     let { year, week } = currentWeek
@@ -66,8 +62,8 @@ export function WeeklyPage() {
 
   const handleDeleteEntry = async (entryId: string) => {
     if (window.confirm(t('timeline.confirm.delete'))) {
-      await deleteTimeEntry(entryId)
-      await loadWeekEntries()
+      await deleteEntry(entryId)
+      await loadWeek()
     }
   }
 
@@ -93,8 +89,8 @@ export function WeeklyPage() {
         activity_code: editActivityCode?.code || editEntry.activity_code,
         activity_code_id: editActivityCode?.id || editEntry.activity_code_id,
       }
-      await updateTimeEntry(updatedEntry)
-      await loadWeekEntries()
+      await updateEntry(updatedEntry)
+      await loadWeek()
       setEditEntry(null)
     } catch (err) {
       console.warn('Failed to update entry:', err)

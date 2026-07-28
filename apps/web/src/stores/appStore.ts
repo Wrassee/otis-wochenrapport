@@ -5,7 +5,8 @@ import { getToday, getWeekDates, getWeekInfo, haversineDistance, calculateZone, 
 import { REFERENCE_LAT, REFERENCE_LON, ACTIVITY_CODES } from '@/lib/constants'
 import type { Language } from '@/lib/translations'
 import { DAY_NAMES } from '@/lib/translations'
-import { supabase } from '@/db/supabase'
+import { supabase, upsertFavorite, getFavorites, syncExpensesToSupabase, getExpenses } from '@/db/supabase'
+import { syncExpenses as queueExpensesSync } from '@/lib/syncExpenses'
 
 interface AppState {
   // Auth
@@ -325,6 +326,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     set(newState)
     // Persist to IndexedDB
     localDb.saveDailyExpenses(newState.dailyExpenses).catch(() => {})
+
+    // Queue background sync to Supabase
+    const { user } = get()
+    if (user) {
+      const all: Array<{ date: string; expense_type: string; value: number }> = []
+      for (const [d, exps] of Object.entries(newState.dailyExpenses)) {
+        for (const exp of exps) {
+          all.push({ date: d, expense_type: exp.expense_type, value: exp.value })
+        }
+      }
+      queueExpensesSync(all, user.id)
+    }
   },
 
   setExpenseValue: (date, expenseType, value) => {
@@ -346,6 +359,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     set(newState)
     // Persist to IndexedDB
     localDb.saveDailyExpenses(newState.dailyExpenses).catch(() => {})
+
+    // Queue background sync to Supabase
+    const { user } = get()
+    if (user) {
+      const all: Array<{ date: string; expense_type: string; value: number }> = []
+      for (const [d, exps] of Object.entries(newState.dailyExpenses)) {
+        for (const exp of exps) {
+          all.push({ date: d, expense_type: exp.expense_type, value: exp.value })
+        }
+      }
+      queueExpensesSync(all, user.id)
+    }
   },
 
   searchLocations: async (query) => {
@@ -363,6 +388,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
     const favorites = await localDb.getFavoriteLocations()
     set({ favoriteLocations: favorites.slice(0, 5) })
+
+    // Also sync to Supabase if online
+    const { user } = get()
+    if (user && navigator.onLine) {
+      try {
+        const fav = favorites.find((f) => f.anlagenummer === location.anlagenummer)
+        await upsertFavorite({
+          user_id: user.id,
+          anlagenummer: location.anlagenummer,
+          project_id: location.project_id,
+          full_address: location.full_address,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          zone: location.zone,
+          use_count: fav?.use_count ?? 1,
+        })
+      } catch {
+        // Silently fail — local is sufficient
+      }
+    }
   },
 
   initialize: async (userId) => {
@@ -409,17 +454,101 @@ export const useAppStore = create<AppState>((set, get) => ({
     const locations = await localDb.getAllLocations()
     if (locations.length > 0) set({ locations })
 
-    // Load favorites
-    const favorites = await localDb.getFavoriteLocations()
-    set({ favoriteLocations: favorites.slice(0, 5) })
+    // Load favorites — try Supabase first, then local
+    let mergedFavorites: FavoriteLocation[] = []
+    if (navigator.onLine) {
+      try {
+        const remoteFavorites = await getFavorites(userId)
+        if (remoteFavorites.length > 0) {
+          const localFavorites = await localDb.getFavoriteLocations()
+          // Merge: remote wins, but keep local-only and preserve use_count
+          const seen = new Set<string>()
+          const merged: FavoriteLocation[] = []
+          // Remote first
+          for (const rf of remoteFavorites) {
+            seen.add(rf.anlagenummer.toUpperCase())
+            merged.push({
+              id: rf.id || `fav_${rf.anlagenummer}`,
+              user_id: rf.user_id,
+              anlagenummer: rf.anlagenummer,
+              project_id: rf.project_id || '',
+              full_address: rf.full_address || '',
+              latitude: rf.latitude || 0,
+              longitude: rf.longitude || 0,
+              zone: rf.zone || 0,
+              manual_zone: rf.manual_zone,
+              use_count: Math.max(rf.use_count || 1, 1),
+              last_used: rf.last_used,
+              created_at: rf.created_at,
+              updated_at: rf.updated_at,
+            })
+          }
+          // Local-only items
+          for (const lf of localFavorites) {
+            if (!seen.has(lf.anlagenummer.toUpperCase())) {
+              merged.push(lf)
+            }
+          }
+          mergedFavorites = merged
+          // Sync merged favorites back to local DB
+          for (const fav of merged) {
+            await localDb.addFavoriteLocation(fav)
+          }
+        }
+      } catch {
+        // Fall through to local only
+      }
+    }
+    if (mergedFavorites.length === 0) {
+      const localFavorites = await localDb.getFavoriteLocations()
+      mergedFavorites = localFavorites
+    }
+    set({ favoriteLocations: mergedFavorites.slice(0, 5) })
 
     // Load activity codes
     const codes = await localDb.getActivityCodes()
     if (codes.length > 0) set({ activityCodes: codes })
 
-    // Load saved daily expenses
-    const savedExpenses = await localDb.getDailyExpenses()
-    if (Object.keys(savedExpenses).length > 0) set({ dailyExpenses: savedExpenses })
+    // Load saved daily expenses — try Supabase first for a full view, merge with local
+    let mergedExpenses: Record<string, any[]> = {}
+    if (navigator.onLine) {
+      try {
+        const { currentWeek } = get()
+        const dates = getWeekDates(currentWeek.year, currentWeek.week)
+        const remoteExpenses = await getExpenses(userId, dates[0], dates[4])
+        if (remoteExpenses.length > 0) {
+          // Group by date
+          for (const re of remoteExpenses) {
+            if (!mergedExpenses[re.date]) mergedExpenses[re.date] = []
+            mergedExpenses[re.date].push(re)
+          }
+        }
+      } catch {
+        // Fall through to local only
+      }
+    }
+    // Merge local expenses (local-only items preserved, remote wins conflicts)
+    const localExpenses = await localDb.getDailyExpenses()
+    for (const [date, exps] of Object.entries(localExpenses)) {
+      if (!mergedExpenses[date]) {
+        mergedExpenses[date] = exps
+      } else {
+        // Merge local-only expense types for this date
+        const remoteTypes = new Set(mergedExpenses[date].map((e) => e.expense_type))
+        for (const exp of exps) {
+          if (!remoteTypes.has(exp.expense_type)) {
+            mergedExpenses[date].push(exp)
+          }
+        }
+      }
+    }
+    if (Object.keys(mergedExpenses).length > 0) {
+      set({ dailyExpenses: mergedExpenses })
+      // Save merged back to IndexedDB
+      localDb.saveDailyExpenses(mergedExpenses).catch(() => {})
+    } else if (Object.keys(localExpenses).length > 0) {
+      set({ dailyExpenses: localExpenses })
+    }
 
     // Load week entries
     await get().loadWeekEntries()

@@ -17,7 +17,8 @@ export type TranslationDict = Record<string, Record<Language, string>>
 /** All user-facing text, organized by component section. */
 export const translations: TranslationDict = {
   // ─── App shell / navigation ───
-  'nav.dashboard':        { de: 'Dashboard',        fr: 'Tableau de bord',    it: 'Dashboard',     hu: 'Irányítópult' },
+  'nav.dashboard':        { de: 'Erfassung',        fr: 'Tableau de bord',    it: 'Registrazione',  hu: 'Rögzítés' },
+  'nav.spesen':           { de: 'Spesen',            fr: 'Frais',              it: 'Spese',          hu: 'Költségek' },
   'nav.week':             { de: 'Woche',             fr: 'Semaine',            it: 'Settimana',      hu: 'Hét' },
   'nav.export':           { de: 'Export',            fr: 'Exporter',           it: 'Esporta',        hu: 'Exportálás' },
   'nav.settings':         { de: 'Einstellungen',     fr: 'Paramètres',         it: 'Impostazioni',   hu: 'Beállítások' },

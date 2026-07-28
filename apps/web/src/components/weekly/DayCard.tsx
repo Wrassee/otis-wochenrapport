@@ -132,7 +132,7 @@ export function DayCard({ day, onDeleteEntry, onEditEntry, onOpenExpenses, expen
         {/* Entries timeline */}
         {day.entries.length > 0 && (
           <div className="mt-3">
-            <div className="bg-white/40 dark:bg-white/[0.02] rounded-xl border border-otis-100/20 dark:border-white/5">
+            <div className="bg-white/40 dark:bg-otis-900/30 rounded-xl border border-otis-100/20 dark:border-otis-700/30">
               <TimelineView
                 entries={day.entries}
                 onEditEntry={onEditEntry}

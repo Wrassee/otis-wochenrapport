@@ -90,6 +90,8 @@ export interface WeekSummary {
 }
 
 export interface FavoriteLocation {
+  id?: string
+  user_id?: string
   anlagenummer: string
   project_id: string
   full_address: string
@@ -100,6 +102,8 @@ export interface FavoriteLocation {
   manual_zone?: number
   last_used: string
   use_count: number
+  created_at?: string
+  updated_at?: string
 }
 
 /** Expense types available in the Spesenrapport */

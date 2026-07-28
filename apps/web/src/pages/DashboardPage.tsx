@@ -11,33 +11,40 @@ import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/lib/useTranslation'
 import type { TimeEntry } from '@/lib/types'
 import { getWeekInfo, decimalToTime, timeToDecimal, formatOtisDuration, otisToStandard, snapToQuarter } from '@/lib/utils'
-import { Clock, ChevronLeft, ChevronRight, CheckCircle2, UtensilsCrossed, Building2, Save } from 'lucide-react'
+import { Clock, ChevronLeft, ChevronRight, CheckCircle2, UtensilsCrossed, Building2, Save, Euro, Wifi, WifiOff, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { TimelineView } from '@/components/ui/TimelineView'
+import { useExpensesSync } from '@/hooks/useExpensesSync'
+import { useTimeEntries } from '@/hooks/useTimeEntries'
+import { ExpenseEditor } from '@/components/weekly/ExpenseEditor'
 
 export function DashboardPage() {
   const { t } = useTranslation()
   const {
     currentDate,
     setCurrentDate,
-    timeEntries,
-    addTimeEntry,
-    updateTimeEntry,
-    deleteTimeEntry,
-    quickAddDuration,
-    loadWeekEntries,
+    syncStatus,
+    setSyncStatus,
   } = useAppStore()
+  const { timeEntries, addEntry, updateEntry, deleteEntry, quickAdd, loadWeek } = useTimeEntries()
+  const handleSync = async () => {
+    const { forceSync } = await import('@/db/sync')
+    setSyncStatus({ syncing: true })
+    await forceSync()
+  }
   const [editEntry, setEditEntry] = useState<TimeEntry | null>(null)
   const [editStart, setEditStart] = useState('')
   const [editDuration, setEditDuration] = useState('')
   const [editIsSaving, setEditIsSaving] = useState(false)
   const [conflictEntryIds, setConflictEntryIds] = useState<string[]>([])
+  const [showExpenseEditor, setShowExpenseEditor] = useState(false)
+  const syncExpensesOnClose = useExpensesSync()
 
   useEffect(() => {
-    loadWeekEntries()
+    loadWeek()
     // Reset conflict highlights when day changes
     setConflictEntryIds([])
-  }, [currentDate, loadWeekEntries])
+  }, [currentDate, loadWeek])
 
   const todayEntries = useMemo(
     () => timeEntries
@@ -72,19 +79,19 @@ export function DashboardPage() {
   }
 
   const handleSaveEntry = async (entry: any) => {
-    await addTimeEntry(entry)
-    await loadWeekEntries()
+    await addEntry(entry)
+    await loadWeek()
   }
 
   const handleQuickAdd = async (entry: any, extraHours: number) => {
-    await quickAddDuration(entry, extraHours)
-    await loadWeekEntries()
+    await quickAdd(entry, extraHours)
+    await loadWeek()
   }
 
   const handleDeleteEntry = async (entryId: string) => {
     if (window.confirm('Diesen Eintrag wirklich löschen?')) {
-      await deleteTimeEntry(entryId)
-      await loadWeekEntries()
+      await deleteEntry(entryId)
+      await loadWeek()
     }
   }
 
@@ -106,8 +113,8 @@ export function DashboardPage() {
         start_time: start,
         duration: standardDur,
       }
-      await updateTimeEntry(updatedEntry)
-      await loadWeekEntries()
+      await updateEntry(updatedEntry)
+      await loadWeek()
       setEditEntry(null)
     } catch (err) {
       console.warn('Failed to update entry:', err)
@@ -122,6 +129,55 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4">
+      {/* Sync status card */}
+      <Card>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className={cn(
+              'w-9 h-9 rounded-xl flex items-center justify-center shadow-lg',
+              syncStatus.online
+                ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/20'
+                : 'bg-gradient-to-br from-red-400 to-red-600 shadow-red-500/20'
+            )}>
+              {syncStatus.online
+                ? <Wifi className="w-4 h-4 text-white" />
+                : <WifiOff className="w-4 h-4 text-white" />
+              }
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className={cn(
+                  'text-xs font-bold',
+                  syncStatus.online ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'
+                )}>
+                  {syncStatus.online ? t('settings.online') : t('settings.offline')}
+                </span>
+                {syncStatus.lastSync && (
+                  <span className="text-[10px] text-gray-400">
+                    {new Date(syncStatus.lastSync).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] text-gray-400">
+                {syncStatus.pendingSync > 0
+                  ? t('settings.pending.count', { n: syncStatus.pendingSync })
+                  : t('settings.pending.none')
+                }
+              </span>
+            </div>
+          </div>
+          <Button
+            onClick={handleSync}
+            variant="primary"
+            size="sm"
+            disabled={syncStatus.syncing}
+          >
+            <RefreshCw className={cn('w-3.5 h-3.5', syncStatus.syncing && 'animate-spin')} />
+            {syncStatus.syncing ? t('settings.syncing') : t('settings.sync.now')}
+          </Button>
+        </div>
+      </Card>
+
       {/* Day navigation */}
       <Card>
         <div className="flex items-center justify-between">
@@ -201,6 +257,21 @@ export function DashboardPage() {
           </div>
         )}
 
+        {/* Spesen quick button */}
+        <button
+          type="button"
+          onClick={() => setShowExpenseEditor(true)}
+          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border transition-all duration-150 mt-3 bg-white/50 dark:bg-white/5 border-amber-200/30 dark:border-amber-700/20 hover:border-amber-300/50 hover:bg-amber-50/30 dark:hover:bg-amber-900/10"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
+              <Euro className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('entry.spesen')}</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-gray-400" />
+        </button>
+
         <div className="flex items-center justify-between mt-2">
           <span className="text-xs text-gray-400">{t('dashboard.entries', { count: todayEntries.length })}</span>
           {lunchEntries.length > 0 && (
@@ -217,7 +288,7 @@ export function DashboardPage() {
             <span>{t('dashboard.today')}</span>
             <div className="flex-1 h-px bg-gradient-to-r from-otis-200/50 to-transparent dark:from-white/5" />
           </div>
-          <div className="bg-white/40 dark:bg-white/[0.02] rounded-2xl border border-otis-100/20 dark:border-white/5">
+          <div className="bg-white/40 dark:bg-otis-900/30 rounded-2xl border border-otis-100/20 dark:border-otis-700/30">
             <TimelineView
               entries={todayEntries}
               onEditEntry={handleEditEntry}
@@ -311,6 +382,19 @@ export function DashboardPage() {
           </div>
         )}
       </BottomSheet>
+
+      {/* Spesen ExpenseEditor */}
+      {showExpenseEditor && (
+        <ExpenseEditor
+          open={showExpenseEditor}
+          onClose={() => {
+            syncExpensesOnClose()
+            setShowExpenseEditor(false)
+          }}
+          date={currentDate}
+          dayName={dayName}
+        />
+      )}
 
       {/* Time Entry Form */}
       <TimeEntryForm

@@ -22,9 +22,9 @@ for (let i = 1; i <= 96; i++) {
   if (standard >= 1) {
     const h = Math.floor(standard)
     const m = Math.round((standard - h) * 60)
-    DURATION_OPTIONS.push({ otis, standard, display: `${otis} (${h}h${m > 0 ? ` ${m}min` : ''})` })
+    DURATION_OPTIONS.push({ otis, standard, display: `${h}h${m > 0 ? ` ${Math.round(m)}min` : ''}` })
   } else {
-    DURATION_OPTIONS.push({ otis, standard, display: `${otis} (${Math.round(standard * 60)}min)` })
+    DURATION_OPTIONS.push({ otis, standard, display: `${Math.round(standard * 60)}min` })
   }
 }
 

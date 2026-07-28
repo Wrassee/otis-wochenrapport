@@ -3,26 +3,28 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/cn'
 import { Calendar, Clock, FileSpreadsheet, Settings, Wifi, WifiOff, RefreshCw, Euro } from 'lucide-react'
 import { useAppStore } from '@/stores/appStore'
+import { useTranslation } from '@/lib/useTranslation'
 
 interface AppShellProps {
   children: ReactNode
 }
 
 const navItems = [
-  { path: '/dashboard', label: 'Erfassung', icon: Clock },
-  { path: '/spesen', label: 'Spesen', icon: Euro },
-  { path: '/weekly', label: 'Woche', icon: Calendar },
-  { path: '/export', label: 'Export', icon: FileSpreadsheet },
-  { path: '/settings', label: 'Einstellungen', icon: Settings },
+  { path: '/dashboard', key: 'nav.dashboard', icon: Clock },
+  { path: '/spesen', key: 'nav.spesen', icon: Euro },
+  { path: '/weekly', key: 'nav.week', icon: Calendar },
+  { path: '/export', key: 'nav.export', icon: FileSpreadsheet },
+  { path: '/settings', key: 'nav.settings', icon: Settings },
 ]
 
 export function AppShell({ children }: AppShellProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const syncStatus = useAppStore((s) => s.syncStatus)
 
   return (
-    <div className="flex flex-col min-h-screen bg-otis-ambient dark:bg-otis-ambient-dark selection:bg-otis-200 selection:text-white">
+    <div className="flex flex-col min-h-screen overflow-x-hidden bg-otis-ambient dark:bg-otis-ambient-dark selection:bg-otis-200 selection:text-white">
       {/* Ambient decorative orbs */}
       <div className="fixed top-0 right-0 w-[300px] h-[300px] orb orb-blue dark:opacity-30 -translate-y-1/2 translate-x-1/4 pointer-events-none" />
       <div className="fixed top-1/3 left-0 w-[200px] h-[200px] orb orb-cyan dark:opacity-20 -translate-x-1/3 pointer-events-none" />
@@ -39,7 +41,7 @@ export function AppShell({ children }: AppShellProps) {
               </div>
               <div>
                 <span className="text-sm font-bold text-otis-800 dark:text-white tracking-tight">OTIS</span>
-                <span className="text-[10px] text-otis-400 dark:text-otis-300 ml-1.5 font-medium">Wochenrapport</span>
+                <span className="text-[10px] text-otis-400 dark:text-otis-300 ml-1.5 font-medium">{t('app.name')}</span>
               </div>
             </div>
           </div>
@@ -109,7 +111,7 @@ export function AppShell({ children }: AppShellProps) {
                       : 'text-gray-400 dark:text-gray-500'
                   )}
                 >
-                  {item.label}
+                  {t(item.key)}
                 </span>
               </button>
             )

@@ -17,7 +17,7 @@ import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 
 export function SettingsPage() {
   const { t } = useTranslation()
-  const { profile, setProfile, user, syncStatus, setSyncStatus, language } = useAppStore()
+  const { profile, setProfile, user, setUser, syncStatus, setSyncStatus, language } = useAppStore()
   const navigate = useNavigate()
   const [notificationEnabled, setNotificationEnabled] = useState(false)
   const [notificationLoading, setNotificationLoading] = useState(false)
@@ -50,6 +50,7 @@ export function SettingsPage() {
 
   const handleLogout = async () => {
     await signOut()
+    setUser(null)
     setProfile(null)
     navigate('/login')
   }

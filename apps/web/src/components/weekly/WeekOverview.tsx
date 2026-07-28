@@ -137,7 +137,6 @@ export function WeekOverview({ weekSummary, onPrevWeek, onNextWeek, onDeleteEntr
           onClose={() => setExpenseEditor(null)}
           date={expenseEditor.date}
           dayName={expenseEditor.dayName}
-          dailyExpenses={dailyExpenses}
         />
       )}
     </div>
