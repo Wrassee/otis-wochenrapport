@@ -9,6 +9,8 @@ import { cn } from '@/lib/cn'
 import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
 import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
+import { Filesystem, Directory } from '@capacitor/filesystem'
+import { Share as CapacitorShare } from '@capacitor/share'
 
 export function ExportPage() {
   const { t } = useTranslation()
@@ -66,11 +68,22 @@ export function ExportPage() {
     return all
   }
 
+  /** Convert a Blob to a base64 string (sans data: prefix) */
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  }
+
   /**
    * Save a Blob to the device. Tries methods in order:
-   * 1. Web Share API (mobile — best UX)
-   * 2. window.open(blobUrl) (desktop fallback)
-   * 3. Visible manual download link (ultimate fallback)
+   * 1. Capacitor native (APK) — Filesystem.writeFile + CapacitorShare.share
+   * 2. Web Share API (mobile browser)
+   * 3. window.open(blobUrl) (desktop fallback)
+   * 4. Visible manual download link (ultimate fallback)
    */
   const saveBlob = async (blob: Blob, filename: string) => {
     // Clean up any previous download URL
@@ -82,7 +95,30 @@ export function ExportPage() {
     // Create the blob URL (sync, no gesture issues)
     const url = window.URL.createObjectURL(blob)
 
-    // 1. Try Web Share API (mobile) — best UX on modern browsers
+    // 1. Try Capacitor native (APK) — most reliable on mobile
+    const isCapacitor = (window as any).Capacitor?.isNative
+    if (isCapacitor) {
+      try {
+        const base64 = await blobToBase64(blob)
+        const saved = await Filesystem.writeFile({
+          path: filename,
+          data: base64,
+          directory: Directory.Cache,
+        })
+        await CapacitorShare.share({
+          title: `Wochenrapport KW${currentWeek.week}`,
+          text: `Wochenrapport KW${currentWeek.week} — ${filename}`,
+          url: saved.uri,
+          files: [saved.uri],
+        })
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+        return
+      } catch (capErr) {
+        console.warn('[Export] Capacitor native save failed, falling back:', capErr)
+      }
+    }
+
+    // 2. Try Web Share API (mobile) — best UX on modern browsers
     if (typeof navigator.share !== 'undefined') {
       try {
         const file = new File([blob], filename, {
@@ -99,10 +135,10 @@ export function ExportPage() {
       }
     }
 
-    // 2. Try window.open — might work in some WebViews / desktop
+    // 3. Try window.open — might work in some WebViews / desktop
     window.open(url, '_blank')
 
-    // 3. ALWAYS provide a visible manual download link.
+    // 4. ALWAYS provide a visible manual download link.
     setDownloadUrl(url)
     setDownloadFilename(filename)
   }
@@ -164,11 +200,9 @@ export function ExportPage() {
         usedOffline = true
       }
 
-      await triggerDownload(blob, usedOffline)
-    } catch (err: any) {
+      await triggerDownload(blob, usedOffline)      } catch (err: any) {
       const msg = err?.message || t('export.failed')
       console.error('[Export] FATAL:', err)
-      window.alert(`Export Error: ${msg}`)
       setStatus(`${t('common.error')}: ${msg}`)
     } finally {
       setExporting(false)
