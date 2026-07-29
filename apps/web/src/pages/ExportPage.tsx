@@ -130,6 +130,7 @@ export function ExportPage() {
   }
 
   const handleExport = async () => {
+    window.alert('DEBUG: handleExport called!')
     dbg('=== Export gestartet ===')
     setExporting(true)
     setStatus(null)
