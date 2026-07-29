@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn'
 import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
 import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
+import { Filesystem, Directory } from '@capacitor/filesystem'
 
 export function ExportPage() {
   const { t } = useTranslation()
@@ -74,9 +75,19 @@ export function ExportPage() {
     return all
   }
 
+  /** Convert a Blob to a base64 string (without the data: prefix) */
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  }
+
   /**
    * Save a Blob to the device.
-   * Tries: Web Share API → window.open → manual <a download> link
+   * Tries: Capacitor Filesystem → Web Share API → manual <a download> link
    */
   const saveBlob = async (blob: Blob, filename: string) => {
     dbg('saveBlob: starting...')
@@ -85,10 +96,28 @@ export function ExportPage() {
       setDownloadUrl(null)
     }
 
+    // 1. Try Capacitor Filesystem — write blob directly to Cache directory
+    const isCapacitor = (window as any).Capacitor?.isNative
+    if (isCapacitor) {
+      try {
+        dbg('saveBlob: Capacitor native, writing file...')
+        const base64 = await blobToBase64(blob)
+        const saved = await Filesystem.writeFile({
+          path: filename,
+          data: base64,
+          directory: Directory.Documents,
+        })
+        dbg(`saveBlob: file saved: ${saved.uri}`)
+        return
+      } catch (capErr: any) {
+        dbg(`saveBlob: Capacitor write failed: ${capErr?.message || 'unknown'}`)
+      }
+    }
+
     const url = window.URL.createObjectURL(blob)
     dbg('saveBlob: blob URL created')
 
-    // 1. Web Share API
+    // 2. Web Share API (fallback for web)
     if (typeof navigator.share !== 'undefined') {
       try {
         dbg('saveBlob: trying Web Share API...')
@@ -109,10 +138,6 @@ export function ExportPage() {
       dbg('saveBlob: navigator.share NOT available')
     }
 
-    // 2. window.open
-    dbg('saveBlob: trying window.open...')
-    window.open(url, '_blank')
-
     // 3. Manual download link
     dbg('saveBlob: setting manual download link')
     setDownloadUrl(url)
@@ -130,7 +155,6 @@ export function ExportPage() {
   }
 
   const handleExport = async () => {
-    window.alert('DEBUG: handleExport called!')
     dbg('=== Export gestartet ===')
     setExporting(true)
     setStatus(null)
