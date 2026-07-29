@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn'
 import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
 import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
-import { Filesystem, Directory } from '@capacitor/filesystem'
+
 
 export function ExportPage() {
   const { t } = useTranslation()
@@ -75,16 +75,6 @@ export function ExportPage() {
     return all
   }
 
-  /** Convert a Blob to a base64 string (without the data: prefix) */
-  const blobToBase64 = (blob: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve((reader.result as string).split(',')[1])
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
-    })
-  }
-
   /**
    * Save a Blob to the device.
    * Tries: Capacitor Filesystem → Web Share API → manual <a download> link
@@ -96,28 +86,25 @@ export function ExportPage() {
       setDownloadUrl(null)
     }
 
-    // 1. Try Capacitor Filesystem — write blob directly to Cache directory
-    const isCapacitor = (window as any).Capacitor?.isNative
-    if (isCapacitor) {
-      try {
-        dbg('saveBlob: Capacitor native, writing file...')
-        const base64 = await blobToBase64(blob)
-        const saved = await Filesystem.writeFile({
-          path: filename,
-          data: base64,
-          directory: Directory.Documents,
-        })
-        dbg(`saveBlob: file saved: ${saved.uri}`)
-        return
-      } catch (capErr: any) {
-        dbg(`saveBlob: Capacitor write failed: ${capErr?.message || 'unknown'}`)
-      }
-    }
-
     const url = window.URL.createObjectURL(blob)
     dbg('saveBlob: blob URL created')
 
-    // 2. Web Share API (fallback for web)
+    // 1. Programmatic <a download> click — works in Capacitor WebView
+    try {
+      dbg('saveBlob: programmatic download...')
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      dbg('saveBlob: download triggered')
+    } catch (dlErr: any) {
+      dbg(`saveBlob: programmatic download failed: ${dlErr?.message || 'unknown'}`)
+    }
+
+    // 2. Web Share API (web fallback)
     if (typeof navigator.share !== 'undefined') {
       try {
         dbg('saveBlob: trying Web Share API...')
@@ -138,8 +125,8 @@ export function ExportPage() {
       dbg('saveBlob: navigator.share NOT available')
     }
 
-    // 3. Manual download link
-    dbg('saveBlob: setting manual download link')
+    // 3. Manual download link (always shown as fallback)
+    dbg('saveBlob: setting visible download link')
     setDownloadUrl(url)
     setDownloadFilename(filename)
     dbg('saveBlob: done')
