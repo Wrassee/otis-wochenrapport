@@ -57,7 +57,6 @@ export function ExportPage() {
   const [downloadFilename, setDownloadFilename] = useState<string>('')
   const [debugLog, setDebugLog] = useState<string[]>([])
   const debugRef = useRef<HTMLPreElement>(null)
-  const [showDebug, setShowDebug] = useState(false)
 
   const dbg = useCallback((msg: string) => {
     const line = `[${new Date().toLocaleTimeString()}] ${msg}`
@@ -66,6 +65,11 @@ export function ExportPage() {
       if (prev.length >= 50) return [...prev.slice(-49), line]
       return [...prev, line]
     })
+  }, [])
+
+  // Alert on mount to confirm component renders
+  useEffect(() => {
+    window.alert('🔍 ExportPage geladen! Debug-Log erscheint beim Export-Klick.')
   }, [])
 
   useEffect(() => {
@@ -262,7 +266,6 @@ export function ExportPage() {
     setExporting(true)
     setStatus(null)
     setDebugLog([])
-    setShowDebug(true)
     try {
       const state = useAppStore.getState()
       dbg(`📅 Woche ${currentWeek.week}/${currentWeek.year}`)
@@ -358,7 +361,6 @@ export function ExportPage() {
     setSending(true)
     setStatus(null)
     setDebugLog([])
-    setShowDebug(true)
     dbg('=== 📧 Email Export gestartet ===')
     try {
       const state = useAppStore.getState()
@@ -433,9 +435,8 @@ export function ExportPage() {
         </div>
       </Card>
 
-      {/* DEBUG PANEL — large, always visible when showDebug is true */}
-      {showDebug && (
-        <Card className="!border-red-500/80 dark:!border-red-600/60 !bg-red-50 dark:!bg-red-950/90 !shadow-lg !shadow-red-500/10">
+      {/* DEBUG PANEL — ALWAYS visible (removed showDebug condition) */}
+      <Card className="!border-red-500/80 dark:!border-red-600/60 !bg-red-50 dark:!bg-red-950/90 !shadow-lg !shadow-red-500/10">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-sm shadow-red-500/50" />
@@ -446,12 +447,6 @@ export function ExportPage() {
                 ({debugLog.length} lines)
               </span>
             </div>
-            <button
-              onClick={() => setShowDebug(false)}
-              className="text-[10px] text-red-500/60 hover:text-red-600 font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg border border-red-300/40 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-            >
-              ✕ Hide
-            </button>
           </div>
           <pre
             ref={debugRef}
@@ -477,7 +472,6 @@ export function ExportPage() {
             </button>
           )}
         </Card>
-      )}
 
       {/* Status message */}
       {status && (
