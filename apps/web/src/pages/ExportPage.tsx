@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn'
 import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
 import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
+import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share as CapacitorShare } from '@capacitor/share'
 
@@ -65,11 +66,6 @@ export function ExportPage() {
       if (prev.length >= 50) return [...prev.slice(-49), line]
       return [...prev, line]
     })
-  }, [])
-
-  // Alert on mount to confirm component renders
-  useEffect(() => {
-    window.alert('🔍 ExportPage geladen! Debug-Log erscheint beim Export-Klick.')
   }, [])
 
   useEffect(() => {
@@ -137,8 +133,8 @@ export function ExportPage() {
     setDownloadUrl(null)
 
     // ── 1. Capacitor NATIV (APK) ──
-    const isCapacitor = (window as any).Capacitor?.isNative
-    dbg(`📱 Capacitor native: ${isCapacitor ? 'YES' : 'NO'}`)
+    const isCapacitor = Capacitor.getPlatform() !== 'web'
+    dbg(`📱 Capacitor native: ${isCapacitor ? 'YES' : 'NO'} (platform: ${Capacitor.getPlatform()})`)
     if (isCapacitor) {
       dbg('📁 Converting blob to base64…')
       try {
