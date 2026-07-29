@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ExportSummary } from '@/components/export/ExportSummary'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -9,6 +9,42 @@ import { cn } from '@/lib/cn'
 import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
 import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
+import { Filesystem, Directory } from '@capacitor/filesystem'
+import { Share as CapacitorShare } from '@capacitor/share'
+
+
+/** Wrap a promise in a timeout — rejects after `ms` milliseconds */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms)
+    ),
+  ])
+}
+
+/** Blob → base64 with 5s safety timeout */
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reader.abort()
+      reject(new Error('blobToBase64 timeout after 5s'))
+    }, 5000)
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      clearTimeout(timer)
+      const result = reader.result as string
+      const b64 = result.split(',')[1]
+      if (!b64) return reject(new Error('Failed to extract base64 from data URL'))
+      resolve(b64)
+    }
+    reader.onerror = () => {
+      clearTimeout(timer)
+      reject(reader.error || new Error('FileReader error'))
+    }
+    reader.readAsDataURL(blob)
+  })
+}
 
 
 export function ExportPage() {
@@ -21,12 +57,22 @@ export function ExportPage() {
   const [downloadFilename, setDownloadFilename] = useState<string>('')
   const [debugLog, setDebugLog] = useState<string[]>([])
   const debugRef = useRef<HTMLPreElement>(null)
+  const [showDebug, setShowDebug] = useState(false)
 
-  const dbg = (msg: string) => {
+  const dbg = useCallback((msg: string) => {
     const line = `[${new Date().toLocaleTimeString()}] ${msg}`
     console.log(line)
-    setDebugLog(prev => [...prev.slice(-9), line])
-  }
+    setDebugLog(prev => {
+      if (prev.length >= 50) return [...prev.slice(-49), line]
+      return [...prev, line]
+    })
+  }, [])
+
+  useEffect(() => {
+    if (debugRef.current) {
+      debugRef.current.scrollTop = debugRef.current.scrollHeight
+    }
+  }, [debugLog])
 
   useEffect(() => {
     loadWeekEntries()
@@ -77,21 +123,87 @@ export function ExportPage() {
 
   /**
    * Save a Blob to the device.
-   * Tries: Capacitor Filesystem → Web Share API → manual <a download> link
+   * Strategy:
+   *   1. Capacitor Filesystem.writeFile(Directory.Data) + CapacitorShare.share()  ← APK
+   *   2. Programmatic <a download> click                                           ← web fallback
+   *   3. Manual amber download link (always rendered as last resort)
    */
   const saveBlob = async (blob: Blob, filename: string) => {
-    dbg('saveBlob: starting...')
-    if (downloadUrl) {
-      window.URL.revokeObjectURL(downloadUrl)
-      setDownloadUrl(null)
+    dbg(`🟦 saveBlob() called — filename: ${filename}, size: ${blob.size} bytes`)
+    setDownloadUrl(null)
+
+    // ── 1. Capacitor NATIV (APK) ──
+    const isCapacitor = (window as any).Capacitor?.isNative
+    dbg(`📱 Capacitor native: ${isCapacitor ? 'YES' : 'NO'}`)
+    if (isCapacitor) {
+      dbg('📁 Converting blob to base64…')
+      try {
+        const b64 = await blobToBase64(blob)
+        dbg(`✅ base64: ${b64.length} chars`)
+
+        // Try Directory.Data first (Android MediaStore, no extra permissions on 10+)
+        try {
+          dbg('💾 Filesystem.writeFile(Directory.Data)…')
+          const result = await withTimeout(
+            Filesystem.writeFile({
+              path: filename,
+              data: b64,
+              directory: Directory.Data,
+            }),
+            8000,
+            'Filesystem.Data',
+          )
+          dbg(`✅ File written! URI: ${result.uri}`)
+          dbg('📤 CapacitorShare.share()…')
+          await withTimeout(
+            CapacitorShare.share({
+              title: `Wochenrapport KW${currentWeek.week}`,
+              files: [result.uri],
+            }),
+            8000,
+            'CapacitorShare',
+          )
+          dbg('✅ Share dialog opened — user can save or send the file')
+          return
+        } catch (dataErr: any) {
+          dbg(`❌ Directory.Data failed: ${dataErr?.message || 'unknown'}`)
+          // Try Directory.Cache as fallback
+          try {
+            dbg('💾 Fallback: Filesystem.writeFile(Directory.Cache)…')
+            const result = await withTimeout(
+              Filesystem.writeFile({
+                path: filename,
+                data: b64,
+                directory: Directory.Cache,
+              }),
+              8000,
+              'Filesystem.Cache',
+            )
+            dbg(`✅ Cache file written! URI: ${result.uri}`)
+            await withTimeout(
+              CapacitorShare.share({
+                title: `Wochenrapport KW${currentWeek.week}`,
+                files: [result.uri],
+              }),
+              8000,
+              'CapacitorShare',
+            )
+            dbg('✅ Share dialog opened (Cache fallback)')
+            return
+          } catch (cacheErr: any) {
+            dbg(`❌ Cache also failed: ${cacheErr?.message || 'unknown'}`)
+          }
+        }
+      } catch (b64Err: any) {
+        dbg(`❌ blobToBase64 failed: ${b64Err?.message || 'unknown'}`)
+      }
+      dbg('⬇️  All Capacitor attempts failed — falling through to web fallbacks…')
     }
 
-    const url = window.URL.createObjectURL(blob)
-    dbg('saveBlob: blob URL created')
-
-    // 1. Programmatic <a download> click — works in Capacitor WebView
+    // ── 2. Programmatic <a download> click (works in web browsers) ──
     try {
-      dbg('saveBlob: programmatic download...')
+      dbg('⬇️  <a download> programmatic click…')
+      const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
       a.download = filename
@@ -99,37 +211,41 @@ export function ExportPage() {
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      dbg('saveBlob: download triggered')
+      dbg('✅ <a> click dispatched')
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000)
     } catch (dlErr: any) {
-      dbg(`saveBlob: programmatic download failed: ${dlErr?.message || 'unknown'}`)
+      dbg(`❌ <a> click failed: ${dlErr?.message || 'unknown'}`)
     }
 
-    // 2. Web Share API (web fallback)
-    if (typeof navigator.share !== 'undefined') {
+    // ── 3. Web Share API (web fallback) ──
+    if (typeof navigator.share !== 'undefined' && typeof navigator.canShare !== 'undefined') {
       try {
-        dbg('saveBlob: trying Web Share API...')
-        const file = new File([blob], filename, {
+        dbg('📤 Web Share API…')
+        const blobCopy = blob.slice(0, blob.size, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        const file = new File([blobCopy], filename, {
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         })
-        await navigator.share({
-          title: `Wochenrapport KW${currentWeek.week}`,
-          files: [file],
-        })
-        dbg('saveBlob: Web Share API succeeded!')
-        setTimeout(() => window.URL.revokeObjectURL(url), 1000)
-        return
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ title: `Wochenrapport KW${currentWeek.week}`, files: [file] })
+          dbg('✅ Web Share succeeded')
+          return
+        } else {
+          dbg('⚠️ navigator.canShare says: cannot share this file')
+        }
       } catch (shareErr: any) {
-        dbg(`saveBlob: Web Share API failed: ${shareErr?.message || 'cancelled'}`)
+        dbg(`❌ Web Share failed: ${shareErr?.message || 'cancelled'}`)
       }
     } else {
-      dbg('saveBlob: navigator.share NOT available')
+      dbg('ℹ️ navigator.share not available in this browser')
     }
 
-    // 3. Manual download link (always shown as fallback)
-    dbg('saveBlob: setting visible download link')
+    // ── 4. Manual download link (always shown) ──
+    dbg('🟠 Setting manual amber download link…')
+    const url = window.URL.createObjectURL(blob)
     setDownloadUrl(url)
     setDownloadFilename(filename)
-    dbg('saveBlob: done')
+    dbg('✅ Manual link ready — user can tap to download')
+    dbg('=== saveBlob complete ===')
   }
 
   const triggerDownload = async (blob: Blob, usedOffline: boolean) => {
@@ -142,26 +258,28 @@ export function ExportPage() {
   }
 
   const handleExport = async () => {
-    dbg('=== Export gestartet ===')
+    dbg('=== 🚀 Export gestartet ===')
     setExporting(true)
     setStatus(null)
     setDebugLog([])
+    setShowDebug(true)
     try {
       const state = useAppStore.getState()
-      dbg('buildEntriesData...')
+      dbg(`📅 Woche ${currentWeek.week}/${currentWeek.year}`)
+      dbg('🔨 buildEntriesData…')
       const entriesData = buildEntriesData()
-      dbg(`entriesData: ${entriesData.length} entries`)
-      dbg('collectWeekExpenses...')
+      dbg(`✅ entriesData: ${entriesData.length} entries`)
+      dbg('🔨 collectWeekExpenses…')
       const allExpenses = collectWeekExpenses()
-      dbg(`allExpenses: ${allExpenses.length} items`)
+      dbg(`✅ allExpenses: ${allExpenses.length} items`)
 
       let blob: Blob
       let usedOffline = false
 
-      // Try backend
+      // Try backend first
       try {
-        dbg('fetching backend...')
         const renderUrl = import.meta.env.VITE_RENDER_URL || 'http://localhost:8000'
+        dbg(`🌐 Fetching backend: ${renderUrl}/generate-excel`)
         const response = await fetch(`${renderUrl}/generate-excel`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -176,45 +294,52 @@ export function ExportPage() {
           }),
           signal: AbortSignal.timeout(5000),
         })
-        dbg('backend response OK')
         if (!response.ok) {
           const detail = await response.text().catch(() => '')
           throw new Error(detail.slice(0, 200))
         }
         blob = await response.blob()
-        dbg(`backend blob: ${blob.size} bytes`)
+        dbg(`✅ Backend blob: ${blob.size} bytes`)
       } catch (innerErr: any) {
-        dbg(`backend failed: ${innerErr?.message || 'unknown error'}`)
-        dbg('generating offline...')
-        blob = await generateExcelOffline({
-          year: currentWeek.year,
-          week_number: currentWeek.week,
-          personnel_number: state.profile?.personnel_number || '',
-          full_name: state.profile?.full_name || '',
-          entries: entriesData,
-          expenses: allExpenses,
-        })
-        dbg(`offline blob: ${blob.size} bytes`)
-        usedOffline = true
+        dbg(`❌ Backend failed: ${innerErr?.message || 'unknown error'}`)
+        dbg('🔄 Generating offline…')
+        try {
+          blob = await generateExcelOffline({
+            year: currentWeek.year,
+            week_number: currentWeek.week,
+            personnel_number: state.profile?.personnel_number || '',
+            full_name: state.profile?.full_name || '',
+            entries: entriesData,
+            expenses: allExpenses,
+          })
+          dbg(`✅ Offline blob: ${blob.size} bytes`)
+          usedOffline = true
+        } catch (offlineErr: any) {
+          dbg(`❌ Offline generation FAILED: ${offlineErr?.message || 'unknown'}`)
+          setStatus(`${t('common.error')}: ${offlineErr?.message || t('export.failed')}`)
+          setExporting(false)
+          return
+        }
       }
 
-      dbg('triggerDownload...')
+      dbg('⬇️  triggerDownload…')
       await triggerDownload(blob, usedOffline)
-      dbg('=== Export erfolgreich abgeschlossen ===')
+      dbg('=== ✅ Export erfolgreich abgeschlossen ===')
     } catch (err: any) {
       const msg = err?.message || 'Unknown error'
-      dbg(`❌ FATAL: ${msg}`)
+      dbg(`🔥 CRASH: ${msg}`)
       setStatus(`${t('common.error')}: ${msg}`)
     } finally {
       setExporting(false)
     }
   }
 
-  /** Generate Excel offline and save via Share API / anchor */
+  /** Generate Excel offline and save via Capacitor / Share API / anchor */
   const generateAndSaveLocally = async (
     entriesData: OfflineEntry[],
     allExpenses: OfflineExpense[],
   ) => {
+    dbg('🔄 generateAndSaveLocally…')
     const blob = await generateExcelOffline({
       year: currentWeek.year,
       week_number: currentWeek.week,
@@ -223,23 +348,27 @@ export function ExportPage() {
       entries: entriesData,
       expenses: allExpenses,
     })
+    dbg(`✅ Blob ready: ${blob.size} bytes`)
     const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
     await saveBlob(blob, filename)
+    dbg('✅ generateAndSaveLocally complete')
   }
 
   const handleSendEmail = async () => {
     setSending(true)
     setStatus(null)
+    setDebugLog([])
+    setShowDebug(true)
+    dbg('=== 📧 Email Export gestartet ===')
     try {
       const state = useAppStore.getState()
       const entriesData = buildEntriesData()
       const allExpenses = collectWeekExpenses()
       const renderUrl = import.meta.env.VITE_RENDER_URL || 'http://localhost:8000'
-
       let usedOffline = false
 
-      // Try backend
       try {
+        dbg(`🌐 Backend: ${renderUrl}/send-email`)
         const response = await fetch(`${renderUrl}/send-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -254,13 +383,11 @@ export function ExportPage() {
           }),
           signal: AbortSignal.timeout(5000),
         })
-
         if (!response.ok) throw new Error(t('export.email.failed'))
-
-        // Email sent via backend — still save a local copy on the device
+        dbg('✅ Email sent via backend')
         await generateAndSaveLocally(entriesData, allExpenses)
       } catch (innerErr: any) {
-        dbg(`Email backend unavailable: ${innerErr?.message || 'unknown'}`)
+        dbg(`❌ Backend email failed: ${innerErr?.message || 'unknown'}`)
         await generateAndSaveLocally(entriesData, allExpenses)
         usedOffline = true
       }
@@ -270,19 +397,12 @@ export function ExportPage() {
         : t('export.email.success'),
       )
     } catch (err: any) {
-      dbg(`Email FATAL: ${err?.message || 'unknown'}`)
+      dbg(`🔥 Email CRASH: ${err?.message || 'unknown'}`)
       setStatus(`${t('common.error')}: ${err.message || t('export.email.failed')}`)
     } finally {
       setSending(false)
     }
   }
-
-  // Scroll debug panel to bottom when new entries arrive
-  useEffect(() => {
-    if (debugRef.current) {
-      debugRef.current.scrollTop = debugRef.current.scrollHeight
-    }
-  }, [debugLog])
 
   if (!weekSummary) return null
 
@@ -313,21 +433,49 @@ export function ExportPage() {
         </div>
       </Card>
 
-      {/* === DEBUG PANEL — shows step-by-step what's happening === */}
-      {debugLog.length > 0 && (
-        <Card className="!border-red-400/60 dark:!border-red-600/40 !bg-red-50/90 dark:!bg-red-950/80">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-[11px] font-bold text-red-700 dark:text-red-300 uppercase tracking-wider">
-              Debug Log
-            </span>
+      {/* DEBUG PANEL — large, always visible when showDebug is true */}
+      {showDebug && (
+        <Card className="!border-red-500/80 dark:!border-red-600/60 !bg-red-50 dark:!bg-red-950/90 !shadow-lg !shadow-red-500/10">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-sm shadow-red-500/50" />
+              <span className="text-xs font-bold text-red-700 dark:text-red-300 uppercase tracking-wider">
+                🔍 EXPORT DEBUG
+              </span>
+              <span className="text-[10px] text-red-500/60 font-mono">
+                ({debugLog.length} lines)
+              </span>
+            </div>
+            <button
+              onClick={() => setShowDebug(false)}
+              className="text-[10px] text-red-500/60 hover:text-red-600 font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg border border-red-300/40 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+            >
+              ✕ Hide
+            </button>
           </div>
           <pre
             ref={debugRef}
-            className="text-[10px] leading-relaxed text-red-900 dark:text-red-200 font-mono max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all"
+            className="text-[11px] leading-relaxed text-red-900 dark:text-red-200 font-mono max-h-[280px] overflow-y-auto whitespace-pre-wrap break-all bg-white/30 dark:bg-black/20 rounded-xl p-3 border border-red-200/40 dark:border-red-800/30"
           >
-            {debugLog.join('\n')}
+            {debugLog.length === 0 ? (
+              <span className="italic text-red-400/60">Waiting for debug output…</span>
+            ) : (
+              debugLog.join('\n')
+            )}
           </pre>
+          {/* Quick copy button */}
+          {debugLog.length > 0 && (
+            <button
+              onClick={() => {
+                const text = debugLog.join('\n')
+                navigator.clipboard?.writeText(text).catch(() => {})
+                dbg('📋 Debug log copied to clipboard')
+              }}
+              className="mt-1.5 text-[10px] text-red-500/70 hover:text-red-600 font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg border border-red-300/30 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+            >
+              📋 Kopieren
+            </button>
+          )}
         </Card>
       )}
 
