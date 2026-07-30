@@ -11,6 +11,7 @@ import { generateExcelOffline } from '@/services/offlineGenerator'
 import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
+import { Share } from '@capacitor/share'
 
 export function ExportPage() {
   const { t } = useTranslation()
@@ -121,6 +122,23 @@ export function ExportPage() {
           directory: Directory.Data,
         })
         dbg('✅ File written to device storage')
+
+        // 1b. Open native Share dialog so user can save/email the file
+        try {
+          const fileStat = await Filesystem.getUri({
+            path: filename,
+            directory: Directory.Data,
+          })
+          dbg(`📤 CapacitorShare.share()… URI: ${fileStat.uri}`)
+          await Share.share({
+            url: fileStat.uri,
+            title: filename,
+            dialogTitle: 'Excel exportieren — speichern oder senden',
+          })
+          dbg('✅ Share dialog completed')
+        } catch (shareErr: any) {
+          dbg(`ℹ️  Share cancelled or failed: ${shareErr?.message || 'unknown'} — continuing…`)
+        }
       } catch (e: any) {
         dbg(`❌ Capacitor write failed: ${e?.message || 'unknown'} — continuing…`)
       }
