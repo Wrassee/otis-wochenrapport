@@ -9,6 +9,8 @@ import { cn } from '@/lib/cn'
 import { Calendar, FileSpreadsheet, Info, Bug } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
 import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
+import { Capacitor } from '@capacitor/core'
+import { Filesystem, Directory } from '@capacitor/filesystem'
 
 export function ExportPage() {
   const { t } = useTranslation()
@@ -87,14 +89,44 @@ export function ExportPage() {
 
   /**
    * Save a Blob to the device.
-   * Strategy — the simplest approach that actually works:
-   *   1. Programmatic <a download> click (works on web and Android WebView)
-   *   2. Manual download link (always visible as backup)
+   * Strategy — three approaches in order:
+   *   1. Capacitor Filesystem.writeFile (writes to internal storage — WORKS on Android)
+   *   2. Programmatic <a download> click (might work on some devices)
+   *   3. Manual download link (user taps it — always works)
    */
-  const saveBlob = (blob: Blob, filename: string) => {
+  const saveBlob = async (blob: Blob, filename: string) => {
     const blobUrl = window.URL.createObjectURL(blob)
 
-    // 1. Programmatic <a download> click
+    // 1. Capacitor native file write (silent, best-effort)
+    const isNative = Capacitor.getPlatform() !== 'web'
+    if (isNative) {
+      dbg('📱 Capacitor native: YES')
+      try {
+        dbg('📁 Converting blob to base64…')
+        const reader = new FileReader()
+        const base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => {
+            const result = reader.result as string
+            resolve(result.split(',')[1])
+          }
+          reader.onerror = reject
+          reader.readAsDataURL(blob)
+        })
+        dbg(`✅ base64: ${base64.length} chars`)
+
+        dbg('💾 Filesystem.writeFile(Directory.Data)…')
+        await Filesystem.writeFile({
+          path: filename,
+          data: base64,
+          directory: Directory.Data,
+        })
+        dbg('✅ File written to device storage')
+      } catch (e: any) {
+        dbg(`❌ Capacitor write failed: ${e?.message || 'unknown'} — continuing…`)
+      }
+    }
+
+    // 2. Programmatic <a download> click
     dbg('⬇️  <a download> programmatic click…')
     const a = document.createElement('a')
     a.href = blobUrl
@@ -105,7 +137,7 @@ export function ExportPage() {
     document.body.removeChild(a)
     dbg('✅ <a> click dispatched')
 
-    // 2. Manual download link (always available as backup)
+    // 3. Manual download link (always available as backup)
     dbg('🟠 Setting manual amber download link…')
     setDownloadUrl(blobUrl)
     setDownloadFilename(filename)
@@ -114,7 +146,7 @@ export function ExportPage() {
 
   const triggerDownload = async (blob: Blob, usedOffline: boolean) => {
     const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
-    saveBlob(blob, filename)
+    await saveBlob(blob, filename)
     setStatus(usedOffline
       ? `${t('export.success')} (${t('export.offline.generated')})`
       : t('export.success'),
@@ -204,7 +236,7 @@ export function ExportPage() {
     })
     dbg(`✅ Blob ready: ${blob.size} bytes`)
     const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
-    saveBlob(blob, filename)
+    await saveBlob(blob, filename)
     dbg('✅ generateAndSaveLocally complete')
   }
 
