@@ -131,6 +131,8 @@ export function ExportPage() {
   const saveBlob = async (blob: Blob, filename: string) => {
     dbg(`🟦 saveBlob() called — filename: ${filename}, size: ${blob.size} bytes`)
     setDownloadUrl(null)
+    // Create blob URL early — used by both <a> click and manual link
+    const blobUrl = window.URL.createObjectURL(blob)
 
     // ── 1. Capacitor NATIV (APK) ──
     const isCapacitor = Capacitor.getPlatform() !== 'web'
@@ -167,6 +169,8 @@ export function ExportPage() {
           return
         } catch (dataErr: any) {
           dbg(`❌ Directory.Data failed: ${dataErr?.message || 'unknown'}`)
+          // Wait 500ms before Cache retry — avoids "sharing in progress" conflict
+          await new Promise(r => setTimeout(r, 500))
           // Try Directory.Cache as fallback
           try {
             dbg('💾 Fallback: Filesystem.writeFile(Directory.Cache)…')
@@ -200,19 +204,17 @@ export function ExportPage() {
       dbg('⬇️  All Capacitor attempts failed — falling through to web fallbacks…')
     }
 
-    // ── 2. Programmatic <a download> click (works in web browsers) ──
+    // ── 2. Programmatic <a download> click + window.open fallback ──
     try {
       dbg('⬇️  <a download> programmatic click…')
-      const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
+      a.href = blobUrl
       a.download = filename
       a.style.display = 'none'
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       dbg('✅ <a> click dispatched')
-      setTimeout(() => window.URL.revokeObjectURL(url), 5000)
     } catch (dlErr: any) {
       dbg(`❌ <a> click failed: ${dlErr?.message || 'unknown'}`)
     }
@@ -241,8 +243,7 @@ export function ExportPage() {
 
     // ── 4. Manual download link (always shown) ──
     dbg('🟠 Setting manual amber download link…')
-    const url = window.URL.createObjectURL(blob)
-    setDownloadUrl(url)
+    setDownloadUrl(blobUrl)
     setDownloadFilename(filename)
     dbg('✅ Manual link ready — user can tap to download')
     dbg('=== saveBlob complete ===')
