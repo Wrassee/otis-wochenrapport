@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { ExportSummary } from '@/components/export/ExportSummary'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -6,7 +6,7 @@ import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/lib/useTranslation'
 import { getWeekDates, formatDateShort } from '@/lib/utils'
 import { cn } from '@/lib/cn'
-import { Calendar, FileSpreadsheet, Info, Bug } from 'lucide-react'
+import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
 import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
 import { Capacitor } from '@capacitor/core'
@@ -21,25 +21,10 @@ export function ExportPage() {
   const [status, setStatus] = useState<string | null>(null)
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [downloadFilename, setDownloadFilename] = useState<string>('')
-  const [showDebug, setShowDebug] = useState(false)
-  const [debugLog, setDebugLog] = useState<string[]>([])
-  const debugRef = useRef<HTMLPreElement>(null)
-
-  /** Debug logger — writes to console and hidden UI panel */
+  /** Debug logger — writes timestamped message to console */
   const dbg = (msg: string) => {
-    const line = `[${new Date().toLocaleTimeString()}] ${msg}`
-    console.log(line)
-    setDebugLog(prev => {
-      if (prev.length >= 50) return [...prev.slice(-49), line]
-      return [...prev, line]
-    })
+    console.log(`[${new Date().toLocaleTimeString()}] ${msg}`)
   }
-
-  useEffect(() => {
-    if (debugRef.current) {
-      debugRef.current.scrollTop = debugRef.current.scrollHeight
-    }
-  }, [debugLog])
 
   useEffect(() => {
     loadWeekEntries()
@@ -91,9 +76,8 @@ export function ExportPage() {
   /**
    * Save a Blob to the device.
    * Strategy — three approaches in order:
-   *   1. Capacitor Filesystem.writeFile (writes to internal storage — WORKS on Android)
-   *   2. Programmatic <a download> click (might work on some devices)
-   *   3. Manual download link (user taps it — always works)
+   *   1. Capacitor Filesystem.writeFile + Share.share() (writes to internal storage + opens Share dialog)
+   *   2. Manual download link (user taps it — always visible)
    */
   const saveBlob = async (blob: Blob, filename: string) => {
     const blobUrl = window.URL.createObjectURL(blob)
@@ -144,18 +128,7 @@ export function ExportPage() {
       }
     }
 
-    // 2. Programmatic <a download> click
-    dbg('⬇️  <a download> programmatic click…')
-    const a = document.createElement('a')
-    a.href = blobUrl
-    a.download = filename
-    a.style.display = 'none'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    dbg('✅ <a> click dispatched')
-
-    // 3. Manual download link (always available as backup)
+    // 2. Manual download link (always available as backup)
     dbg('🟠 Setting manual amber download link…')
     setDownloadUrl(blobUrl)
     setDownloadFilename(filename)
@@ -174,7 +147,6 @@ export function ExportPage() {
   const handleExport = async () => {
     setExporting(true)
     setStatus(null)
-    setDebugLog([])
     try {
       const state = useAppStore.getState()
       const entriesData = buildEntriesData()
@@ -261,7 +233,6 @@ export function ExportPage() {
   const handleSendEmail = async () => {
     setSending(true)
     setStatus(null)
-    setDebugLog([])
     try {
       const state = useAppStore.getState()
       const entriesData = buildEntriesData()
@@ -383,55 +354,6 @@ export function ExportPage() {
               </p>
             </div>
           </a>
-        </Card>
-      )}
-
-      {/* Hidden debug panel — toggleable via bug icon */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setShowDebug(!showDebug)}
-          className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex items-center gap-1"
-          title={showDebug ? 'Hide debug panel' : 'Show debug panel'}
-        >
-          <Bug className="w-3 h-3" />
-          <span>{showDebug ? `${t('common.hide')} Debug` : 'Debug'}</span>
-        </button>
-      </div>
-
-      {showDebug && (
-        <Card className="!border-red-500/80 dark:!border-red-600/60 !bg-red-50 dark:!bg-red-950/90 !shadow-lg !shadow-red-500/10">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-sm shadow-red-500/50" />
-              <span className="text-xs font-bold text-red-700 dark:text-red-300 uppercase tracking-wider">
-                EXPORT DEBUG
-              </span>
-              <span className="text-[10px] text-red-500/60 font-mono">
-                ({debugLog.length} lines)
-              </span>
-            </div>
-          </div>
-          <pre
-            ref={debugRef}
-            className="text-[11px] leading-relaxed text-red-900 dark:text-red-200 font-mono max-h-[280px] overflow-y-auto whitespace-pre-wrap break-all bg-white/30 dark:bg-black/20 rounded-xl p-3 border border-red-200/40 dark:border-red-800/30"
-          >
-            {debugLog.length === 0 ? (
-              <span className="italic text-red-400/60">Waiting for debug output…</span>
-            ) : (
-              debugLog.join('\n')
-            )}
-          </pre>
-          {debugLog.length > 0 && (
-            <button
-              onClick={() => {
-                const text = debugLog.join('\n')
-                navigator.clipboard?.writeText(text).catch(() => {})
-              }}
-              className="mt-1.5 text-[10px] text-red-500/70 hover:text-red-600 font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg border border-red-300/30 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-            >
-              📋 Kopieren
-            </button>
-          )}
         </Card>
       )}
 
