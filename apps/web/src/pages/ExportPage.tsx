@@ -15,7 +15,7 @@ import { Share } from '@capacitor/share'
 
 export function ExportPage() {
   const { t } = useTranslation()
-  const { currentWeek, weekSummary, loadWeekEntries, calculateWeekSummary, profile, timeEntries, dailyExpenses, locations, favoriteLocations } = useAppStore()
+  const { currentWeek, weekSummary, loadWeekEntries, calculateWeekSummary, timeEntries, dailyExpenses, locations, favoriteLocations } = useAppStore()
   const [exporting, setExporting] = useState(false)
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
@@ -74,12 +74,61 @@ export function ExportPage() {
   }
 
   /**
+   * Generate the week's Excel blob — backend first, offline fallback.
+   * Shared by both the export and email buttons.
+   */
+  const generateWeekBlob = async (): Promise<{ blob: Blob; usedOffline: boolean }> => {
+    const state = useAppStore.getState()
+    const entriesData = buildEntriesData()
+    const allExpenses = collectWeekExpenses()
+
+    try {
+      const renderUrl = import.meta.env.VITE_RENDER_URL || 'http://localhost:8000'
+      dbg(`🌐 Backend: ${renderUrl}/generate-excel`)
+      const response = await fetch(`${renderUrl}/generate-excel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          year: currentWeek.year,
+          week_number: currentWeek.week,
+          user_id: state.user?.id,
+          personnel_number: state.profile?.personnel_number || '',
+          full_name: state.profile?.full_name || '',
+          entries: entriesData,
+          expenses: allExpenses,
+        }),
+        signal: AbortSignal.timeout(5000),
+      })
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '')
+        throw new Error(detail.slice(0, 200))
+      }
+      const blob = await response.blob()
+      dbg(`✅ Backend blob: ${blob.size} bytes`)
+      return { blob, usedOffline: false }
+    } catch (innerErr: any) {
+      dbg(`❌ Backend failed: ${innerErr?.message || 'unknown'}`)
+      dbg('🔄 Generating offline…')
+      const blob = await generateExcelOffline({
+        year: currentWeek.year,
+        week_number: currentWeek.week,
+        personnel_number: state.profile?.personnel_number || '',
+        full_name: state.profile?.full_name || '',
+        entries: entriesData,
+        expenses: allExpenses,
+      })
+      dbg(`✅ Offline blob: ${blob.size} bytes`)
+      return { blob, usedOffline: true }
+    }
+  }
+
+  /**
    * Save a Blob to the device.
-   * Strategy — three approaches in order:
+   * Strategy — two approaches in order:
    *   1. Capacitor Filesystem.writeFile + Share.share() (writes to internal storage + opens Share dialog)
    *   2. Manual download link (user taps it — always visible)
    */
-  const saveBlob = async (blob: Blob, filename: string) => {
+  const saveBlob = async (blob: Blob, filename: string, dialogTitle?: string) => {
     const blobUrl = window.URL.createObjectURL(blob)
 
     // 1. Capacitor native file write (silent, best-effort)
@@ -117,7 +166,7 @@ export function ExportPage() {
           await Share.share({
             url: fileStat.uri,
             title: filename,
-            dialogTitle: 'Excel exportieren — speichern oder senden',
+            dialogTitle: dialogTitle || t('export.excel.btn'),
           })
           dbg('✅ Share dialog completed')
         } catch (shareErr: any) {
@@ -135,73 +184,17 @@ export function ExportPage() {
     dbg('=== saveBlob complete ===')
   }
 
-  const triggerDownload = async (blob: Blob, usedOffline: boolean) => {
-    const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
-    await saveBlob(blob, filename)
-    setStatus(usedOffline
-      ? `${t('export.success')} (${t('export.offline.generated')})`
-      : t('export.success'),
-    )
-  }
-
   const handleExport = async () => {
     setExporting(true)
     setStatus(null)
     try {
-      const state = useAppStore.getState()
-      const entriesData = buildEntriesData()
-      const allExpenses = collectWeekExpenses()
-
-      let blob: Blob
-      let usedOffline = false
-
-      // Try backend first
-      try {
-        const renderUrl = import.meta.env.VITE_RENDER_URL || 'http://localhost:8000'
-        dbg(`🌐 Backend: ${renderUrl}/generate-excel`)
-        const response = await fetch(`${renderUrl}/generate-excel`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            year: currentWeek.year,
-            week_number: currentWeek.week,
-            user_id: state.user?.id,
-            personnel_number: state.profile?.personnel_number || '',
-            full_name: state.profile?.full_name || '',
-            entries: entriesData,
-            expenses: allExpenses,
-          }),
-          signal: AbortSignal.timeout(5000),
-        })
-        if (!response.ok) {
-          const detail = await response.text().catch(() => '')
-          throw new Error(detail.slice(0, 200))
-        }
-        blob = await response.blob()
-        dbg(`✅ Backend blob: ${blob.size} bytes`)
-      } catch (innerErr: any) {
-        dbg(`❌ Backend failed: ${innerErr?.message || 'unknown'}`)
-        dbg('🔄 Generating offline…')
-        try {
-          blob = await generateExcelOffline({
-            year: currentWeek.year,
-            week_number: currentWeek.week,
-            personnel_number: state.profile?.personnel_number || '',
-            full_name: state.profile?.full_name || '',
-            entries: entriesData,
-            expenses: allExpenses,
-          })
-          dbg(`✅ Offline blob: ${blob.size} bytes`)
-          usedOffline = true
-        } catch (offlineErr: any) {
-          dbg(`❌ Offline generation FAILED: ${offlineErr?.message || 'unknown'}`)
-          setStatus(`${t('common.error')}: ${offlineErr?.message || t('export.failed')}`)
-          setExporting(false)
-          return
-        }
-      }
-
-      await triggerDownload(blob, usedOffline)
+      const { blob, usedOffline } = await generateWeekBlob()
+      const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
+      await saveBlob(blob, filename, t('export.excel.btn'))
+      setStatus(usedOffline
+        ? `${t('export.success')} (${t('export.offline.generated')})`
+        : t('export.success'),
+      )
     } catch (err: any) {
       const msg = err?.message || 'Unknown error'
       dbg(`🔥 CRASH: ${msg}`)
@@ -211,60 +204,15 @@ export function ExportPage() {
     }
   }
 
-  const generateAndSaveLocally = async (
-    entriesData: OfflineEntry[],
-    allExpenses: OfflineExpense[],
-  ) => {
-    dbg('🔄 generateAndSaveLocally…')
-    const blob = await generateExcelOffline({
-      year: currentWeek.year,
-      week_number: currentWeek.week,
-      personnel_number: profile?.personnel_number || '',
-      full_name: profile?.full_name || '',
-      entries: entriesData,
-      expenses: allExpenses,
-    })
-    dbg(`✅ Blob ready: ${blob.size} bytes`)
-    const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
-    await saveBlob(blob, filename)
-    dbg('✅ generateAndSaveLocally complete')
-  }
-
   const handleSendEmail = async () => {
     setSending(true)
     setStatus(null)
     try {
-      const state = useAppStore.getState()
-      const entriesData = buildEntriesData()
-      const allExpenses = collectWeekExpenses()
-      const renderUrl = import.meta.env.VITE_RENDER_URL || 'http://localhost:8000'
-      let usedOffline = false
-
-      try {
-        dbg(`🌐 Backend: ${renderUrl}/send-email`)
-        const response = await fetch(`${renderUrl}/send-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            year: currentWeek.year,
-            week_number: currentWeek.week,
-            user_id: state.user?.id,
-            personnel_number: state.profile?.personnel_number || '',
-            full_name: state.profile?.full_name || '',
-            supervisor_email: profile?.supervisor_email,
-            entries: entriesData,
-          }),
-          signal: AbortSignal.timeout(5000),
-        })
-        if (!response.ok) throw new Error(t('export.email.failed'))
-        dbg('✅ Email sent via backend')
-        await generateAndSaveLocally(entriesData, allExpenses)
-      } catch (innerErr: any) {
-        dbg(`❌ Backend email failed: ${innerErr?.message || 'unknown'}`)
-        await generateAndSaveLocally(entriesData, allExpenses)
-        usedOffline = true
-      }
-
+      const { blob, usedOffline } = await generateWeekBlob()
+      const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
+      // Open the native Share sheet — the user picks their email app from there,
+      // same pattern as the export button.
+      await saveBlob(blob, filename, t('export.email.btn'))
       setStatus(usedOffline
         ? `${t('export.email.success')} (${t('export.offline.generated')})`
         : t('export.email.success'),
