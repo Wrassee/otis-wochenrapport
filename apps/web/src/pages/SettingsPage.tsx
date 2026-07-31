@@ -155,7 +155,7 @@ export function SettingsPage() {
           {notificationLoading ? (
             <span className="flex items-center gap-2">
               <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              {notificationEnabled ? 'Deaktiviere...' : 'Aktiviere...'}
+              {notificationEnabled ? t('settings.reminder.deactivating') : t('settings.reminder.activating')}
             </span>
           ) : notificationEnabled ? (
             <span className="flex items-center gap-2">
@@ -193,7 +193,7 @@ export function SettingsPage() {
             </div>
           </div>
           <Badge variant={syncStatus.online ? 'success' : 'danger'}>
-            {syncStatus.online ? 'Online' : 'Offline'}
+            {syncStatus.online ? t('settings.online') : t('settings.offline')}
           </Badge>
         </div>
 
@@ -201,13 +201,13 @@ export function SettingsPage() {
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <Wifi className="w-4 h-4 text-gray-400" />
-              Status
+              {t('settings.status')}
             </span>
             <span className="flex items-center gap-1.5 font-medium">
               {syncStatus.online ? (
-                <><Wifi className="w-4 h-4 text-emerald-500" /> Online</>
+                <><Wifi className="w-4 h-4 text-emerald-500" /> {t('settings.online')}</>
               ) : (
-                <><WifiOff className="w-4 h-4 text-red-500" /> Offline</>
+                <><WifiOff className="w-4 h-4 text-red-500" /> {t('settings.offline')}</>
               )}
             </span>
           </div>
@@ -215,7 +215,7 @@ export function SettingsPage() {
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-gray-400" />
-                Letzte Synchronisation
+                {t('settings.last.sync')}
               </span>
               <span className="font-medium">{new Date(syncStatus.lastSync).toLocaleTimeString('de-DE')}</span>
             </div>
@@ -223,17 +223,17 @@ export function SettingsPage() {
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <Shield className="w-4 h-4 text-gray-400" />
-              Ausstehend
+              {t('settings.pending')}
             </span>
             <Badge variant={syncStatus.pendingSync > 0 ? 'warning' : 'success'} size="sm">
-              {syncStatus.pendingSync > 0 ? `${syncStatus.pendingSync} Einträge` : 'Keine'}
+              {syncStatus.pendingSync > 0 ? t('settings.pending.count', { n: syncStatus.pendingSync }) : t('settings.pending.none')}
             </Badge>
           </div>
         </div>
 
         <Button onClick={handleSync} variant="secondary" fullWidth disabled={syncStatus.syncing}>
           <RefreshCw className={cn('w-4 h-4', syncStatus.syncing && 'animate-spin')} />
-          {syncStatus.syncing ? 'Synchronisiere...' : 'Jetzt synchronisieren'}
+          {syncStatus.syncing ? t('settings.syncing') : t('settings.sync.now')}
         </Button>
       </Card>
 
@@ -244,10 +244,10 @@ export function SettingsPage() {
             <Info className="w-4 h-4 text-otis-500" />
           </div>
           <div className="text-xs text-gray-400 space-y-1">
-            <p className="font-semibold text-otis-600 dark:text-otis-300">OTIS Wochenrapport v1.0.0</p>
-            <p>Offline-First PWA für OTIS Servicetechniker</p>
-            <p>Montag Erinnerung: {notificationEnabled ? 'Aktiviert' : 'Deaktiviert'}</p>
-            {user && <p className="font-mono text-[10px] text-gray-400">User: {user.email}</p>}
+            <p className="font-semibold text-otis-600 dark:text-otis-300">{t('settings.app.info')}</p>
+            <p>{t('settings.app.desc')}</p>
+            <p>{t('settings.reminder.state', { state: notificationEnabled ? t('settings.reminder.active') : t('settings.reminder.inactive') })}</p>
+            {user && <p className="font-mono text-[10px] text-gray-400">{t('settings.user', { email: user.email })}</p>}
           </div>
         </div>
       </Card>
@@ -446,11 +446,11 @@ function LiftZoneManager() {
       const updatedFavs = await localDb.getFavoriteLocations()
       setFavoriteLocations(updatedFavs.slice(0, 5))
 
-      showFeedback(`${anlagenummer} gespeichert`, 'success')
+      showFeedback(t('lifts.saved', { nr: anlagenummer }), 'success')
       setEditingLift(null)
       loadLifts()
     } catch (err) {
-      showFeedback('Fehler beim Speichern', 'error')
+      showFeedback(t('lifts.save.error'), 'error')
       setEditingLift(null)
     }
   }
@@ -465,12 +465,12 @@ function LiftZoneManager() {
       const updatedFavs = await localDb.getFavoriteLocations()
       setFavoriteLocations(updatedFavs.slice(0, 5))
 
-      showFeedback(`${anlagenummer} gelöscht`, 'success')
+      showFeedback(t('lifts.deleted', { nr: anlagenummer }), 'success')
       setDeleteConfirm(null)
       setEditingLift(null)
       loadLifts()
     } catch (err) {
-      showFeedback('Fehler beim Löschen', 'error')
+      showFeedback(t('lifts.delete.error'), 'error')
       setDeleteConfirm(null)
     }
   }
@@ -513,7 +513,7 @@ function LiftZoneManager() {
       const updatedFavs = await localDb.getFavoriteLocations()
       setFavoriteLocations(updatedFavs.slice(0, 5))
 
-      showFeedback(`${key} hinzugefügt`, 'success')
+      showFeedback(t('lifts.added', { nr: key }), 'success')
       setIsAdding(false)
       setAddNr('')
       setAddProject('')
@@ -521,16 +521,16 @@ function LiftZoneManager() {
       setAddZone(0)
       loadLifts()
     } catch (err) {
-      showFeedback('Fehler beim Hinzufügen', 'error')
+      showFeedback(t('lifts.add.error'), 'error')
     }
   }
 
   const ZONE_OPTIONS = [
-    { value: 0, label: '— Auto (0)' },
-    { value: 1, label: 'Zone 1 (<10 km)' },
-    { value: 2, label: 'Zone 2 (<30 km)' },
-    { value: 3, label: 'Zone 3 (<60 km)' },
-    { value: 4, label: 'Zone 4 (>60 km)' },
+    { value: 0, label: t('lifts.zone.auto') },
+    { value: 1, label: t('lifts.zone.1') },
+    { value: 2, label: t('lifts.zone.2') },
+    { value: 3, label: t('lifts.zone.3') },
+    { value: 4, label: t('lifts.zone.4') },
   ]
 
   if (liftList.length === 0 && !isLoading) return null
@@ -561,15 +561,15 @@ function LiftZoneManager() {
               setSearchQuery('')
             }}
             className="h-8 px-3 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center gap-1.5 text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 hover:from-emerald-500 hover:to-emerald-700 transition-all active:scale-95"
-            title="Anlage hinzufügen"
+            title={t('lifts.add.title')}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Hinzufügen</span>
+            <span className="hidden sm:inline">{t('lifts.add')}</span>
           </button>
           <button
             onClick={loadLifts}
             className="w-8 h-8 rounded-xl glass dark:glass-dark flex items-center justify-center hover:bg-white/20 transition-all"
-            title="Aktualisieren"
+            title={t('lifts.refresh')}
           >
             <RefreshCw className={cn('w-4 h-4 text-gray-400', isLoading && 'animate-spin')} />
           </button>
@@ -583,7 +583,7 @@ function LiftZoneManager() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Suchen... (Nr., Projekt, Adresse)"
+          placeholder={t('lifts.search.placeholder')}
           className="w-full h-10 pl-10 pr-4 rounded-2xl text-sm glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none transition-all"
         />
         {searchQuery && (
@@ -619,14 +619,14 @@ function LiftZoneManager() {
               <Plus className="w-3.5 h-3.5 text-white" />
             </div>
             <span className="font-bold text-sm text-emerald-700 dark:text-emerald-300">
-              Neue Anlage hinzufügen
+              {t('lifts.add.title')}
             </span>
           </div>
 
           <div className="space-y-2.5">
             <div>
               <label className="block text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5">
-                Anlagen-Nr. <span className="text-red-400">*</span>
+                {t('lifts.add.nr')} <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
@@ -638,7 +638,7 @@ function LiftZoneManager() {
             </div>
             <div>
               <label className="block text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5">
-                Projekt-Nr.
+                {t('lifts.add.project')}
               </label>
               <input
                 type="text"
@@ -650,7 +650,7 @@ function LiftZoneManager() {
             </div>
             <div>
               <label className="block text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5">
-                Adresse
+                {t('lifts.add.address')}
               </label>
               <input
                 type="text"
@@ -662,7 +662,7 @@ function LiftZoneManager() {
             </div>
             <div>
               <label className="block text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5">
-                Zone
+                {t('lifts.add.zone')}
               </label>
               <select
                 value={addZone}
@@ -682,14 +682,14 @@ function LiftZoneManager() {
             <button
               onClick={() => {
                 if (!addNr.trim()) {
-                  showFeedback('Bitte Anlagen-Nr. eingeben', 'error')
+                  showFeedback(t('lifts.add.error.required'), 'error')
                   return
                 }
                 const key = addNr.trim().toUpperCase()
                 // Check if already exists
                 const exists = liftList.some((l) => l.anlagenummer.toUpperCase() === key)
                 if (exists) {
-                  showFeedback(`${key} existiert bereits`, 'error')
+                  showFeedback(t('lifts.add.error.exists', { nr: key }), 'error')
                   return
                 }
                 addLift(key, addProject.trim(), addAddress.trim(), addZone)
@@ -697,7 +697,7 @@ function LiftZoneManager() {
               className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-emerald-500 text-white font-semibold text-xs hover:bg-emerald-600 transition-all active:scale-95 shadow-md shadow-emerald-500/20"
             >
               <Plus className="w-3.5 h-3.5" />
-              Hinzufügen
+              {t('lifts.add.btn')}
             </button>
             <button
               onClick={() => {
@@ -710,7 +710,7 @@ function LiftZoneManager() {
               className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200/60 dark:border-red-700/40 text-red-600 dark:text-red-300 font-semibold text-xs hover:bg-red-100 dark:hover:bg-red-800/30 transition-all active:scale-95"
             >
               <X className="w-3.5 h-3.5" />
-              Abbrechen
+              {t('lifts.add.cancel')}
             </button>
           </div>
         </div>
@@ -727,12 +727,12 @@ function LiftZoneManager() {
             <MapPin className="w-6 h-6 text-gray-400" />
           </div>
           <p className="text-sm text-gray-400 font-medium">
-            {searchQuery ? 'Keine Anlagen gefunden' : 'Noch keine Anlagen gespeichert'}
+            {searchQuery ? t('lifts.notfound') : t('lifts.empty')}
           </p>
           <p className="text-[10px] text-gray-400 mt-0.5">
             {searchQuery
-              ? 'Versuche einen anderen Suchbegriff'
-              : 'Anlagen erscheinen hier nach dem ersten Erfassen'}
+              ? t('lifts.notfound.hint')
+              : t('lifts.empty.hint')}
           </p>
         </div>
       ) : (
@@ -779,7 +779,7 @@ function LiftZoneManager() {
                   <div className="space-y-2">
                     <div>
                       <label className="block text-[10px] font-semibold text-otis-500 dark:text-otis-400 mb-0.5">
-                        Projekt-Nr.
+                        {t('lifts.edit.project')}
                       </label>
                       <input
                         type="text"
@@ -791,7 +791,7 @@ function LiftZoneManager() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-semibold text-otis-500 dark:text-otis-400 mb-0.5">
-                        Adresse
+                        {t('lifts.edit.address')}
                       </label>
                       <input
                         type="text"
@@ -810,19 +810,19 @@ function LiftZoneManager() {
                       className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200/60 dark:border-emerald-700/40 text-emerald-700 dark:text-emerald-300 font-semibold text-xs hover:bg-emerald-200 dark:hover:bg-emerald-800/40 transition-all active:scale-95"
                     >
                       <Check className="w-3.5 h-3.5" />
-                      Speichern
+                      {t('lifts.edit.save')}
                     </button>
                     <button
                       onClick={cancelEditing}
                       className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200/60 dark:border-red-700/40 text-red-600 dark:text-red-300 font-semibold text-xs hover:bg-red-100 dark:hover:bg-red-800/30 transition-all active:scale-95"
                     >
                       <X className="w-3.5 h-3.5" />
-                      Abbrechen
+                      {t('lifts.edit.cancel')}
                     </button>
                     <button
                       onClick={() => setDeleteConfirm(lift.anlagenummer)}
                       className="w-9 h-9 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200/60 dark:border-orange-700/40 flex items-center justify-center hover:bg-orange-100 dark:hover:bg-orange-800/30 transition-all active:scale-90"
-                      title="Löschen"
+                      title={t('lifts.delete.btn')}
                     >
                       <Trash2 className="w-4 h-4 text-orange-500" />
                     </button>
@@ -833,19 +833,19 @@ function LiftZoneManager() {
                     <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-50/80 dark:bg-red-900/20 border border-red-200/60 dark:border-red-700/40 animate-slide-down">
                       <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
                       <span className="text-xs text-red-600 dark:text-red-300 flex-1">
-                        {lift.anlagenummer} wirklich löschen?
+                        {t('lifts.confirm.delete', { nr: lift.anlagenummer })}
                       </span>
                       <button
                         onClick={() => deleteLift(lift.anlagenummer)}
                         className="h-7 px-3 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600 transition-all active:scale-95"
                       >
-                        Löschen
+                        {t('lifts.delete.btn')}
                       </button>
                       <button
                         onClick={() => setDeleteConfirm(null)}
                         className="h-7 px-3 rounded-lg bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-gray-300 text-xs font-semibold hover:bg-gray-300 dark:hover:bg-white/20 transition-all active:scale-95"
                       >
-                        Nein
+                        {t('lifts.delete.no')}
                       </button>
                     </div>
                   )}
@@ -881,7 +881,7 @@ function LiftZoneManager() {
                     <button
                       onClick={() => startEditing(lift)}
                       className="w-7 h-7 rounded-lg bg-otis-100/50 dark:bg-otis-800/30 flex items-center justify-center hover:bg-otis-200/50 dark:hover:bg-otis-700/40 transition-all active:scale-90"
-                      title="Bearbeiten"
+                      title={t('lifts.edit.title')}
                     >
                       <Pencil className="w-3.5 h-3.5 text-otis-500" />
                     </button>

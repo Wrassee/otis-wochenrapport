@@ -42,14 +42,21 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
   const [overlapWarning, setOverlapWarning] = useState<string | null>(null)
   const [conflictingEntryIds, setConflictingEntryIds] = useState<string[]>([])
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const justSubmittedRef = useRef(false)
+  /** Values of the form at submit time — keeps overlap checks skipped until
+   *  the chained (next) start time lands, surviving multiple intermediate
+   *  renders caused by addEntry + loadWeek. */
+  const justSubmittedRef = useRef<string | null>(null)
 
-  // Check for time overlaps — skip one render cycle after submit to avoid
-  // false alarm when startTime is chained but existingEntries hasn't updated yet
+  // Check for time overlaps — skip the render(s) triggered by the submit
+  // itself: once the new entry lands in existingEntries, the form still holds
+  // the OLD startTime for a moment, which would falsely look like a self-overlap.
   useEffect(() => {
     if (justSubmittedRef.current) {
-      justSubmittedRef.current = false
-      return
+      // Still showing the submitted (stale) values → an intermediate render of
+      // the just-created entry is in flight; keep skipping until values change.
+      if (justSubmittedRef.current === `${startTime}|${duration}`) return
+      // Chained values have landed → clear the guard and run a real check.
+      justSubmittedRef.current = null
     }
     if (!startTime || !duration) return
     const start = timeToDecimal(startTime)
@@ -68,7 +75,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
 
     if (conflicting.length > 0) {
       setOverlapWarning(
-        `Zeitüberschneidung! ${conflicting
+        `${t('entry.overlap')} ${conflicting
           .map((e) => `${decimalToTime(e.start_time)}-${decimalToTime(e.start_time + e.duration)}`)
           .join(', ')}`
       )
@@ -310,6 +317,11 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
 
+    // Flag the in-flight submit BEFORE any await: when the new entry lands in
+    // existingEntries, the overlap effect must ignore the stale form values
+    // until the chained next start time has been applied.
+    justSubmittedRef.current = `${startTime}|${duration}`
+
     const start = timeToDecimal(startTime)
     // Duration is in OTIS format — convert to standard decimal for storage
     const dur = otisDurationToStandard(duration)
@@ -370,7 +382,6 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
     setSelectedActivityCode(null)
     setOverlapWarning(null)
     setConflictingEntryIds([])
-    justSubmittedRef.current = true
   }
 
   const todayStr = new Date(date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -577,7 +588,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-red-600 dark:text-red-300 font-medium">{overlapWarning}</p>
                 <p className="text-[10px] text-red-400/70 dark:text-red-400/50 mt-0.5">
-                  Zum Eintrag springen &rarr;
+                  {t('entry.overlap.jump')}
                 </p>
               </div>
             </button>

@@ -100,31 +100,42 @@
     display: none;
   }
 
-  /* Thicker horizontal scrollbar for the TimelineView */
+  /* Thicker horizontal scrollbar for the TimelineView — easy to grab with a mouse */
   .timeline-scrollbar::-webkit-scrollbar {
-    height: 8px;
+    height: 12px;
   }
   .timeline-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(0, 55, 166, 0.06);
+    border-radius: 99px;
+  }
+  .dark .timeline-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04);
   }
   .timeline-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(0, 55, 166, 0.15);
+    background: rgba(0, 55, 166, 0.25);
     border-radius: 99px;
-    border: 2px solid transparent;
+    border: 3px solid transparent;
     background-clip: content-box;
   }
   .dark .timeline-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(77, 163, 255, 0.15);
-    border: 2px solid transparent;
+    background: rgba(77, 163, 255, 0.25);
+    border: 3px solid transparent;
     background-clip: content-box;
   }
   .timeline-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 55, 166, 0.3);
-    border: 0px solid transparent;
+    background: rgba(0, 55, 166, 0.45);
+    border: 3px solid transparent;
   }
   .dark .timeline-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(77, 163, 255, 0.3);
-    border: 0px solid transparent;
+    background: rgba(77, 163, 255, 0.45);
+    border: 3px solid transparent;
+  }
+  .timeline-scrollbar {
+    scrollbar-width: auto;
+    scrollbar-color: rgba(0, 55, 166, 0.4) rgba(0, 55, 166, 0.08);
+  }
+  .dark .timeline-scrollbar {
+    scrollbar-color: rgba(77, 163, 255, 0.4) rgba(255, 255, 255, 0.06);
   }
 }
 

@@ -97,7 +97,7 @@ export function ExportPage() {
           entries: entriesData,
           expenses: allExpenses,
         }),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(30000),
       })
       if (!response.ok) {
         const detail = await response.text().catch(() => '')

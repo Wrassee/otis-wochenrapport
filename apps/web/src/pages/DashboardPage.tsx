@@ -93,7 +93,7 @@ export function DashboardPage() {
   }
 
   const handleDeleteEntry = async (entryId: string) => {
-    if (window.confirm('Diesen Eintrag wirklich löschen?')) {
+    if (window.confirm(t('timeline.confirm.delete'))) {
       await deleteEntry(entryId)
       await loadWeek()
     }
@@ -315,7 +315,7 @@ export function DashboardPage() {
       <BottomSheet
         open={editEntry !== null}
         onClose={() => setEditEntry(null)}
-        title="Eintrag bearbeiten"
+        title={t('edit.title')}
       >
         {editEntry && (
           <div className="space-y-4">
@@ -345,7 +345,7 @@ export function DashboardPage() {
             {/* Tätigkeit — Activity code picker */}
             <div className="space-y-1.5">
               <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200">
-                Tätigkeit
+                {t('entry.activity')}
               </label>
               <button
                 type="button"
@@ -357,7 +357,7 @@ export function DashboardPage() {
                     <Building2 className="w-3.5 h-3.5 text-otis-500 dark:text-otis-400" />
                   </div>
                   <span className={`text-sm font-medium ${editActivityCode ? 'text-otis-800 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
-                    {editActivityCode ? editActivityCode.code : '— Keine Auswahl —'}
+                    {editActivityCode ? editActivityCode.code : t('entry.activity.select')}
                   </span>
                 </div>
                 <ChevronDown className="w-4 h-4 text-gray-400" />
@@ -367,7 +367,7 @@ export function DashboardPage() {
             {/* Start time */}
             <Input
               id="dash-edit-start"
-              label="Beginn"
+              label={t('entry.beginn')}
               type="time"
               value={editStart}
               onChange={(e) => {
@@ -377,12 +377,12 @@ export function DashboardPage() {
               }}
               step="900"
               required
-              hint="15-Minuten-Schritte"
+              hint={t('entry.beginn.hint')}
             />
 
             {/* Duration (OTIS) */}
             <OtisDurationSelect
-              label="Dauer (OTIS)"
+              label={t('entry.dauer')}
               value={editDuration}
               onChange={(value) => setEditDuration(value)}
               required
@@ -396,7 +396,7 @@ export function DashboardPage() {
                 className="flex-1"
                 size="lg"
               >
-                Abbrechen
+                {t('edit.cancel')}
               </Button>
               <Button
                 variant="primary"
@@ -406,7 +406,7 @@ export function DashboardPage() {
                 disabled={editIsSaving}
               >
                 <Save className="w-4 h-4" />
-                {editIsSaving ? 'Speichert...' : 'Speichern'}
+                {editIsSaving ? t('edit.saving') : t('edit.save')}
               </Button>
             </div>
           </div>

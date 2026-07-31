@@ -54,9 +54,9 @@ export function AppShell({ children }: AppShellProps) {
                 : 'bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400'
             )}>
               {syncStatus.online ? (
-                <><Wifi className="w-3 h-3" /> Online</>
+                <><Wifi className="w-3 h-3" /> {t('settings.online')}</>
               ) : (
-                <><WifiOff className="w-3 h-3" /> Offline</>
+                <><WifiOff className="w-3 h-3" /> {t('settings.offline')}</>
               )}
             </div>
             {syncStatus.pendingSync > 0 && (

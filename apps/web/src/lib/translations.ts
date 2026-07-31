@@ -100,6 +100,7 @@ export const translations: TranslationDict = {
   'entry.spesen':         { de: 'Spesen (optional)',  fr: 'Frais (optionnel)',  it: 'Spese (opzionale)', hu: 'K\u00f6lts\u00e9gek (opcion\u00e1lis)' },
   'entry.save':           { de: 'Eintrag erfassen',   fr: 'Enregistrer l\'entr\u00e9e', it: 'Registra voce', hu: 'Bejegyz\u00e9s r\u00f6gz\u00edt\u00e9se' },
   'entry.overlap':        { de: 'Zeit\u00fcberschneidung!',fr: 'Chevauchement!',     it: 'Sovrapposizione!', hu: 'Id\u0151\u00fctk\u00f6z\u00e9s!' },
+  'entry.overlap.jump':   { de: 'Zum Eintrag springen', fr: 'Aller \u00e0 l\'entr\u00e9e', it: 'Vai alla voce',  hu: 'Ugr\u00e1s a bejegyz\u00e9shez' },
 
   // ─── Activity Picker ───
   'activity.productive':      { de: 'Produktiv',      fr: 'Productif',          it: 'Produttivo',     hu: 'Produkt\u00edv' },
