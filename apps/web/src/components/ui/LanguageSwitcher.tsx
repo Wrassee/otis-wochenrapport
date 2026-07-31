@@ -1,11 +1,12 @@
 import { Card, CardTitle } from '@/components/ui/Card'
 import { useAppStore } from '@/stores/appStore'
-import type { Language } from '@/lib/translations'
 import { LANGUAGES } from '@/lib/translations'
+import { useTranslation } from '@/lib/useTranslation'
 import { cn } from '@/lib/cn'
 import { Languages } from 'lucide-react'
 
 export function LanguageSwitcher() {
+  const { t } = useTranslation()
   const language = useAppStore((s) => s.language)
   const setLanguage = useAppStore((s) => s.setLanguage)
 
@@ -16,25 +17,25 @@ export function LanguageSwitcher() {
           <Languages className="w-4 h-4 text-white" />
         </div>
         <div>
-          <CardTitle>Sprache</CardTitle>
-          <p className="text-[10px] text-gray-400">App-Sprache ändern</p>
+          <CardTitle>{t('language.title')}</CardTitle>
+          <p className="text-[10px] text-gray-400">{t('language.subtitle')}</p>
         </div>
       </div>
 
-      <div className="flex gap-2">
+      <div className="grid grid-cols-4 gap-1.5">
         {LANGUAGES.map((lang) => (
           <button
             key={lang.code}
             onClick={() => setLanguage(lang.code)}
             className={cn(
-              'flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-2xl border text-sm font-semibold transition-all duration-200 active:scale-95',
+              'flex flex-col items-center justify-center gap-1 min-w-0 px-1 py-2.5 rounded-2xl border font-semibold transition-all duration-200 active:scale-95 overflow-hidden',
               language === lang.code
                 ? 'bg-otis-50 dark:bg-otis-900/30 border-otis-300/60 dark:border-otis-600/40 text-otis-700 dark:text-otis-300 shadow-sm'
                 : 'bg-white/50 dark:bg-white/5 border-gray-200/50 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-otis-200/50 hover:text-otis-600'
             )}
           >
-            <span className="text-lg leading-none">{lang.code === 'de' ? '🇩🇪' : lang.code === 'fr' ? '🇫🇷' : lang.code === 'it' ? '🇮🇹' : '🇭🇺'}</span>
-            <span className="text-xs">{lang.nativeLabel}</span>
+            <span className="text-base leading-none">{lang.code === 'de' ? '🇩🇪' : lang.code === 'fr' ? '🇫🇷' : lang.code === 'it' ? '🇮🇹' : '🇭🇺'}</span>
+            <span className="text-[10px] truncate max-w-full">{lang.nativeLabel}</span>
           </button>
         ))}
       </div>

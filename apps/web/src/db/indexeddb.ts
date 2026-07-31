@@ -160,7 +160,13 @@ export async function searchLocations(query: string): Promise<Location[]> {
 export async function getLocalProfile(): Promise<Profile | undefined> {
   const db = await getDb()
   const all = await db.getAll('profile')
-  return all[0]
+  // The 'profile' object store also holds non-profile payloads (e.g. the daily
+  // expenses record saved under the EXPENSES_KEY). Only return a real profile
+  // record — relying on all[0] could return the wrong entry depending on key
+  // sort order, which made the Settings profile fields appear empty.
+  return all.find(
+    (p: any) => p && typeof p.full_name === 'string' && typeof p.email === 'string'
+  ) as Profile | undefined
 }
 
 export async function saveLocalProfile(profile: Profile): Promise<void> {

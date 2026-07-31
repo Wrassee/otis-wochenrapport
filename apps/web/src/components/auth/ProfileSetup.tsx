@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
@@ -19,6 +19,15 @@ export function ProfileSetup({ initialName = '', initialPersonnel = '', initialS
   const [supervisorEmail, setSupervisorEmail] = useState(initialSupervisorEmail)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+
+  // Sync local state when the saved profile arrives/updates (e.g. after an
+  // async load). Without this, the fields would keep their initial (empty)
+  // values even though the store now holds the saved profile.
+  useEffect(() => {
+    setFullName(initialName)
+    setPersonnelNumber(initialPersonnel)
+    setSupervisorEmail(initialSupervisorEmail)
+  }, [initialName, initialPersonnel, initialSupervisorEmail])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()

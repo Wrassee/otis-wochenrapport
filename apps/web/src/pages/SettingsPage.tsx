@@ -39,8 +39,14 @@ export function SettingsPage() {
       created_at: profile?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
-    await upsertProfile(updatedProfile)
+    // Offline-first: persist to the store + IndexedDB immediately so the
+    // fields keep their values even if the Supabase sync fails (e.g. offline).
     setProfile(updatedProfile)
+    try {
+      await upsertProfile(updatedProfile)
+    } catch (err) {
+      console.warn('Failed to sync profile to Supabase:', err)
+    }
   }
 
   const handleSync = async () => {

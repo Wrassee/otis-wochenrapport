@@ -16,6 +16,11 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden'
+      // Dismiss any open keyboard so the sheet fits the (reduced) visual
+      // viewport instead of hanging off the bottom of the screen.
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur()
+      }
     } else {
       document.body.style.overflow = ''
     }
@@ -40,9 +45,9 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
         className={cn(
           'relative w-full max-w-lg',
           'glass-card dark:glass-card-dark',
-          'sm:rounded-2xl sm:max-h-[85vh] sm:mx-4',
+          'sm:rounded-2xl sm:max-h-[85dvh] sm:mx-4',
           'rounded-t-3xl shadow-2xl animate-slide-up flex flex-col',
-          'max-h-[90vh] overflow-hidden',
+          'max-h-[90dvh] overflow-hidden',
           className
         )}
       >
