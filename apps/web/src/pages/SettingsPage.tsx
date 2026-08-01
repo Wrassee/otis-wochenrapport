@@ -96,7 +96,14 @@ export function SettingsPage() {
 
   const handleSync = async () => {
     setSyncStatus({ syncing: true })
-    await forceSync()
+    try {
+      await forceSync()
+      // After pushing local changes, pull the cloud week so entries recorded
+      // on another device (e.g. the phone) appear immediately.
+      await useAppStore.getState().loadWeekEntries()
+    } finally {
+      setSyncStatus({ syncing: false })
+    }
   }
 
   const handleLogout = async () => {

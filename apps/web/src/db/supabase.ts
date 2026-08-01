@@ -117,12 +117,44 @@ export async function getWeekEntries(userId: string, startDate: string, endDate:
 }
 
 /**
- * Sync entries to Supabase (used by background sync)
+ * The exact columns of the `time_entries` table. Local TimeEntry objects also
+ * carry denormalized joined fields (location_anlagenummer, location_address,
+ * …) used for display — sending those to PostgREST fails the whole upsert
+ * with PGRST204 ("Could not find the 'location_anlagenummer' column of
+ * 'time_entries'"), which silently killed the mobile→cloud push.
+ */
+const TIME_ENTRY_COLUMNS = [
+  'id',
+  'user_id',
+  'date',
+  'start_time',
+  'duration',
+  'location_id',
+  'activity_code_id',
+  'activity_code',
+  'is_lunch',
+  'notes',
+  'synced',
+  'created_at',
+  'updated_at',
+] as const
+
+/**
+ * Sync entries to Supabase (used by background sync). Only the table's own
+ * columns are sent — denormalized display fields are stripped so the upsert
+ * never fails with PGRST204.
  */
 export async function syncEntries(entries: any[]) {
+  const rows = entries.map((e: Record<string, unknown>) => {
+    const row: Record<string, unknown> = {}
+    for (const col of TIME_ENTRY_COLUMNS) {
+      if (e[col] !== undefined) row[col] = e[col]
+    }
+    return row
+  })
   const { data, error } = await supabase
     .from('time_entries')
-    .upsert(entries, { onConflict: 'id' })
+    .upsert(rows, { onConflict: 'id' })
     .select()
   if (error) throw error
   return data

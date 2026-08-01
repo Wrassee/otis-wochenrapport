@@ -64,7 +64,14 @@ export function DashboardPage() {
   const handleSync = async () => {
     const { forceSync } = await import('@/db/sync')
     setSyncStatus({ syncing: true })
-    await forceSync()
+    try {
+      await forceSync()
+      // After pushing local changes, pull the cloud week so entries recorded
+      // on another device (e.g. the phone) appear immediately.
+      await loadWeek()
+    } finally {
+      setSyncStatus({ syncing: false })
+    }
   }
   const [editEntry, setEditEntry] = useState<TimeEntry | null>(null)
   const [editStart, setEditStart] = useState('')

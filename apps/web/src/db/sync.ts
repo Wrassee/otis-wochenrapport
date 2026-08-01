@@ -35,17 +35,28 @@ function notifyListeners(status: {
 }
 
 /**
- * Start background sync that runs periodically
+ * Start background sync that runs periodically.
+ *
+ * @param intervalMs   Sync interval in ms (default 30 s)
+ * @param onAfterSync  Optional callback fired after EACH sync completes
+ *                     (success or failure) — lets the caller pull fresh
+ *                     cloud data (e.g. the current week) so entries recorded
+ *                     on another device appear without a manual reload.
  */
-export function startBackgroundSync(intervalMs = 30000) {
+export function startBackgroundSync(intervalMs = 30000, onAfterSync?: () => void) {
+  const runSync = async () => {
+    await performSync()
+    onAfterSync?.()
+  }
+
   // Check immediately
-  performSync()
+  runSync()
 
   // Set up periodic check
-  syncInterval = setInterval(performSync, intervalMs)
+  syncInterval = setInterval(runSync, intervalMs)
 
   // Also listen for online/offline events
-  window.addEventListener('online', performSync)
+  window.addEventListener('online', runSync)
   window.addEventListener('offline', () => {
     notifyListeners({
       online: false,

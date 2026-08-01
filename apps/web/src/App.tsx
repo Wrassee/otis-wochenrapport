@@ -133,7 +133,19 @@ export default function App() {
 
     init()
 
-    startBackgroundSync(30000)
+    // After each background sync, also pull the active week from the cloud so
+    // entries recorded on another device (e.g. the phone) appear here without
+    // a manual reload — cross-device sync in both directions.
+    startBackgroundSync(30000, () => {
+      // Only pull when online — loadWeekEntries already re-reads IndexedDB
+      // unconditionally, and doing that every 30s while offline would just
+      // churn state with a pointless re-render.
+      if (!navigator.onLine) return
+      useAppStore
+        .getState()
+        .loadWeekEntries()
+        .catch((e) => console.warn('Failed to refresh week after background sync:', e))
+    })
 
     const unsubscribe = onSyncStatusChange((status) => {
       setSyncStatus(status)
