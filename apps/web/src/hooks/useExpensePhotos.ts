@@ -16,7 +16,13 @@ import { getWeekKey } from '@/lib/utils'
  */
 export function useExpensePhotos(year: number, week: number) {
   const user = useAppStore((s) => s.user)
-  const photos = useAppStore((s) => s.expensePhotos[getWeekKey(year, week)] || [])
+  // Select the stable map reference and derive the week's array OUTSIDE the
+  // selector. `s.expensePhotos[key] || []` in the selector would return a
+  // brand-new empty array on every render while the week isn't loaded yet,
+  // which makes useSyncExternalStore see a changed snapshot each time →
+  // "getSnapshot should be cached" + infinite re-render loop (white screen).
+  const expensePhotos = useAppStore((s) => s.expensePhotos)
+  const photos = expensePhotos[getWeekKey(year, week)] || []
   const loadExpensePhotos = useAppStore((s) => s.loadExpensePhotos)
   const addExpensePhoto = useAppStore((s) => s.addExpensePhoto)
   const updateExpensePhotoNote = useAppStore((s) => s.updateExpensePhotoNote)
