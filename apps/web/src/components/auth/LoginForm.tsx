@@ -30,7 +30,7 @@ export function LoginForm({ onLogin, onSwitchToRegister, error }: LoginFormProps
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-auth-ambient dark:bg-auth-ambient-dark relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center min-h-dvh p-6 bg-auth-ambient dark:bg-auth-ambient-dark relative overflow-hidden">
       {/* Decorative orbs */}
       <div className="absolute -top-40 -right-40 w-80 h-80 orb orb-blue opacity-60 dark:opacity-40" />
       <div className="absolute -bottom-32 -left-32 w-64 h-64 orb orb-cyan opacity-40 dark:opacity-30" />

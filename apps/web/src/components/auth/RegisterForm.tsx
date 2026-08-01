@@ -53,7 +53,7 @@ export function RegisterForm({ onRegister, onSwitchToLogin, error }: RegisterFor
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-auth-ambient dark:bg-auth-ambient-dark relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center min-h-dvh p-6 bg-auth-ambient dark:bg-auth-ambient-dark relative overflow-hidden">
       {/* Decorative orbs */}
       <div className="absolute -top-32 -right-32 w-72 h-72 orb orb-blue opacity-50 dark:opacity-35" />
       <div className="absolute -bottom-40 -left-40 w-80 h-80 orb orb-cyan opacity-35 dark:opacity-25" />

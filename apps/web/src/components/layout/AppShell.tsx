@@ -24,7 +24,7 @@ export function AppShell({ children }: AppShellProps) {
   const syncStatus = useAppStore((s) => s.syncStatus)
 
   return (
-    <div className="flex flex-col min-h-screen overflow-x-hidden bg-otis-ambient dark:bg-otis-ambient-dark selection:bg-otis-200 selection:text-white">
+    <div className="flex flex-col min-h-dvh overflow-x-hidden bg-otis-ambient dark:bg-otis-ambient-dark selection:bg-otis-200 selection:text-white">
       {/* Ambient decorative orbs */}
       <div className="fixed top-0 right-0 w-[300px] h-[300px] orb orb-blue dark:opacity-30 -translate-y-1/2 translate-x-1/4 pointer-events-none" />
       <div className="fixed top-1/3 left-0 w-[200px] h-[200px] orb orb-cyan dark:opacity-20 -translate-x-1/3 pointer-events-none" />

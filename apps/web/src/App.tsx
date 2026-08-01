@@ -130,7 +130,7 @@ export default function App() {
 
   if (initializing) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-auth-ambient dark:bg-auth-ambient-dark relative overflow-hidden">
+      <div className="flex items-center justify-center min-h-dvh bg-auth-ambient dark:bg-auth-ambient-dark relative overflow-hidden">
         <div className="absolute -top-40 -right-40 w-96 h-96 orb orb-blue opacity-60" />
         <div className="absolute -bottom-32 -left-32 w-72 h-72 orb orb-cyan opacity-40" />
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[500px] h-[500px] orb orb-purple opacity-20" />
