@@ -4,6 +4,7 @@ import { LANGUAGES } from '@/lib/translations'
 import { useTranslation } from '@/lib/useTranslation'
 import { cn } from '@/lib/cn'
 import { Languages } from 'lucide-react'
+import { Flag } from '@/components/ui/Flag'
 
 export function LanguageSwitcher() {
   const { t } = useTranslation()
@@ -34,7 +35,7 @@ export function LanguageSwitcher() {
                 : 'bg-white/50 dark:bg-white/5 border-gray-200/50 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-otis-200/50 hover:text-otis-600'
             )}
           >
-            <span className="text-base leading-none">{lang.code === 'de' ? '🇩🇪' : lang.code === 'fr' ? '🇫🇷' : lang.code === 'it' ? '🇮🇹' : '🇭🇺'}</span>
+            <Flag code={lang.code} />
             <span className="text-[10px] truncate max-w-full">{lang.nativeLabel}</span>
           </button>
         ))}

@@ -14,6 +14,7 @@ import { cacheLocations, cacheActivityCodes, getAllLocations as getLocalLocation
 import { getLocations as getSupabaseLocations } from '@/db/supabase'
 import { ACTIVITY_CODES } from '@/lib/constants'
 import { scheduleMondayReminder, isReminderScheduled } from '@/db/notifications'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { Building2 } from 'lucide-react'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -163,71 +164,73 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppNavigator />
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <LoginPage />
-            </PublicRoute>
-          }
-        />
+          <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <LoginPage />
+              </PublicRoute>
+            }
+          />
 
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <AppShell>
-                <DashboardPage />
-              </AppShell>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/spesen"
-          element={
-            <ProtectedRoute>
-              <AppShell>
-                <SpesenPage />
-              </AppShell>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/weekly"
-          element={
-            <ProtectedRoute>
-              <AppShell>
-                <WeeklyPage />
-              </AppShell>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/export"
-          element={
-            <ProtectedRoute>
-              <AppShell>
-                <ExportPage />
-              </AppShell>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <AppShell>
-                <SettingsPage />
-              </AppShell>
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <DashboardPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/spesen"
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <SpesenPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/weekly"
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <WeeklyPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/export"
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <ExportPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <SettingsPage />
+                </AppShell>
+              </ProtectedRoute>
+            }
+          />
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   )
 }

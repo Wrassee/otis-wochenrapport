@@ -339,6 +339,75 @@ t('holiday.count', { n: holidays.length })
 - Use Zustand's `useAppStore()` for global state (not prop drilling)
 - Use `useTranslation()` for text (not hardcoded strings)
 
+### Zustand Selectors (infinite-loop prevention)
+
+Zustand v5 subscribes via `useSyncExternalStore`, which compares the selector
+result with `Object.is` on every render. **A selector that returns a fresh
+object/array reference on each render causes `Maximum update depth exceeded`
+→ white screen.** Always return a stable reference and derive values OUTSIDE
+the selector:
+
+```ts
+// ❌ NEVER — while the week isn't loaded, `|| []` creates a new array every
+//    render, so every snapshot looks "changed" → infinite render loop.
+const photos = useAppStore((s) => s.expensePhotos[getWeekKey(year, week)] || [])
+
+// ✅ Select the stable map reference, derive the array in the component body.
+//    Reactivity is preserved: the map gets a new reference when it changes.
+const expensePhotos = useAppStore((s) => s.expensePhotos)
+const photos = expensePhotos[getWeekKey(year, week)] || []
+```
+
+| Selector returns... | Safe? | Notes |
+|---|---|---|
+| Primitive (`string`/`number`/`boolean`) | ✅ | e.g. `s.isAuthenticated`, `s.language` |
+| Stored reference, no derivation | ✅ | e.g. `s.syncStatus`, `s.expensePhotos`, `s.user` — the stored object/map/array reference only changes when `set()` replaces it |
+| Store action (function) | ✅ | defined once inside `create()` |
+| Derived value (`arr.map/filter`, `|| fallback`, object literal, `[a, b]`) | ❌ | fresh reference per render → infinite loop |
+
+**Need multiple values in one call?** Use `useShallow` from
+`zustand/react/shallow`. It caches the last selector result and returns the
+previous (stable) reference whenever the new result is shallow-equal — so an
+object-literal selector like the one below neither re-renders on unrelated
+store updates nor triggers an infinite loop. The "derive outside the
+selector" rule still applies when derived values change identity on every
+render (e.g. `.map(e => ({ ...e }))` creating new objects — shallow
+comparison can't deduplicate those):
+
+```ts
+import { useShallow } from 'zustand/react/shallow'
+
+const { theme, language } = useAppStore(useShallow((s) => ({ theme: s.theme, language: s.language })))
+```
+
+### Flags (language selector icons)
+
+Language flags are rendered as **inline SVG** in `components/ui/Flag.tsx` —
+**never as flag emoji** (🇩🇪/🇫🇷/…). Flag emoji render natively on Android but
+NOT on Windows desktop Chrome/Firefox (the OS font has no flag glyphs), which
+caused blank language pills on the web. SVG renders identically on every
+platform.
+
+Supported codes (typed union `FlagCode`): `de fr it hu` (current app
+languages) + `at ch gb` (pre-added for future language extensions).
+
+**To add a new flag:**
+
+1. Extend the `FlagCode` union in `Flag.tsx` (e.g. `| 'es'`).
+2. Add one entry to the `FLAG_RENDERERS` record. The `Record<FlagCode, …>`
+   type makes TypeScript fail the build if any code lacks a renderer — the
+   compiler enforces completeness.
+3. Use the country's **official colors**. For simple 3-stripe flags reuse the
+   `Stripes` helper (`vertical` for left→right columns, e.g. FR/IT; default is
+   top→bottom rows, e.g. DE/HU/AT). For complex patterns add a small renderer
+   function (e.g. `SwissCross`, `UnionJack`) — all coordinates live in the
+   24×16 viewBox.
+4. Use it in components: `<Flag code="…" />` (or `<Flag code={lang.code} />`
+   with a `Language` value).
+
+Rules: no flag emoji in UI code; official color values; keep `aria-hidden`
+on the decorative SVG (the adjacent text label carries the meaning).
+
 ### CSS / Tailwind
 
 - Use `cn()` utility for conditional class merging

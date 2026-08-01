@@ -290,6 +290,14 @@ export const translations: TranslationDict = {
   'common.backend.warming':{ de: 'W\u00e4rmt auf... (kann 15\u201330s dauern)', fr: 'Pr\u00e9chauffage... (15\u201330s)', it: 'Riscaldamento... (15\u201330s)', hu: '\u00c9breszt\u00e9s... (15\u201330 mp)' },
   'common.backend.warm':  { de: 'Server bereit \u2713',    fr: 'Serveur pr\u00eat \u2713',      it: 'Server pronto \u2713', hu: 'Szerver k\u00e9szen \u2713' },
   'common.otis':          { de: 'OTIS Elevator Company', fr: 'OTIS Elevator Company', it: 'OTIS Elevator Company', hu: 'OTIS Elevator Company' },
+
+  // ─── Error Boundary ───
+  'error.title':    { de: 'Etwas ist schief gelaufen', fr: 'Une erreur est survenue', it: 'Qualcosa \u00e8 andato storto', hu: 'Valami hiba t\u00f6rt\u00e9nt' },
+  'error.subtitle': { de: 'Unerwarteter Fehler',       fr: 'Erreur inattendue',       it: 'Errore imprevisto',          hu: 'V\u00e1ratlan hiba' },
+  'error.message':  { de: 'Ein unerwarteter Fehler ist aufgetreten. Du kannst es erneut versuchen oder die App neu laden. Falls das Problem bestehen bleibt, melde den Fehler mit dem Text unten.', fr: "Une erreur inattendue s'est produite. Vous pouvez r\u00e9essayer ou recharger l'application. Si le probl\u00e8me persiste, signalez l'erreur avec le texte ci-dessous.", it: "Si \u00e8 verificato un errore imprevisto. Puoi riprovare o ricaricare l'app. Se il problema persiste, segnala l'errore con il testo qui sotto.", hu: 'V\u00e1ratlan hiba t\u00f6rt\u00e9nt. Pr\u00f3b\u00e1lja \u00fajra, vagy t\u00f6ltse \u00fajra az alkalmaz\u00e1st. Ha a probl\u00e9ma tov\u00e1bbra is fenn\u00e1ll, jelentse a hib\u00e1t az al\u00e1bbi sz\u00f6veggel.' },
+  'error.retry':    { de: 'Erneut versuchen',          fr: 'R\u00e9essayer',              it: 'Riprova',                    hu: '\u00dajra pr\u00f3b\u00e1lkoz\u00e1s' },
+  'error.reload':   { de: 'Neu laden',                 fr: 'Recharger',               it: 'Ricarica',                   hu: '\u00dajrat\u00f6lt\u00e9s' },
+  'error.details':  { de: 'Fehlerdetails anzeigen',    fr: 'Afficher les d\u00e9tails',  it: 'Mostra i dettagli',          hu: 'Hibadetails mutat\u00e1sa' },
 }
 
 /** Shortcut for day names */
