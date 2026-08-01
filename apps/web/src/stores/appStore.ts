@@ -5,7 +5,7 @@ import { getToday, getWeekDates, getWeekInfo, getWeekKey, haversineDistance, cal
 import { REFERENCE_LAT, REFERENCE_LON, ACTIVITY_CODES } from '@/lib/constants'
 import type { Language } from '@/lib/translations'
 import { DAY_NAMES } from '@/lib/translations'
-import { supabase, getProfile, upsertFavorite, getFavorites, syncExpensesToSupabase, getExpenses, upsertExpensePhoto, deleteExpensePhotoFromSupabase, subscribeExpensePhotoChanges } from '@/db/supabase'
+import { supabase, getProfile, upsertFavorite, getFavorites, syncExpensesToSupabase, getExpenses, upsertExpensePhoto, deleteExpensePhotoFromSupabase, subscribeExpensePhotoChanges, subscribeDailyExpenseChanges } from '@/db/supabase'
 import { syncExpenses as queueExpensesSync } from '@/lib/syncExpenses'
 import { loadWeekExpensePhotos, markPhotoDeleted, clearPhotoDeleted } from '@/lib/expensePhotos'
 import { fileToPhotoDataUrl } from '@/lib/photoUtils'
@@ -18,6 +18,12 @@ let photoRealtimeUnsubscribe: (() => void) | null = null
 
 /** Debounce timer for realtime photo reloads — batches rapid events into one fetch. */
 let photoRealtimeTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Realtime expense-change subscription cleanup handle (per signed-in user). */
+let expenseRealtimeUnsubscribe: (() => void) | null = null
+
+/** Debounce timer for persisting realtime expense changes to IndexedDB. */
+let expenseRealtimeTimer: ReturnType<typeof setTimeout> | null = null
 
 /**
  * Collect all expenses from the dailyExpenses map into a flat array
@@ -169,6 +175,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!user && photoRealtimeTimer) {
       clearTimeout(photoRealtimeTimer)
       photoRealtimeTimer = null
+    }
+    // Logged out — also tear down the realtime expense subscription.
+    if (!user && expenseRealtimeUnsubscribe) {
+      expenseRealtimeUnsubscribe()
+      expenseRealtimeUnsubscribe = null
+    }
+    if (!user && expenseRealtimeTimer) {
+      clearTimeout(expenseRealtimeTimer)
+      expenseRealtimeTimer = null
     }
     set({ user, isAuthenticated: !!user })
   },
@@ -802,6 +817,64 @@ export const useAppStore = create<AppState>((set, get) => ({
         get()
           .loadExpensePhotos(year, week, true)
           .catch((e) => console.warn('Failed to reload photos on realtime event:', e))
+      }, 300)
+    })
+
+    // Live cross-device expense sync — Supabase Realtime. Rows are applied
+    // directly (not via week reload): the sync strategy is full-replace
+    // (delete-all + insert-fresh), so a reload would fight the merge logic
+    // that deliberately preserves local-only rows.
+    // NOTE: this device's OWN full-replace sync echoes DELETE+INSERT events
+    // back into this handler — that is intentional and idempotent (each event
+    // upserts/removes one specific date+type key, and the handler never
+    // triggers a sync itself), so no echo-guard is needed.
+    if (expenseRealtimeUnsubscribe) {
+      expenseRealtimeUnsubscribe()
+      expenseRealtimeUnsubscribe = null
+    }
+    expenseRealtimeUnsubscribe = subscribeDailyExpenseChanges(userId, (payload) => {
+      const rec = payload.eventType === 'DELETE' ? payload.old : payload.new
+      const date = String(rec?.date || '')
+      const expenseType = String(rec?.expense_type || '')
+      if (!date || !expenseType) return
+
+      set((state) => {
+        const current = state.dailyExpenses[date] || []
+        if (payload.eventType === 'DELETE') {
+          return {
+            dailyExpenses: {
+              ...state.dailyExpenses,
+              [date]: current.filter((e) => e.expense_type !== expenseType),
+            },
+          }
+        }
+        // INSERT / UPDATE — upsert the row for this date + type.
+        // Note: a legit `0` (e.g. Material) must survive — Number.isFinite
+        // handles both JSON numbers and "0" strings correctly.
+        const entry: DailyExpense = {
+          date,
+          expense_type: expenseType as ExpenseType,
+          value: Number.isFinite(Number(rec?.value)) ? Number(rec?.value) : 1,
+        }
+        const exists = current.some((e) => e.expense_type === expenseType)
+        return {
+          dailyExpenses: {
+            ...state.dailyExpenses,
+            [date]: exists
+              ? current.map((e) => (e.expense_type === expenseType ? entry : e))
+              : [...current, entry],
+          },
+        }
+      })
+
+      // Batch IndexedDB persistence — a full-replace sync emits a burst of
+      // DELETE+INSERT events; collapse them into one write.
+      if (expenseRealtimeTimer) clearTimeout(expenseRealtimeTimer)
+      expenseRealtimeTimer = setTimeout(() => {
+        expenseRealtimeTimer = null
+        localDb.saveDailyExpenses(get().dailyExpenses).catch((e) =>
+          console.warn('Failed to persist realtime expenses to IndexedDB:', e)
+        )
       }, 300)
     })
 

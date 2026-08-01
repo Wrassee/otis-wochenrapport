@@ -361,3 +361,39 @@ export function subscribeExpensePhotoChanges(
     supabase.removeChannel(channel)
   }
 }
+
+/**
+ * Subscribe to realtime changes on the user's daily_expenses rows.
+ *
+ * Requires the table to be in the `supabase_realtime` publication and
+ * REPLICA IDENTITY FULL (see migration 007). The channel is filtered by
+ * user_id, so only this user's expenses trigger the callback.
+ *
+ * Returns an unsubscribe function.
+ */
+export function subscribeDailyExpenseChanges(
+  userId: string,
+  onExpenseChange: (payload: {
+    eventType: 'INSERT' | 'UPDATE' | 'DELETE'
+    new?: Record<string, any>
+    old?: Record<string, any>
+  }) => void,
+): () => void {
+  const channel = supabase
+    .channel(`daily-expenses-${userId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'daily_expenses',
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => onExpenseChange(payload),
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
