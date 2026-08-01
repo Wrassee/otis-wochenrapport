@@ -12,13 +12,13 @@ import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
-import * as localDb from '@/db/indexeddb'
 import { dataUrlToBase64 } from '@/lib/photoUtils'
+import { loadWeekExpensePhotos } from '@/lib/expensePhotos'
 import type { ExpensePhoto } from '@/lib/types'
 
 export function ExportPage() {
   const { t } = useTranslation()
-  const { currentWeek, weekSummary, loadWeekEntries, calculateWeekSummary, timeEntries, dailyExpenses, locations, favoriteLocations } = useAppStore()
+  const { currentWeek, weekSummary, loadWeekEntries, calculateWeekSummary, timeEntries, dailyExpenses, locations, favoriteLocations, user } = useAppStore()
   const [exporting, setExporting] = useState(false)
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
@@ -38,11 +38,11 @@ export function ExportPage() {
     calculateWeekSummary()
   }, [timeEntries, calculateWeekSummary])
 
-  // Load photographed receipts (Spesen Belege) for the current week
+  // Load photographed receipts (Spesen Belege) for the current week — merged
+  // local + cloud so a second device sees the photos too.
   useEffect(() => {
     let cancelled = false
-    localDb
-      .getExpensePhotos(currentWeek.year, currentWeek.week)
+    loadWeekExpensePhotos(user?.id, currentWeek.year, currentWeek.week)
       .then((list) => {
         if (!cancelled) setPhotos(list)
       })
@@ -50,7 +50,7 @@ export function ExportPage() {
     return () => {
       cancelled = true
     }
-  }, [currentWeek])
+  }, [currentWeek, user?.id])
 
   const buildEntriesData = (): OfflineEntry[] => {
     return timeEntries.map((e) => {
@@ -91,10 +91,10 @@ export function ExportPage() {
     return all
   }
 
-  /** Photographed receipts (Spesen Belege) for the current week. */
+  /** Photographed receipts (Spesen Belege) for the current week — merged local + cloud. */
   const collectWeekPhotos = async (): Promise<ExpensePhoto[]> => {
     try {
-      return await localDb.getExpensePhotos(currentWeek.year, currentWeek.week)
+      return await loadWeekExpensePhotos(user?.id, currentWeek.year, currentWeek.week)
     } catch (e) {
       console.warn('Failed to load receipt photos:', e)
       return []

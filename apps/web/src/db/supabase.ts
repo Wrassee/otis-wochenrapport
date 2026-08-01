@@ -277,3 +277,50 @@ export async function getExpenses(
   if (error) throw error
   return data || []
 }
+
+/**
+ * Upsert an expense receipt photo (Spesen Beleg).
+ * id is the local-generated id, so re-syncing the same photo overwrites it.
+ */
+export async function upsertExpensePhoto(photo: {
+  id: string
+  user_id: string
+  year: number
+  week: number
+  filename: string
+  data_url: string
+  created_at?: string
+}) {
+  const { data, error } = await supabase
+    .from('expense_photos')
+    .upsert(photo, { onConflict: 'id' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get all receipt photos for a user in a given week.
+ */
+export async function getExpensePhotosFromSupabase(userId: string, year: number, week: number) {
+  const { data, error } = await supabase
+    .from('expense_photos')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('year', year)
+    .eq('week', week)
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Delete a receipt photo from the server.
+ */
+export async function deleteExpensePhotoFromSupabase(id: string) {
+  const { error } = await supabase
+    .from('expense_photos')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
