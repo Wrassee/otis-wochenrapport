@@ -48,3 +48,27 @@ CREATE POLICY "Users can update own favorites"
 CREATE POLICY "Users can delete own favorites"
   ON user_favorites FOR DELETE
   USING (auth.uid() = user_id);
+
+-- ============================================================
+-- REALTIME (live cross-device favorites sync)
+-- The table is realtime-enabled HERE at creation time, so the
+-- order of migrations 002 / 008 no longer matters: whichever runs
+-- first, the end state is correct. Idempotent (safe to re-run).
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'user_favorites'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE user_favorites;
+  END IF;
+END
+$$;
+
+-- REPLICA IDENTITY FULL: include all columns (esp. user_id,
+-- anlagenummer) in DELETE payloads, so the filtered realtime
+-- channel can attribute deletes to the right user. Idempotent.
+ALTER TABLE user_favorites REPLICA IDENTITY FULL;

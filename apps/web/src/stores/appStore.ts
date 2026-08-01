@@ -5,7 +5,7 @@ import { getToday, getWeekDates, getWeekInfo, getWeekKey, haversineDistance, cal
 import { REFERENCE_LAT, REFERENCE_LON, ACTIVITY_CODES } from '@/lib/constants'
 import type { Language } from '@/lib/translations'
 import { DAY_NAMES } from '@/lib/translations'
-import { supabase, getProfile, upsertFavorite, getFavorites, syncExpensesToSupabase, getExpenses, upsertExpensePhoto, deleteExpensePhotoFromSupabase, subscribeExpensePhotoChanges, subscribeDailyExpenseChanges } from '@/db/supabase'
+import { getProfile, upsertFavorite, getFavorites, getExpenses, upsertExpensePhoto, deleteExpensePhotoFromSupabase, subscribeExpensePhotoChanges, subscribeDailyExpenseChanges, subscribeFavoriteChanges, updateProfileLanguage } from '@/db/supabase'
 import { syncExpenses as queueExpensesSync } from '@/lib/syncExpenses'
 import { loadWeekExpensePhotos, markPhotoDeleted, clearPhotoDeleted } from '@/lib/expensePhotos'
 import { fileToPhotoDataUrl } from '@/lib/photoUtils'
@@ -24,6 +24,9 @@ let expenseRealtimeUnsubscribe: (() => void) | null = null
 
 /** Debounce timer for persisting realtime expense changes to IndexedDB. */
 let expenseRealtimeTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Realtime favorite-change subscription cleanup handle (per signed-in user). */
+let favoriteRealtimeUnsubscribe: (() => void) | null = null
 
 /**
  * Collect all expenses from the dailyExpenses map into a flat array
@@ -151,17 +154,40 @@ export const useAppStore = create<AppState>((set, get) => ({
     localStorage.setItem('otis_language', lang)
     set({ language: lang })
 
-    // Sync language preference to Supabase profile
+    // Sync language preference to Supabase profile — offline-first:
+    // online → push immediately; offline (or push failure) → queue a
+    // language_sync so the background sync retries once connectivity returns
+    // (IndexedDB queue survives app restarts, so it is never lost).
     const { user } = get()
+    const profile = get().profile
+    let pushed = false
     if (user && navigator.onLine) {
       try {
-        await supabase
-          .from('profiles')
-          .update({ language: lang })
-          .eq('id', user.id)
+        await updateProfileLanguage(user.id, lang)
+        pushed = true
       } catch (e) {
         console.warn('Failed to sync language to Supabase:', e)
       }
+    }
+    if (user && !pushed) {
+      await localDb.addToSyncQueue({
+        type: 'language_sync',
+        userId: user.id,
+        language: lang,
+        timestamp: Date.now(),
+      })
+    }
+
+    // Keep the locally cached profile in sync so an offline app restart
+    // shows the same language (initialize() prefers the IndexedDB profile
+    // over localStorage). updated_at is bumped only when the cloud push is
+    // queued — the fresh local choice must win until it reaches the cloud;
+    // on a successful push the remote row is newer, so it stays authoritative.
+    if (profile) {
+      const updated = pushed
+        ? { ...profile, language: lang }
+        : { ...profile, language: lang, updated_at: new Date().toISOString() }
+      get().setProfile(updated)
     }
   },
 
@@ -184,6 +210,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!user && expenseRealtimeTimer) {
       clearTimeout(expenseRealtimeTimer)
       expenseRealtimeTimer = null
+    }
+    // Logged out — also tear down the realtime favorites subscription.
+    if (!user && favoriteRealtimeUnsubscribe) {
+      favoriteRealtimeUnsubscribe()
+      favoriteRealtimeUnsubscribe = null
     }
     set({ user, isAuthenticated: !!user })
   },
@@ -652,21 +683,25 @@ export const useAppStore = create<AppState>((set, get) => ({
           const remoteUpdated = remoteProfile.updated_at
             ? new Date(remoteProfile.updated_at).getTime()
             : 0
-          if (localUpdated > remoteUpdated) return
-
-          const mergedProfile: Profile = {
-            id: remoteProfile.id,
-            email: remoteProfile.email || currentProfile?.email || '',
-            full_name: remoteProfile.full_name || currentProfile?.full_name || '',
-            personnel_number: remoteProfile.personnel_number || currentProfile?.personnel_number || '',
-            supervisor_email: remoteProfile.supervisor_email || currentProfile?.supervisor_email || '',
-            language: remoteProfile.language || currentProfile?.language || get().language,
-            created_at: remoteProfile.created_at || currentProfile?.created_at || new Date().toISOString(),
-            updated_at: remoteProfile.updated_at || new Date().toISOString(),
+          if (localUpdated <= remoteUpdated) {
+            const mergedProfile: Profile = {
+              id: remoteProfile.id,
+              email: remoteProfile.email || currentProfile?.email || '',
+              full_name: remoteProfile.full_name || currentProfile?.full_name || '',
+              personnel_number: remoteProfile.personnel_number || currentProfile?.personnel_number || '',
+              supervisor_email: remoteProfile.supervisor_email || currentProfile?.supervisor_email || '',
+              language: remoteProfile.language || currentProfile?.language || get().language,
+              created_at: remoteProfile.created_at || currentProfile?.created_at || new Date().toISOString(),
+              updated_at: remoteProfile.updated_at || new Date().toISOString(),
+            }
+            // Reuse the store action: sets state, persists to IndexedDB and
+            // applies the language preference if it differs.
+            get().setProfile(mergedProfile)
           }
-          // Reuse the store action: sets state, persists to IndexedDB and
-          // applies the language preference if it differs.
-          get().setProfile(mergedProfile)
+          // If the local profile is NEWER (e.g. edited offline), keep it —
+          // a stale remote row must not overwrite it. Either way the rest of
+          // the initialization (locations, favorites, expenses, entries,
+          // realtime) still runs to completion.
         }
       } catch (e) {
         console.warn('Failed to fetch profile from Supabase:', e)
@@ -882,6 +917,73 @@ export const useAppStore = create<AppState>((set, get) => ({
           console.warn('Failed to persist realtime expenses to IndexedDB:', e)
         )
       }, 300)
+    })
+
+    // Live cross-device favorites sync — Supabase Realtime. When another
+    // device uses a lift, its user_favorites row is upserted (use_count /
+    // last_used change) — reflect it immediately so "Letzte Anlagen" stays
+    // in sync. INSERT/UPDATE rows are applied directly (the payload carries
+    // every column, so no reload is needed); DELETE is applied directly too
+    // (a reload+merge would resurrect the row, since the merge deliberately
+    // preserves local-only favorites).
+    // NOTE: this device's OWN upsert (addRecentLocation → upsertFavorite)
+    // echoes back as an INSERT/UPDATE event — that is intentional and
+    // idempotent (re-saving the same row + refreshing the top-5), and the
+    // handler never triggers a sync itself, so no echo-guard is needed.
+    if (favoriteRealtimeUnsubscribe) {
+      favoriteRealtimeUnsubscribe()
+      favoriteRealtimeUnsubscribe = null
+    }
+    favoriteRealtimeUnsubscribe = subscribeFavoriteChanges(userId, (payload) => {
+      const rec = payload.eventType === 'DELETE' ? payload.old : payload.new
+      const anlagenummer = String(rec?.anlagenummer || '')
+      if (!anlagenummer) return
+
+      if (payload.eventType === 'DELETE') {
+        // Remote delete → drop locally too, so it can't resurrect via the
+        // local-preserving merge on the next load.
+        localDb.removeFavoriteLocation(anlagenummer).catch((e) =>
+          console.warn('Failed to remove favorite from IndexedDB on realtime delete:', e)
+        )
+        set((state) => ({
+          favoriteLocations: state.favoriteLocations.filter(
+            (f) => f.anlagenummer.toUpperCase() !== anlagenummer.toUpperCase()
+          ),
+        }))
+        return
+      }
+
+      // INSERT / UPDATE — upsert the row locally (preserving the higher
+      // use_count, so a device that used the lift more often wins) and
+      // refresh the top-5 list. When the row already exists locally, write
+      // under its existing anlagenummer key — the favorites store is keyed
+      // by anlagenummer and the codebase is case-inconsistent, so saving
+      // with the remote casing could create a duplicate row.
+      localDb.getFavoriteLocations().then((localFavs) => {
+        const existing = localFavs.find(
+          (f) => f.anlagenummer.toUpperCase() === anlagenummer.toUpperCase()
+        )
+        const fav = {
+          anlagenummer: existing?.anlagenummer || String(rec?.anlagenummer || ''),
+          project_id: String(rec?.project_id || ''),
+          full_address: String(rec?.full_address || ''),
+          latitude: Number(rec?.latitude) || 0,
+          longitude: Number(rec?.longitude) || 0,
+          zone: Number(rec?.zone) || 0,
+          manual_zone: rec?.manual_zone != null ? Number(rec.manual_zone) : undefined,
+          use_count: Math.max(Number(rec?.use_count) || 1, existing?.use_count || 1),
+          last_used: String(rec?.last_used || new Date().toISOString()),
+        }
+        return localDb.saveFavoriteLocation(fav).then(() =>
+          localDb.getFavoriteLocations()
+        )
+      })
+        .then((refreshed) => {
+          set({ favoriteLocations: refreshed.slice(0, 5) })
+        })
+        .catch((e) =>
+          console.warn('Failed to apply realtime favorite update:', e)
+        )
     })
 
     set({ isLoading: false })

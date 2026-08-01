@@ -80,6 +80,19 @@ export async function upsertProfile(profile: {
 }
 
 /**
+ * Update the user's preferred language on their Supabase profile.
+ * Used by setLanguage (immediate push when online) and the background sync
+ * queue (language_sync — retried later when connectivity returns).
+ */
+export async function updateProfileLanguage(userId: string, language: string) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ language })
+    .eq('id', userId)
+  if (error) throw error
+}
+
+/**
  * Get all locations (elevators) for autocomplete
  */
 export async function getLocations() {
@@ -390,6 +403,42 @@ export function subscribeDailyExpenseChanges(
         filter: `user_id=eq.${userId}`,
       },
       (payload) => onExpenseChange(payload),
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
+
+/**
+ * Subscribe to realtime changes on the user's user_favorites rows.
+ *
+ * Requires the table to be in the `supabase_realtime` publication and
+ * REPLICA IDENTITY FULL (see migration 008). The channel is filtered by
+ * user_id, so only this user's favorites trigger the callback.
+ *
+ * Returns an unsubscribe function.
+ */
+export function subscribeFavoriteChanges(
+  userId: string,
+  onFavoriteChange: (payload: {
+    eventType: 'INSERT' | 'UPDATE' | 'DELETE'
+    new?: Record<string, any>
+    old?: Record<string, any>
+  }) => void,
+): () => void {
+  const channel = supabase
+    .channel(`favorites-${userId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'user_favorites',
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => onFavoriteChange(payload),
     )
     .subscribe()
 

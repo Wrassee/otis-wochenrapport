@@ -249,6 +249,43 @@ export async function addFavoriteLocation(loc: {
   })
 }
 
+/**
+ * Write a favorite with explicit values — used by the favorites merge /
+ * realtime reload. Unlike addFavoriteLocation this does NOT increment
+ * use_count and does not overwrite last_used with the current time, so a
+ * remote row can be applied exactly as-is (offline-first safe).
+ */
+export async function saveFavoriteLocation(fav: {
+  anlagenummer: string
+  project_id: string
+  full_address: string
+  latitude: number
+  longitude: number
+  zone: number
+  manual_zone?: number
+  use_count: number
+  last_used?: string
+}): Promise<void> {
+  const db = await getDb()
+  await db.put('favorites', { ...fav, last_used: fav.last_used || new Date().toISOString() })
+}
+
+/**
+ * Remove a favorite locally by anlagenummer (case-insensitive) — used by
+ * the realtime DELETE handler so a remote delete can't resurrect via the
+ * local-preserving merge.
+ */
+export async function removeFavoriteLocation(anlagenummer: string): Promise<void> {
+  const db = await getDb()
+  const all = await db.getAll('favorites')
+  const target = all.find(
+    (f) => f.anlagenummer?.toUpperCase() === anlagenummer.toUpperCase()
+  )
+  if (target) {
+    await db.delete('favorites', target.anlagenummer)
+  }
+}
+
 // ===================== LOCATION CRUD =====================
 
 /**
@@ -358,6 +395,7 @@ export async function addToSyncQueue(item: {
   expenses?: Array<{ date: string; expense_type: string; value: number }>
   locationData?: any
   locationDeleteAnlagenummer?: string
+  language?: string
   timestamp: number
 }): Promise<void> {
   const db = await getDb()

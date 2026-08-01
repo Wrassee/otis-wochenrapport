@@ -1,5 +1,5 @@
 import { getUnsyncedEntries, markEntrySynced, getSyncQueue, clearSyncQueue } from './indexeddb'
-import { syncEntries, deleteEntry as deleteRemoteEntry, upsertLocation, deleteLocationByAnlagenummer, syncExpensesToSupabase } from './supabase'
+import { syncEntries, deleteEntry as deleteRemoteEntry, upsertLocation, deleteLocationByAnlagenummer, syncExpensesToSupabase, updateProfileLanguage } from './supabase'
 
 let syncInterval: ReturnType<typeof setInterval> | null = null
 let isSyncing = false
@@ -121,6 +121,12 @@ export async function performSync() {
           await syncExpensesToSupabase(item.userId, item.expenses)
         } catch (e) {
           console.warn('Expenses sync to Supabase failed:', e)
+        }
+      } else if (item.type === 'language_sync' && item.language && item.userId) {
+        try {
+          await updateProfileLanguage(item.userId, item.language)
+        } catch (e) {
+          console.warn('Language sync to Supabase failed:', e)
         }
       }
     }

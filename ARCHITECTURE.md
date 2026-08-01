@@ -396,6 +396,7 @@ The `sync_queue` covers **outgoing** changes (device → cloud, polled every 30s
 |---|---|---|---|
 | `expense_photos` | `006_expense_photos_realtime.sql` | `expense-photos-${userId}` | `subscribeExpensePhotoChanges()` |
 | `daily_expenses` | `007_daily_expenses_realtime.sql` | `daily-expenses-${userId}` | `subscribeDailyExpenseChanges()` |
+| `user_favorites` | `008_user_favorites_realtime.sql` | `favorites-${userId}` | `subscribeFavoriteChanges()` |
 
 **Prerequisites (both migrations):**
 
@@ -417,6 +418,7 @@ A naive "reload after every event" would **resurrect** rows the remote deleted: 
 |---|---|---|
 | `expense_photos` | 300ms debounce → `loadExpensePhotos(year, week, force=true)` (full week reload + merge) | Direct removal from store **and** IndexedDB (`localDb.deleteExpensePhoto(id)`) — cannot resurrect on the next merge |
 | `daily_expenses` | Direct row upsert on the `(date, expense_type)` key (no reload — the sync is full-replace, a reload would fight the merge) | Direct removal of the `expense_type` from that date's array (store + debounced IndexedDB persist) |
+| `user_favorites` | Direct upsert (payload carries every column; `use_count` kept at the max) + top-5 refresh | Direct removal from store + IndexedDB (`localDb.removeFavoriteLocation`) — cannot resurrect on the next merge |
 
 ---
 
