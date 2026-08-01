@@ -56,6 +56,14 @@ jobs:
         run: |
           python -c "from src.excel_generator import generate_excel; from src.main import app; print('All imports OK')"
 
+      # Cross-check: the export filename (Wochenrapport_KW31_2026_27_07-31_07.xlsx)
+      # is built in JS (frontend getWeekDates) and Python (_build_excel_filename).
+      # This test runs BOTH implementations via node -e and asserts identical
+      # output for the same year/week (incl. year-boundary + 53-week years).
+      # Node is preinstalled on ubuntu runners.
+      - name: Cross-check Excel filename (JS ↔ Python)
+        run: python tests/test_filename_crosscheck.py
+
   # ─── Deploy: Vercel (frontend) ───
   # IMPORTANT: Vercel project Root Directory must be set to '/' (repo root)
   # in the Vercel Dashboard. If set to 'apps/web', the path doubles
@@ -196,46 +204,15 @@ jobs:
           path: apps/web/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      # Self-cleaning: remove drafts/tags from the earlier per-push scheme
-      # (apk-<run_number>), keeping only the rolling apk-latest. Best-effort —
-      # a cleanup hiccup must never block the draft upload.
-      - name: Clean up old APK drafts (apk-*)
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "Listing existing apk-* drafts..."
-          # Only touch DRAFTS (never a published release). The old per-push
-          # scheme created drafts with tag apk-<run_number>.
-          TAGS=$(gh api --paginate "repos/${{ github.repository }}/releases" \
-            --jq '.[] | select(.draft == true) | .tag_name' 2>/dev/null || true)
-          for TAG in $TAGS; do
-            case "$TAG" in
-              apk-latest)
-                echo "  keep: $TAG"
-                ;;
-              apk-[0-9]*)
-                echo "  deleting draft $TAG (release + tag)..."
-                # One call instead of release-ID + delete + ref-delete: gh
-                # resolves the tag to the release, deletes it, and --cleanup-tag
-                # removes the git tag too (handling the ordering internally —
-                # GitHub blocks tag deletion while a release points at it).
-                gh release delete "$TAG" --yes --cleanup-tag >/dev/null 2>&1 || true
-                echo "  deleted $TAG"
-                ;;
-              *) ;;
-            esac
-          done
-          echo "Cleanup done."
-
       # Rolling tag: apk-latest. Every build updates THE SAME draft release
       # (allowUpdates: true), so only one latest draft exists at any time
       # instead of accumulating one draft per push.
       # NOTE: publishing the draft is ONE-WAY — the tag moves with it, and the
       # next build will update that published release (the GitHub API has no
       # "unpublish" endpoint, so it can never go back to draft).
-      # Old apk-<run_number> drafts are removed automatically by the
-      # "Clean up old APK drafts" step above.
+      # A one-time cleanup of the legacy apk-<run_number> drafts (per-push
+      # scheme) was done manually — those tags are gone, so no cleanup step
+      # is needed anymore.
       - name: Create/Update Draft Release (rolling apk-latest)
         uses: softprops/action-gh-release@v2
         with:
