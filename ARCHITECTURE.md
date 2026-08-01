@@ -248,6 +248,37 @@ Background sync (30s interval or 'online' event)
   └─▶ syncExpenses(userId, expenses) — pushed to Supabase ✓
 ```
 
+### Live cross-device sync (Supabase Realtime)
+
+The Spesen domain's **Belege photos** are live-synced: a photo captured on another device appears in the ReceiptPhotos strip within ~1 second — no manual sync, no app restart. (Requires migration `006_expense_photos_realtime.sql` — run it in the Supabase SQL Editor.)
+
+```
+Device B: camera capture → addExpensePhoto(file, year, week)   [store action]
+              ├─▶ saveExpensePhoto()               [IndexedDB]
+              └─▶ upsertExpensePhoto()             [Supabase — if online]
+                          │
+                          ▼  (postgres_changes — INSERT event)
+Device A: channel "expense-photos-<userId>"   [filter: user_id=eq.<userId>]
+                          │
+                          ▼
+              appStore realtime handler
+                          │
+              ├─▶ INSERT / UPDATE
+              │     └─▶ 300ms debounce
+              │           └─▶ loadExpensePhotos(year, week, force=true)
+              │                 [full week reload: cloud + local merge]
+              │
+              └─▶ DELETE
+                    └─▶ direct: localDb.deleteExpensePhoto(id)
+                          + store filter → can't resurrect via merge
+                          │
+                          ▼
+        ReceiptPhotos strip re-renders instantly
+        (Dashboard / Woche / Spesen / Export all share the store)
+```
+
+> **Note:** `daily_expenses` (migration `007`) uses the same Realtime pattern with one difference — rows are applied **directly** (upsert/remove by `(date, expense_type)` key) instead of a week reload, because the expense sync is full-replace (`DELETE ALL` + `INSERT FRESH`) and a reload would resurrect locally-deleted rows through the merge logic.
+
 ---
 
 ## Key Data Domains
@@ -356,6 +387,36 @@ The `sync_queue` IndexedDB store holds pending operations. Types:
 | `location_upsert` | `performSync()` | `supabase.from('locations').upsert()` |
 | `location_delete` | `performSync()` | `supabase.from('locations').delete()` |
 | `expenses_sync` | `performSync()` | `supabase.from('daily_expenses').delete().insert()` |
+
+### Realtime — the incoming direction
+
+The `sync_queue` covers **outgoing** changes (device → cloud, polled every 30s). Supabase **Realtime** covers the **incoming** direction (cloud → device): when another device writes to a subscribed table, `postgres_changes` events stream back over a websocket and the UI updates immediately — no 30s interval, no app restart.
+
+| Table | Migration | Channel | Subscription function |
+|---|---|---|---|
+| `expense_photos` | `006_expense_photos_realtime.sql` | `expense-photos-${userId}` | `subscribeExpensePhotoChanges()` |
+| `daily_expenses` | `007_daily_expenses_realtime.sql` | `daily-expenses-${userId}` | `subscribeDailyExpenseChanges()` |
+
+**Prerequisites (both migrations):**
+
+1. **Publication membership** — the table is added to the `supabase_realtime` publication (idempotent `DO` block in the migration). Without this, no `postgres_changes` events are emitted.
+2. **`REPLICA IDENTITY FULL`** — DELETE payloads carry all columns (`user_id` + `year`/`week`, resp. `date`/`expense_type`), so events can be attributed to the right user and applied directly. (Default `REPLICA IDENTITY` only sends the primary key on DELETE.)
+
+**Lifecycle** — subscriptions live in the store, tied to the auth session:
+
+- `initialize(userId)` → subscribes after the initial data load
+- `setUser(null)` → unsubscribes + clears any pending debounce timers
+
+Each channel is filtered with `user_id=eq.<userId>` (RLS-friendly), so only the signed-in user's own rows trigger callbacks.
+
+### DELETE special-case (why events aren't just "reload the week")
+
+A naive "reload after every event" would **resurrect** rows the remote deleted: the load-and-merge logic deliberately preserves local-only rows. So the handlers treat DELETE as authoritative and apply it directly:
+
+| Table | INSERT / UPDATE | DELETE |
+|---|---|---|
+| `expense_photos` | 300ms debounce → `loadExpensePhotos(year, week, force=true)` (full week reload + merge) | Direct removal from store **and** IndexedDB (`localDb.deleteExpensePhoto(id)`) — cannot resurrect on the next merge |
+| `daily_expenses` | Direct row upsert on the `(date, expense_type)` key (no reload — the sync is full-replace, a reload would fight the merge) | Direct removal of the `expense_type` from that date's array (store + debounced IndexedDB persist) |
 
 ---
 
