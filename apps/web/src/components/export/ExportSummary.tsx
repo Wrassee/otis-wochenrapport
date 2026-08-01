@@ -104,7 +104,7 @@ export function ExportSummary({ weekSummary, onExport, onSendEmail, exporting, s
                   .map((day) => (
                     <div key={day.date} className="flex justify-between items-center">
                       <span className="text-purple-600 dark:text-purple-400">{day.dayName} ({formatDateShort(day.date)})</span>
-                      <Badge variant="zone" size="sm">Zone {day.maxZone}</Badge>
+                      <Badge variant="zone" size="sm">{t('day.zone', { n: day.maxZone })}</Badge>
                     </div>
                   ))}
               </div>

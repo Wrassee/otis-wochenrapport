@@ -24,7 +24,7 @@ interface ErrorBoundaryState {
  *  - "Neu laden"        → full page reload (recovers persistent issues).
  *  - Collapsible details → the error message + stack trace, so the error can
  *    be reported / pasted into a ticket (the user has been doing exactly this
- *    with the debug panel).
+ *    with the console output).
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false, error: null }
@@ -34,7 +34,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // Keep the error visible in devtools / the Capacitor debug panel.
+    // Keep the error visible in devtools for diagnosis.
     console.error('[ErrorBoundary] caught error:', error, info.componentStack)
   }
 

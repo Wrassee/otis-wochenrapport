@@ -15,6 +15,7 @@ import { getLocations as getSupabaseLocations } from '@/db/supabase'
 import { ACTIVITY_CODES } from '@/lib/constants'
 import { scheduleMondayReminder, isReminderScheduled } from '@/db/notifications'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { useTranslation } from '@/lib/useTranslation'
 import { Building2 } from 'lucide-react'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -53,6 +54,7 @@ function AppNavigator() {
 
 export default function App() {
   const [initializing, setInitializing] = useState(true)
+  const { t } = useTranslation()
   const { setUser, initialize, setSyncStatus, setLocations, setActivityCodes, theme } = useAppStore()
 
   // Apply the selected theme on mount and when it changes
@@ -150,10 +152,10 @@ export default function App() {
           </div>
 
           <div className="text-center">
-            <p className="text-white/80 text-sm font-medium">Wochenrapport wird geladen...</p>
+            <p className="text-white/80 text-sm font-medium">{t('app.loading')}</p>
             <div className="flex items-center justify-center gap-1.5 mt-3 text-otis-200/50 text-xs">
               <Building2 className="w-3 h-3" />
-              <span>OTIS Elevator Company</span>
+              <span>{t('common.otis')}</span>
             </div>
           </div>
         </div>

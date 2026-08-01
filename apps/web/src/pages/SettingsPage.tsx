@@ -76,11 +76,11 @@ export function SettingsPage() {
           await setReminderPreference(true)
           setNotificationEnabled(true)
         } else {
-          setNotificationError(result.error || 'Benachrichtigung konnte nicht aktiviert werden')
+          setNotificationError(result.error || t('settings.reminder.error'))
         }
       }
     } catch (err: any) {
-      setNotificationError(err.message || 'Fehler')
+      setNotificationError(err.message || t('common.error'))
     } finally {
       setNotificationLoading(false)
     }
@@ -638,7 +638,7 @@ function LiftZoneManager() {
                 type="text"
                 value={addNr}
                 onChange={(e) => setAddNr(e.target.value.toUpperCase())}
-                placeholder="z.B. AEV17, 1DG02"
+                placeholder={t('lifts.add.nr.placeholder')}
                 className="w-full h-9 px-3 rounded-xl text-xs bg-white dark:bg-otis-800 border border-emerald-300/40 dark:border-emerald-700/30 text-otis-800 dark:text-white focus:outline-none focus:border-emerald-400/60"
               />
             </div>
@@ -650,7 +650,7 @@ function LiftZoneManager() {
                 type="text"
                 value={addProject}
                 onChange={(e) => setAddProject(e.target.value)}
-                placeholder="z.B. SDAFQL"
+                placeholder={t('lifts.add.project.placeholder')}
                 className="w-full h-9 px-3 rounded-xl text-xs bg-white dark:bg-otis-800 border border-emerald-300/40 dark:border-emerald-700/30 text-otis-800 dark:text-white focus:outline-none focus:border-emerald-400/60"
               />
             </div>
@@ -662,7 +662,7 @@ function LiftZoneManager() {
                 type="text"
                 value={addAddress}
                 onChange={(e) => setAddAddress(e.target.value)}
-                placeholder="z.B. Winterthur Industriestrasse 24"
+                placeholder={t('lifts.add.address.placeholder')}
                 className="w-full h-9 px-3 rounded-xl text-xs bg-white dark:bg-otis-800 border border-emerald-300/40 dark:border-emerald-700/30 text-otis-800 dark:text-white focus:outline-none focus:border-emerald-400/60"
               />
             </div>
@@ -791,7 +791,7 @@ function LiftZoneManager() {
                         type="text"
                         value={editProject}
                         onChange={(e) => setEditProject(e.target.value)}
-                        placeholder="z.B. SDAFQL"
+                        placeholder={t('lifts.add.project.placeholder')}
                         className="w-full h-9 px-3 rounded-xl text-xs bg-white dark:bg-otis-800 border border-otis-300/30 dark:border-otis-700/30 text-otis-800 dark:text-white focus:outline-none focus:border-otis-400/50"
                       />
                     </div>
@@ -803,7 +803,7 @@ function LiftZoneManager() {
                         type="text"
                         value={editAddress}
                         onChange={(e) => setEditAddress(e.target.value)}
-                        placeholder="z.B. Winterthur Industriestrasse 24"
+                        placeholder={t('lifts.add.address.placeholder')}
                         className="w-full h-9 px-3 rounded-xl text-xs bg-white dark:bg-otis-800 border border-otis-300/30 dark:border-otis-700/30 text-otis-800 dark:text-white focus:outline-none focus:border-otis-400/50"
                       />
                     </div>

@@ -89,31 +89,10 @@ export function getWeekDates(year: number, week: number): string[] {
 }
 
 /**
- * Format a date for display
- */
-export function formatDate(dateStr: string): string {
-  return format(parseISO(dateStr), 'EEEE, d. MMMM', { locale: de })
-}
-
-/**
  * Format a date short (e.g., "13.07.")
  */
 export function formatDateShort(dateStr: string): string {
   return format(parseISO(dateStr), 'dd.MM.', { locale: de })
-}
-
-/**
- * Format day name (e.g., "Montag", "Dienstag")
- */
-export function getDayName(dateStr: string): string {
-  return format(parseISO(dateStr), 'EEEE', { locale: de })
-}
-
-/**
- * Get day abbreviation (Mo, Di, Mi, Do, Fr)
- */
-export function getDayAbbr(dateStr: string): string {
-  return format(parseISO(dateStr), 'EEEEEE', { locale: de })
 }
 
 /**
@@ -137,22 +116,6 @@ export function meetsDailyRequirement(totalHours: number, dayOfWeek: number): { 
   // dayOfWeek: 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday
   const required = dayOfWeek === 5 ? 8.0 : 8.5
   return { meets: totalHours >= required, required }
-}
-
-/**
- * Validate lunch break duration
- */
-export function validateLunch(lunchMinutes: number): { valid: boolean; message: string | null } {
-  if (lunchMinutes === 0) {
-    return { valid: false, message: 'Keine Mittagspause erfasst' }
-  }
-  if (lunchMinutes < 30) {
-    return { valid: false, message: `Mittagspause zu kurz: ${lunchMinutes} Min. (min. 30 Min.)` }
-  }
-  if (lunchMinutes > 60) {
-    return { valid: false, message: `Mittagspause zu lang: ${lunchMinutes} Min. (max. 60 Min.)` }
-  }
-  return { valid: true, message: null }
 }
 
 /**

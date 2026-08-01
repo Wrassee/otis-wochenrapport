@@ -101,7 +101,7 @@ export function DayCard({ day, onDeleteEntry, onEditEntry, onOpenExpenses, expen
           <div className="flex items-center gap-1.5 mb-3">
             <MapPin className="w-4 h-4 text-purple-500" />
             <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
-              Zone {day.maxZone}
+              {t('day.zone', { n: day.maxZone })}
             </span>
           </div>
         )}
@@ -149,7 +149,7 @@ export function DayCard({ day, onDeleteEntry, onEditEntry, onOpenExpenses, expen
             {day.errors.map((error, i) => (
               <div key={i} className="flex items-start gap-1.5 text-sm text-red-600 dark:text-red-400">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>{error}</span>
+                <span>{t(error.key, error.params)}</span>
               </div>
             ))}
           </div>

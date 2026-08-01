@@ -4,8 +4,19 @@
  * Uses @capacitor/local-notifications for native Android notifications
  * and falls back to Service Worker Notification API for PWA.
  */
+import { translations } from '@/lib/translations'
+import { useAppStore } from '@/stores/appStore'
 
 type ScheduleResult = { scheduled: boolean; error?: string }
+
+/**
+ * Translate a key in the CURRENT app language (notifications.ts is not a
+ * React component, so it reads the language directly from the store).
+ */
+function tr(key: string): string {
+  const lang = useAppStore.getState().language
+  return translations[key]?.[lang] ?? translations[key]?.de ?? key
+}
 
 /** Guard: only re-schedule if last attempt was > 12h ago */
 const STORAGE_KEY = 'otis_monday_reminder'
@@ -56,7 +67,7 @@ async function scheduleCapacitorNotification(): Promise<ScheduleResult> {
     // Request permission
     const permResult = await LocalNotifications.requestPermissions()
     if (permResult.display !== 'granted') {
-      return { scheduled: false, error: 'Keine Berechtigung für Benachrichtigungen' }
+      return { scheduled: false, error: tr('notification.error.permission') }
     }
 
     // Cancel any existing weekly reminder (id=1)
@@ -68,8 +79,8 @@ async function scheduleCapacitorNotification(): Promise<ScheduleResult> {
       notifications: [
         {
           id: 1,
-          title: '📊 Wochenrapport',
-          body: 'Dein Wochenrapport ist bereit! Tippe hier um ihn an deinen Supervisor zu senden.',
+          title: tr('notification.title'),
+          body: tr('notification.body'),
           schedule: {
             on: {
               weekday: 2, // Monday!
@@ -80,7 +91,7 @@ async function scheduleCapacitorNotification(): Promise<ScheduleResult> {
           },
           sound: 'default',
           smallIcon: 'ic_stat_icon',
-          largeBody: 'Deine Arbeitszeiten für die letzte Woche sind komplett. Sende den Rapport an deinen Supervisor.',
+          largeBody: tr('notification.largeBody'),
           extra: {
             url: '/export',
           },
@@ -109,12 +120,12 @@ async function scheduleSWNotification(): Promise<ScheduleResult> {
   try {
     // Request permission
     if (!('Notification' in window)) {
-      return { scheduled: false, error: 'Benachrichtigungen werden nicht unterstützt' }
+      return { scheduled: false, error: tr('notification.error.unsupported') }
     }
 
     const permission = await Notification.requestPermission()
     if (permission !== 'granted') {
-      return { scheduled: false, error: 'Keine Berechtigung' }
+      return { scheduled: false, error: tr('notification.error.denied') }
     }
 
     // Register with the Service Worker
@@ -127,8 +138,8 @@ async function scheduleSWNotification(): Promise<ScheduleResult> {
         days: [1], // Monday (JS convention: 0=Sunday, 1=Monday)
         hour: 7,
         minute: 0,
-        title: '📊 Wochenrapport',
-        body: 'Dein Wochenrapport ist bereit! Tippe hier um ihn an deinen Supervisor zu senden.',
+        title: tr('notification.title'),
+        body: tr('notification.body'),
         url: '/export',
       },
     })
@@ -141,7 +152,7 @@ async function scheduleSWNotification(): Promise<ScheduleResult> {
     return { scheduled: true }
   } catch (err) {
     console.error('[Notifications] SW scheduling failed:', err)
-    return { scheduled: false, error: 'Benachrichtigung konnte nicht eingerichtet werden' }
+    return { scheduled: false, error: tr('notification.error.setup') }
   }
 }
 

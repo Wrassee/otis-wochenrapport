@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { TimeEntry, Profile, Location, FavoriteLocation, WeekSummary, ActivityCode, SyncStatus, DailyExpense, DailyExpensesMap, ExpenseType, ExpensePhoto } from '@/lib/types'
+import type { TimeEntry, Profile, Location, FavoriteLocation, WeekSummary, ActivityCode, SyncStatus, DailyExpense, DailyExpensesMap, ExpenseType, ExpensePhoto, DayError } from '@/lib/types'
 import * as localDb from '@/db/indexeddb'
 import { getToday, getWeekDates, getWeekInfo, getWeekKey, haversineDistance, calculateZone, generateId } from '@/lib/utils'
 import { REFERENCE_LAT, REFERENCE_LON, ACTIVITY_CODES } from '@/lib/constants'
@@ -323,18 +323,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       const lunchMinutes = lunchEntries.reduce((sum, e) => sum + e.duration * 60, 0)
 
       const requiredHours = index === 4 ? 8.0 : 8.5
-      const errors: string[] = []
+      // Structured, localized errors — keys + params are resolved to text via
+      // t(error.key, error.params) in DayCard, so the UI follows the selected
+      // app language (not hardcoded German).
+      const errors: DayError[] = []
 
       if (totalHours < requiredHours) {
-        errors.push(`Nur ${totalHours.toFixed(1)}h von ${requiredHours}h erfasst`)
+        errors.push({
+          key: 'week.error.hours',
+          params: { hours: totalHours.toFixed(1), required: requiredHours },
+        })
       }
 
       if (lunchEntries.length === 0 && totalHours > 0) {
-        errors.push('Keine Mittagspause erfasst')
+        errors.push({ key: 'week.error.noLunch' })
       } else if (lunchMinutes < 30) {
-        errors.push(`Mittagspause zu kurz (${Math.round(lunchMinutes)} Min.)`)
+        errors.push({ key: 'week.error.lunchShort', params: { min: Math.round(lunchMinutes) } })
       } else if (lunchMinutes > 60) {
-        errors.push(`Mittagspause zu lang (${Math.round(lunchMinutes)} Min.)`)
+        errors.push({ key: 'week.error.lunchLong', params: { min: Math.round(lunchMinutes) } })
       }
 
       // Calculate max zone for the day

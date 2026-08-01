@@ -29,11 +29,6 @@ export function ExportPage() {
   // Receipt photos come from the store-backed hook — Dashboard/Woche share the
   // same data, and the Export page just renders the merged week's photos.
   const { photos } = useExpensePhotos(currentWeek.year, currentWeek.week)
-  /** Debug logger — writes timestamped message to console */
-  const dbg = (msg: string) => {
-    console.log(`[${new Date().toLocaleTimeString()}] ${msg}`)
-  }
-
   useEffect(() => {
     loadWeekEntries()
   }, [currentWeek, loadWeekEntries])
@@ -110,7 +105,6 @@ export function ExportPage() {
 
     try {
       const renderUrl = import.meta.env.VITE_RENDER_URL || 'http://localhost:8000'
-      dbg(`🌐 Backend: ${renderUrl}/generate-excel`)
       const response = await fetch(`${renderUrl}/generate-excel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,11 +125,10 @@ export function ExportPage() {
         throw new Error(detail.slice(0, 200))
       }
       const blob = await response.blob()
-      dbg(`✅ Backend blob: ${blob.size} bytes`)
       return { blob, usedOffline: false }
     } catch (innerErr: any) {
-      dbg(`❌ Backend failed: ${innerErr?.message || 'unknown'}`)
-      dbg('🔄 Generating offline…')
+      // Backend unreachable — fall back to offline generation (expected on mobile).
+      console.warn('Backend unreachable, generating Excel offline:', innerErr)
       const blob = await generateExcelOffline({
         year: currentWeek.year,
         week_number: currentWeek.week,
@@ -145,7 +138,6 @@ export function ExportPage() {
         expenses: allExpenses,
         photo_notes: photoNotes,
       })
-      dbg(`✅ Offline blob: ${blob.size} bytes`)
       return { blob, usedOffline: true }
     }
   }
@@ -169,9 +161,7 @@ export function ExportPage() {
     // 1. Capacitor native file write (silent, best-effort)
     const isNative = Capacitor.getPlatform() !== 'web'
     if (isNative) {
-      dbg('📱 Capacitor native: YES')
       try {
-        dbg('📁 Converting blob to base64…')
         const reader = new FileReader()
         const base64 = await new Promise<string>((resolve, reject) => {
           reader.onload = () => {
@@ -181,21 +171,17 @@ export function ExportPage() {
           reader.onerror = reject
           reader.readAsDataURL(blob)
         })
-        dbg(`✅ base64: ${base64.length} chars`)
 
-        dbg('💾 Filesystem.writeFile(Directory.Data)…')
         await Filesystem.writeFile({
           path: filename,
           data: base64,
           directory: Directory.Data,
         })
-        dbg('✅ File written to device storage')
 
         // Write each receipt photo to internal storage
         const photoUris: string[] = []
         for (let i = 0; i < attachments.length; i++) {
           const att = attachments[i]
-          dbg(`📸 Writing attachment ${i + 1}/${attachments.length}: ${att.filename}`)
           await Filesystem.writeFile({
             path: att.filename,
             data: dataUrlToBase64(att.dataUrl),
@@ -215,7 +201,6 @@ export function ExportPage() {
             directory: Directory.Data,
           })
           const allUris = [fileStat.uri, ...photoUris]
-          dbg(`📤 CapacitorShare.share()… ${allUris.length} file(s)`)
           await Share.share({
             // urls is Android-only. Pass url: allUris[0] alongside urls so iOS
             // still shares the Excel file (Android ignores url when urls is set).
@@ -223,20 +208,18 @@ export function ExportPage() {
             title: filename,
             dialogTitle: dialogTitle || t('export.excel.btn'),
           })
-          dbg('✅ Share dialog completed')
         } catch (shareErr: any) {
-          dbg(`ℹ️  Share cancelled or failed: ${shareErr?.message || 'unknown'} — continuing…`)
+          // Share sheet cancelled or failed — the manual download link remains as fallback.
+          console.warn('Share cancelled or failed:', shareErr)
         }
       } catch (e: any) {
-        dbg(`❌ Capacitor write failed: ${e?.message || 'unknown'} — continuing…`)
+        console.error('Capacitor native write failed — falling back to download link:', e)
       }
     }
 
     // 2. Manual download link (always available as backup)
-    dbg('🟠 Setting manual amber download link…')
     setDownloadUrl(blobUrl)
     setDownloadFilename(filename)
-    dbg('=== saveBlob complete ===')
   }
 
   const handleExport = async () => {
@@ -252,7 +235,7 @@ export function ExportPage() {
       )
     } catch (err: any) {
       const msg = err?.message || 'Unknown error'
-      dbg(`🔥 CRASH: ${msg}`)
+      console.error('Excel export failed:', err)
       setStatus(`${t('common.error')}: ${msg}`)
     } finally {
       setExporting(false)
@@ -285,7 +268,7 @@ export function ExportPage() {
         : `${t('export.email.success')}${photoNote}`,
       )
     } catch (err: any) {
-      dbg(`🔥 Email CRASH: ${err?.message || 'unknown'}`)
+      console.error('Email send failed:', err)
       setStatus(`${t('common.error')}: ${err.message || t('export.email.failed')}`)
     } finally {
       setSending(false)

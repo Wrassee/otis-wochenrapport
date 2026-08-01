@@ -4,12 +4,14 @@ import { LoginForm } from '@/components/auth/LoginForm'
 import { RegisterForm } from '@/components/auth/RegisterForm'
 import { signIn, signUp, upsertProfile, getCurrentSession } from '@/db/supabase'
 import { useAppStore } from '@/stores/appStore'
+import { useTranslation } from '@/lib/useTranslation'
 
 export function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { setUser, setProfile, initialize, language } = useAppStore()
 
   const handleLogin = async (email: string, password: string) => {
@@ -23,7 +25,7 @@ export function LoginPage() {
         navigate('/dashboard')
       }
     } catch (err: any) {
-      setError(err.message || 'Anmeldung fehlgeschlagen')
+      setError(err.message || t('auth.login.failed'))
     } finally {
       setLoading(false)
     }
@@ -59,7 +61,7 @@ export function LoginPage() {
         navigate('/settings')
       }
     } catch (err: any) {
-      setError(err.message || 'Registrierung fehlgeschlagen')
+      setError(err.message || t('auth.register.failed'))
     } finally {
       setLoading(false)
     }

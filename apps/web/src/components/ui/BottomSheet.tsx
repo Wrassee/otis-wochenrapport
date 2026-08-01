@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef } from 'react'
 import { cn } from '@/lib/cn'
 import { X } from 'lucide-react'
+import { useTranslation } from '@/lib/useTranslation'
 
 interface BottomSheetProps {
   open: boolean
@@ -11,6 +12,7 @@ interface BottomSheetProps {
 }
 
 export function BottomSheet({ open, onClose, title, children, className }: BottomSheetProps) {
+  const { t } = useTranslation()
   const sheetRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -59,7 +61,7 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
             <button
               onClick={onClose}
               className="flex-1 flex justify-end"
-              aria-label="Close"
+              aria-label={t('common.close')}
             >
               <X className="w-6 h-6 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" />
             </button>

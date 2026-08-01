@@ -7,16 +7,16 @@ import { useAppStore } from '@/stores/appStore'
 import { useDailyExpenses } from '@/hooks/useDailyExpenses'
 import { useExpensePhotos } from '@/hooks/useExpensePhotos'
 import { getWeekDates } from '@/lib/utils'
-import { Euro, Check, X, Camera, Trash2, ImagePlus, StickyNote } from 'lucide-react'
+import { Clock, Bed, Car, RadioTower, Coins, Wrench, CarFront, Euro, Check, X, Camera, Trash2, ImagePlus, StickyNote } from 'lucide-react'
 
 const EXPENSE_ITEMS = [
-  { type: 'entschaedigung_10h' as const, labelKey: 'spesen.10h', icon: '⏰' },
-  { type: 'hotel' as const, labelKey: 'spesen.hotel', icon: '🏨' },
-  { type: 'transport' as const, labelKey: 'spesen.transport', icon: '🚗' },
-  { type: 'pikettdienst' as const, labelKey: 'spesen.pikett', icon: '📟' },
-  { type: 'entschaedigung_pikett' as const, labelKey: 'spesen.pikett.ent', icon: '💰' },
-  { type: 'material' as const, labelKey: 'spesen.material', icon: '🔧', hasValue: true, valueUnit: 'CHF' },
-  { type: 'privatfahrzeug' as const, labelKey: 'spesen.privat', icon: '🚙', hasValue: true, valueUnit: 'km' },
+  { type: 'entschaedigung_10h' as const, labelKey: 'spesen.10h', icon: Clock },
+  { type: 'hotel' as const, labelKey: 'spesen.hotel', icon: Bed },
+  { type: 'transport' as const, labelKey: 'spesen.transport', icon: Car },
+  { type: 'pikettdienst' as const, labelKey: 'spesen.pikett', icon: RadioTower },
+  { type: 'entschaedigung_pikett' as const, labelKey: 'spesen.pikett.ent', icon: Coins },
+  { type: 'material' as const, labelKey: 'spesen.material', icon: Wrench, hasValue: true, valueUnit: 'CHF' },
+  { type: 'privatfahrzeug' as const, labelKey: 'spesen.privat', icon: CarFront, hasValue: true, valueUnit: 'km' },
 ]
 
 export function SpesenPage() {
@@ -280,7 +280,7 @@ export function SpesenPage() {
                           : 'bg-white/50 dark:bg-white/5 border-gray-200/50 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-otis-200/50 hover:text-otis-600'
                       )}
                     >
-                      <span className="text-lg">{item.icon}</span>
+                      <item.icon className="w-5 h-5 shrink-0" />
                       <span className="flex-1">{t(item.labelKey as any)}</span>
                       {isActive ? (
                         <Check className="w-4 h-4 text-otis-500" />

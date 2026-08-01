@@ -3,13 +3,13 @@ import type { Language } from '@/lib/translations'
 import { cn } from '@/lib/cn'
 
 /**
- * Every flag code the component can render. `Language` covers the app's four
- * current languages; the extra codes (at/ch/gb) are pre-added for future
- * language extensions (English, Swiss/Austrian variants, ...).
+ * Every flag code the component can render. `Language` covers the app's five
+ * current languages; the extra codes (at/ch) are pre-added for future
+ * language extensions (Swiss/Austrian variants, ...).
  * To add a new flag: extend this union + add one entry to FLAG_RENDERERS
  * (the Record type enforces it at compile time). See CONTRIBUTING.md.
  */
-export type FlagCode = Language | 'at' | 'ch' | 'gb'
+export type FlagCode = Language | 'at' | 'ch'
 
 interface FlagProps {
   code: FlagCode
@@ -80,9 +80,9 @@ const FLAG_RENDERERS: Record<FlagCode, () => ReactNode> = {
   fr: () => <Stripes vertical colors={['#0055A4', '#FFFFFF', '#EF4135']} />,
   it: () => <Stripes vertical colors={['#009246', '#FFFFFF', '#CE2B37']} />,
   hu: () => <Stripes colors={['#CD2A3E', '#FFFFFF', '#436F4D']} />,
+  en: () => <UnionJack />,
   at: () => <Stripes colors={['#ED2939', '#FFFFFF', '#ED2939']} />,
   ch: () => <SwissCross />,
-  gb: () => <UnionJack />,
 }
 
 /**

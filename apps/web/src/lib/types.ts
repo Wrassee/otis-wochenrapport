@@ -66,6 +66,12 @@ export interface UserSettings {
 
 export type WeekDay = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
 
+/** A localized day-validation error: translation key + params (see week.error.*). */
+export interface DayError {
+  key: string
+  params?: Record<string, string | number>
+}
+
 export interface DaySummary {
   date: string
   dayName: string
@@ -76,7 +82,7 @@ export interface DaySummary {
   entries: TimeEntry[]
   requiredHours: number // 8.5 for Mon-Thu, 8.0 for Fri
   isValid: boolean
-  errors: string[]
+  errors: DayError[]
   maxZone: number // highest zone for the day (Spesenrapport)
 }
 

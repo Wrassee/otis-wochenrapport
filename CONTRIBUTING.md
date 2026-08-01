@@ -388,8 +388,8 @@ NOT on Windows desktop Chrome/Firefox (the OS font has no flag glyphs), which
 caused blank language pills on the web. SVG renders identically on every
 platform.
 
-Supported codes (typed union `FlagCode`): `de fr it hu` (current app
-languages) + `at ch gb` (pre-added for future language extensions).
+Supported codes (typed union `FlagCode`): `de fr it hu en` (current app
+languages) + `at ch` (pre-added for future language extensions).
 
 **To add a new flag:**
 

@@ -23,7 +23,7 @@ export function LanguageSwitcher() {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-5 gap-1.5">
         {LANGUAGES.map((lang) => (
           <button
             key={lang.code}

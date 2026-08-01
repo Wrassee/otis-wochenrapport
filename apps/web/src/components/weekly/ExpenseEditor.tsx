@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/Badge'
 import { useTranslation } from '@/lib/useTranslation'
 import { useDailyExpenses } from '@/hooks/useDailyExpenses'
 import { cn } from '@/lib/cn'
-import { Euro, CheckCircle2 } from 'lucide-react'
+import { Clock, Bed, Car, RadioTower, Coins, Wrench, CarFront, Euro, CheckCircle2, type LucideIcon } from 'lucide-react'
 
 const SAVE_DEBOUNCE_MS = 500
 const SAVED_VISIBLE_MS = 2000
@@ -133,14 +133,14 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
     return exp?.value !== undefined ? String(exp.value) : ''
   }
 
-  const EXPENSE_ITEMS: { type: ExpenseType; label: string; icon: string; hasValue?: boolean; valueUnit?: string }[] = [
-    { type: 'entschaedigung_10h', label: t('spesen.10h'), icon: '⏰' },
-    { type: 'hotel', label: t('spesen.hotel'), icon: '🏨' },
-    { type: 'transport', label: t('spesen.transport'), icon: '🚗' },
-    { type: 'pikettdienst', label: t('spesen.pikett'), icon: '📟' },
-    { type: 'entschaedigung_pikett', label: t('spesen.pikett.ent'), icon: '💰' },
-    { type: 'material', label: t('spesen.material'), icon: '🔧', hasValue: true, valueUnit: 'CHF' },
-    { type: 'privatfahrzeug', label: t('spesen.privat'), icon: '🚙', hasValue: true, valueUnit: 'km' },
+  const EXPENSE_ITEMS: { type: ExpenseType; label: string; icon: LucideIcon; hasValue?: boolean; valueUnit?: string }[] = [
+    { type: 'entschaedigung_10h', label: t('spesen.10h'), icon: Clock },
+    { type: 'hotel', label: t('spesen.hotel'), icon: Bed },
+    { type: 'transport', label: t('spesen.transport'), icon: Car },
+    { type: 'pikettdienst', label: t('spesen.pikett'), icon: RadioTower },
+    { type: 'entschaedigung_pikett', label: t('spesen.pikett.ent'), icon: Coins },
+    { type: 'material', label: t('spesen.material'), icon: Wrench, hasValue: true, valueUnit: 'CHF' },
+    { type: 'privatfahrzeug', label: t('spesen.privat'), icon: CarFront, hasValue: true, valueUnit: 'km' },
   ]
 
   return (
@@ -185,7 +185,7 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
                     : 'bg-white/50 dark:bg-white/5 border-gray-200/50 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-otis-200/50 hover:text-otis-600'
                 )}
               >
-                <span className="text-lg">{item.icon}</span>
+                <item.icon className="w-5 h-5 shrink-0" />
                 <span className="flex-1">{item.label}</span>
                 {isActive ? (
                   <Badge variant="info" size="sm">{t('spesen.active')}</Badge>
