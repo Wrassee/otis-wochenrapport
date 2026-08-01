@@ -70,6 +70,37 @@ export function useExpensePhotos(year: number, week: number) {
     [user, year, week]
   )
 
+  /** Set/edit the optional note on a receipt photo (offline-first, best-effort cloud sync). */
+  const updatePhotoNote = useCallback(
+    async (id: string, note: string) => {
+      const current = photos.find((p) => p.id === id)
+      if (!current) return
+      const updated: ExpensePhoto = { ...current, note: note.trim() || undefined }
+      await localDb.saveExpensePhoto(updated)
+      setPhotos((prev) => prev.map((p) => (p.id === id ? updated : p)))
+      if (navigator.onLine) {
+        try {
+          await upsertExpensePhoto({
+            id: updated.id,
+            user_id: updated.user_id,
+            year: updated.year,
+            week: updated.week,
+            filename: updated.filename,
+            data_url: updated.dataUrl,
+            // Send '' (not undefined) so a cleared note actually clears the
+            // cloud column — JSON.stringify drops undefined keys, which would
+            // leave the stale note behind and resurrect it on the next merge.
+            note: updated.note ?? '',
+            created_at: updated.created_at,
+          })
+        } catch (err) {
+          console.warn('Failed to sync receipt photo note to Supabase:', err)
+        }
+      }
+    },
+    [photos]
+  )
+
   const removePhoto = useCallback(
     async (id: string) => {
       if (!user) return
@@ -92,5 +123,5 @@ export function useExpensePhotos(year: number, week: number) {
     [user]
   )
 
-  return { photos, isLoading, addPhoto, removePhoto, reload: load }
+  return { photos, isLoading, addPhoto, removePhoto, updatePhotoNote, reload: load }
 }

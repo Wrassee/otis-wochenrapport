@@ -70,6 +70,7 @@ class GenerateRequest(BaseModel):
     entries: list[TimeEntryInput] = []
     expenses: list[ExpenseInput] = []
     supervisor_email: Optional[str] = None
+    photo_notes: list[str] = []
 
 
 class SendEmailRequest(GenerateRequest):
@@ -145,6 +146,7 @@ async def generate_excel_endpoint(request: GenerateRequest):
             full_name=request.full_name,
             entries=entries_dict,
             expenses=expenses_dict if expenses_dict else None,
+            photo_notes=request.photo_notes or None,
         )
 
         filename = f"Wochenrapport_KW{request.week_number}_{request.year}.xlsx"

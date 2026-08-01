@@ -142,5 +142,7 @@ export interface ExpensePhoto {
   filename: string
   /** Downscaled base64 JPEG data URL */
   dataUrl: string
+  /** Optional note (e.g. hotel name, km reading) shown in the Spesenrapport */
+  note?: string
   created_at: string
 }

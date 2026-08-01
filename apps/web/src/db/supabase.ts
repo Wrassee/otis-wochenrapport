@@ -289,6 +289,7 @@ export async function upsertExpensePhoto(photo: {
   week: number
   filename: string
   data_url: string
+  note?: string
   created_at?: string
 }) {
   const { data, error } = await supabase

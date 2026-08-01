@@ -101,6 +101,13 @@ export function ExportPage() {
     }
   }
 
+  /** Non-empty photo notes for the current week, in display order. */
+  const collectPhotoNotes = (): string[] => {
+    return photos
+      .map((p) => p.note?.trim() || '')
+      .filter((n) => n.length > 0)
+  }
+
   /**
    * Generate the week's Excel blob — backend first, offline fallback.
    * Shared by both the export and email buttons.
@@ -109,6 +116,7 @@ export function ExportPage() {
     const state = useAppStore.getState()
     const entriesData = buildEntriesData()
     const allExpenses = collectWeekExpenses()
+    const photoNotes = collectPhotoNotes()
 
     try {
       const renderUrl = import.meta.env.VITE_RENDER_URL || 'http://localhost:8000'
@@ -124,6 +132,7 @@ export function ExportPage() {
           full_name: state.profile?.full_name || '',
           entries: entriesData,
           expenses: allExpenses,
+          photo_notes: photoNotes,
         }),
         signal: AbortSignal.timeout(30000),
       })
@@ -144,6 +153,7 @@ export function ExportPage() {
         full_name: state.profile?.full_name || '',
         entries: entriesData,
         expenses: allExpenses,
+        photo_notes: photoNotes,
       })
       dbg(`✅ Offline blob: ${blob.size} bytes`)
       return { blob, usedOffline: true }

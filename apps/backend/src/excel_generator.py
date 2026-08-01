@@ -216,6 +216,7 @@ def _fill_spesenrapport(
     full_name: str,
     entries: list[dict],
     expenses: Optional[list[dict]] = None,
+    photo_notes: Optional[list[str]] = None,
 ) -> str:
     """Fill Spesenrapport sheet XML with data."""
     xml = sheet_xml
@@ -276,6 +277,12 @@ def _fill_spesenrapport(
                     row = EXPENSE_ROWS[exp_type]
                     xml = _set_cell_num(xml, f"{col_letter}{row}", value)
 
+    # --- Photo notes (Bemerkungen, row 34 - empty in the template) ---
+    notes = [n.strip() for n in (photo_notes or []) if n.strip()]
+    if notes:
+        xml = _set_cell_str(xml, "C34", "Bemerkungen / Notes :")
+        xml = _set_cell_str(xml, "E34", "  |  ".join(notes))
+
     # --- Footer date (E36) ---
     today = datetime.now()
     xml = _set_cell_str(xml, "E36", today.strftime("%d.%m.%Y"))
@@ -290,6 +297,7 @@ def generate_excel(
     full_name: str,
     entries: list[dict],
     expenses: Optional[list[dict]] = None,
+    photo_notes: Optional[list[str]] = None,
     output_path: Optional[str] = None,
 ) -> bytes:
     """
@@ -316,7 +324,7 @@ def generate_excel(
         )
         sheet2_filled = _fill_spesenrapport(
             sheet2_xml, year, week_number, personnel_number, full_name,
-            entries, expenses
+            entries, expenses, photo_notes
         )
 
         # Rebuild the zip with modified sheets

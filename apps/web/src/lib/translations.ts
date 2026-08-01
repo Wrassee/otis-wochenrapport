@@ -154,6 +154,10 @@ export const translations: TranslationDict = {
   'spesen.photos.none':   { de: 'Noch keine Belege',  fr: 'Aucun justificatif',  it: 'Nessuna ricevuta', hu: 'M\u00e9g nincs bizonylat' },
   'spesen.photos.delete': { de: 'Beleg l\u00f6schen',   fr: 'Supprimer',          it: 'Elimina',         hu: 'Bizonylat t\u00f6rl\u00e9se' },
   'spesen.photos.error':  { de: 'Foto konnte nicht gespeichert werden', fr: 'Impossible d\'enregistrer la photo', it: 'Impossibile salvare la foto', hu: 'A fot\u00f3 ment\u00e9se nem siker\u00fclt' },
+  'spesen.photos.note':   { de: 'Notiz',              fr: 'Note',               it: 'Nota',           hu: 'Megjegyz\u00e9s' },
+  'spesen.photos.note.placeholder':{ de: 'z.B. Hotelname, km-Stand...', fr: 'p.ex. nom de l\'h\u00f4tel, km...', it: 'es. nome hotel, km...', hu: 'pl. sz\u00e1lloda neve, km \u00f3ra...' },
+  'spesen.photos.note.save':{ de: 'Speichern',        fr: 'Enregistrer',        it: 'Salva',          hu: 'Ment\u00e9s' },
+  'spesen.photos.note.cancel':{ de: 'Abbrechen',      fr: 'Annuler',            it: 'Annulla',        hu: 'M\u00e9gse' },
 
   // ─── Timeline / Entry list ───
   'timeline.edit':        { de: 'Bearbeiten',         fr: 'Modifier',           it: 'Modifica',       hu: 'Szerkeszt\u00e9s' },

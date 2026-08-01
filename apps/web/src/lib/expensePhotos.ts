@@ -89,6 +89,7 @@ export async function loadWeekExpensePhotos(
         week: r.week ?? week,
         filename: r.filename || `Beleg_${week}.jpg`,
         dataUrl: r.data_url || '',
+        note: r.note || undefined,
         created_at: r.created_at || new Date().toISOString(),
       })
     }

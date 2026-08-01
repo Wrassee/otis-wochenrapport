@@ -166,6 +166,8 @@ export interface OfflineGenerateOptions {
   full_name: string
   entries: OfflineEntry[]
   expenses?: OfflineExpense[]
+  /** Optional receipt-photo notes written into the Spesenrapport (row 34). */
+  photo_notes?: string[]
 }
 
 // ====== SHEET FILLERS ======
@@ -270,6 +272,7 @@ function fillSpesenrapport(
   fullName: string,
   entries: OfflineEntry[],
   expenses?: OfflineExpense[],
+  photoNotes?: string[],
 ): string {
   let xml = sheetXml
 
@@ -332,6 +335,13 @@ function fillSpesenrapport(
     }
   }
 
+  // --- Photo notes (Bemerkungen, row 34 — empty in the template) ---
+  const notes = (photoNotes || []).map((n) => n.trim()).filter(Boolean)
+  if (notes.length > 0) {
+    xml = setCellStr(xml, 'C34', 'Bemerkungen / Notes :')
+    xml = setCellStr(xml, 'E34', notes.join('  |  '))
+  }
+
   // --- Footer date (E36) ---
   const today = new Date()
   xml = setCellStr(xml, 'E36', formatDateDMY(today))
@@ -353,7 +363,7 @@ function fillSpesenrapport(
 export async function generateExcelOffline(
   options: OfflineGenerateOptions,
 ): Promise<Blob> {
-  const { year, week_number, personnel_number, full_name, entries, expenses } = options
+  const { year, week_number, personnel_number, full_name, entries, expenses, photo_notes } = options
 
   // 1. Decode the embedded template from base64
   const templateBinary = atob(TEMPLATE_BASE64)
@@ -375,7 +385,7 @@ export async function generateExcelOffline(
     sheet1Raw, year, week_number, personnel_number, full_name, entries,
   )
   const sheet2Filled = fillSpesenrapport(
-    sheet2Raw, year, week_number, personnel_number, full_name, entries, expenses,
+    sheet2Raw, year, week_number, personnel_number, full_name, entries, expenses, photo_notes,
   )
 
   // 5. Update the ZIP

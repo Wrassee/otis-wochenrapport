@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn'
 import { useDailyExpenses } from '@/hooks/useDailyExpenses'
 import { useExpensePhotos } from '@/hooks/useExpensePhotos'
 import { getWeekDates, getToday, getWeekInfo } from '@/lib/utils'
-import { Euro, Check, X, Camera, Trash2, ImagePlus } from 'lucide-react'
+import { Euro, Check, X, Camera, Trash2, ImagePlus, StickyNote } from 'lucide-react'
 
 const EXPENSE_ITEMS = [
   { type: 'entschaedigung_10h' as const, labelKey: 'spesen.10h', icon: '⏰' },
@@ -28,10 +28,12 @@ export function SpesenPage() {
 
   const { dailyExpenses, toggleExpense, setExpenseValue, syncExpenses } = useDailyExpenses(dates)
 
-  const { photos, addPhoto, removePhoto } = useExpensePhotos(weekInfo.year, weekInfo.week)
+  const { photos, addPhoto, removePhoto, updatePhotoNote } = useExpensePhotos(weekInfo.year, weekInfo.week)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
+  const [noteEditingId, setNoteEditingId] = useState<string | null>(null)
+  const [noteDraft, setNoteDraft] = useState('')
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -50,6 +52,18 @@ export function SpesenPage() {
   }
 
   const totalActive = Object.values(dailyExpenses).reduce((sum, exps) => sum + exps.length, 0)
+
+  const startNoteEdit = (photoId: string, currentNote?: string) => {
+    setNoteDraft(currentNote || '')
+    setNoteEditingId(photoId)
+  }
+
+  const saveNote = async () => {
+    if (!noteEditingId) return
+    await updatePhotoNote(noteEditingId, noteDraft)
+    setNoteEditingId(null)
+    setNoteDraft('')
+  }
 
   return (
     <div className="space-y-4">
@@ -119,28 +133,76 @@ export function SpesenPage() {
         )}
 
         {photos.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            {photos.map((photo) => (
-              <div
-                key={photo.id}
-                className="relative rounded-xl overflow-hidden border border-otis-200/20 dark:border-white/10 aspect-square bg-otis-100/30 dark:bg-otis-900/30"
-              >
-                <img
-                  src={photo.dataUrl}
-                  alt={photo.filename}
-                  className="w-full h-full object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => removePhoto(photo.id)}
-                  className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center shadow-md backdrop-blur-sm transition-colors active:scale-90 hover:bg-black/75"
-                  title={t('spesen.photos.delete')}
+          <>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              {photos.map((photo) => (
+                <div
+                  key={photo.id}
+                  className="relative rounded-xl overflow-hidden border border-otis-200/20 dark:border-white/10 aspect-square bg-otis-100/30 dark:bg-otis-900/30"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                  <img
+                    src={photo.dataUrl}
+                    alt={photo.filename}
+                    className="w-full h-full object-cover"
+                  />
+                  {/* Note badge overlay — shows the note is set */}
+                  {photo.note && (
+                    <div className="absolute bottom-0 inset-x-0 px-1.5 py-0.5 bg-black/55 text-white text-[8px] leading-tight truncate">
+                      {photo.note}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => startNoteEdit(photo.id, photo.note)}
+                    className="absolute bottom-1 right-1 w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center shadow-md backdrop-blur-sm transition-colors active:scale-90 hover:bg-black/75"
+                    title={t('spesen.photos.note')}
+                  >
+                    <StickyNote className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removePhoto(photo.id)}
+                    className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center shadow-md backdrop-blur-sm transition-colors active:scale-90 hover:bg-black/75"
+                    title={t('spesen.photos.delete')}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Inline note editor */}
+            {noteEditingId && (
+              <div className="mt-3 p-3 rounded-2xl bg-otis-50/70 dark:bg-otis-900/30 border border-otis-200/30 dark:border-white/10">
+                <p className="text-[11px] font-semibold text-otis-700 dark:text-otis-300 mb-1.5">
+                  {t('spesen.photos.note')}
+                </p>
+                <textarea
+                  value={noteDraft}
+                  onChange={(e) => setNoteDraft(e.target.value)}
+                  placeholder={t('spesen.photos.note.placeholder')}
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm rounded-xl glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none resize-none"
+                />
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={saveNote}
+                    className="flex-1 h-11 rounded-xl bg-otis-600 text-white text-sm font-semibold transition-all active:scale-[0.98] hover:bg-otis-700"
+                  >
+                    {t('spesen.photos.note.save')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setNoteEditingId(null); setNoteDraft('') }}
+                    className="h-11 px-4 rounded-xl bg-white/60 dark:bg-white/10 text-gray-500 dark:text-gray-300 text-sm font-medium transition-all active:scale-[0.98]"
+                  >
+                    {t('spesen.photos.note.cancel')}
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         ) : (
           <p className="text-[11px] text-gray-400 text-center mt-3">
             {t('spesen.photos.none')}

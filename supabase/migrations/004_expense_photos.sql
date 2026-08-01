@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS expense_photos (
   week INTEGER NOT NULL,
   filename TEXT NOT NULL,
   data_url TEXT NOT NULL,
+  note TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
