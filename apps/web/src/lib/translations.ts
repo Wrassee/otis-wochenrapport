@@ -320,6 +320,31 @@ export const translations: TranslationDict = {
   'error.details':  { de: 'Fehlerdetails anzeigen',    fr: 'Afficher les d\u00e9tails',  it: 'Mostra i dettagli',          hu: 'Hibadetails mutat\u00e1sa' , en: 'Show error details' },
 }
 
+/**
+ * Pure translation lookup — shared by the `useTranslation` hook (React) and
+ * non-component contexts (e.g. notifications.ts). Falls back to German, then
+ * to the raw key when a translation is missing, and interpolates `{param}`
+ * placeholders from `params`.
+ */
+export function translate(
+  key: string,
+  lang: Language,
+  params?: Record<string, string | number>,
+): string {
+  const entry = translations[key]
+  if (!entry) return key
+
+  let text = entry[lang] ?? entry.de ?? key
+
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      text = text.replace(`{${k}}`, String(v))
+    }
+  }
+
+  return text
+}
+
 /** Shortcut for day names */
 export const DAY_NAMES: Record<Language, string[]> = {
   de: ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'],

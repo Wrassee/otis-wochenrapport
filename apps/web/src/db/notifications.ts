@@ -4,7 +4,7 @@
  * Uses @capacitor/local-notifications for native Android notifications
  * and falls back to Service Worker Notification API for PWA.
  */
-import { translations } from '@/lib/translations'
+import { translate } from '@/lib/translations'
 import { useAppStore } from '@/stores/appStore'
 
 type ScheduleResult = { scheduled: boolean; error?: string }
@@ -15,7 +15,7 @@ type ScheduleResult = { scheduled: boolean; error?: string }
  */
 function tr(key: string): string {
   const lang = useAppStore.getState().language
-  return translations[key]?.[lang] ?? translations[key]?.de ?? key
+  return translate(key, lang)
 }
 
 /** Guard: only re-schedule if last attempt was > 12h ago */
