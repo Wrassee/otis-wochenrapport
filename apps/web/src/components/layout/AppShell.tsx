@@ -1,15 +1,26 @@
 import { type ReactNode } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/cn'
-import { Calendar, Clock, FileSpreadsheet, Settings, Wifi, WifiOff, RefreshCw, Euro } from 'lucide-react'
+import {
+  Calendar,
+  Clock,
+  FileSpreadsheet,
+  Settings,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  Euro,
+} from 'lucide-react'
 import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/lib/useTranslation'
+import type { TranslationKey } from '@/lib/translations'
+import type { LucideIcon } from 'lucide-react'
 
 interface AppShellProps {
   children: ReactNode
 }
 
-const navItems = [
+const navItems: { path: string; key: TranslationKey; icon: LucideIcon }[] = [
   { path: '/dashboard', key: 'nav.dashboard', icon: Clock },
   { path: '/spesen', key: 'nav.spesen', icon: Euro },
   { path: '/weekly', key: 'nav.week', icon: Calendar },
@@ -40,23 +51,33 @@ export function AppShell({ children }: AppShellProps) {
                 <span className="text-xs font-black text-white tracking-tight">O</span>
               </div>
               <div>
-                <span className="text-sm font-bold text-otis-800 dark:text-white tracking-tight">OTIS</span>
-                <span className="text-[10px] text-otis-400 dark:text-otis-300 ml-1.5 font-medium">{t('app.name')}</span>
+                <span className="text-sm font-bold text-otis-800 dark:text-white tracking-tight">
+                  OTIS
+                </span>
+                <span className="text-[10px] text-otis-400 dark:text-otis-300 ml-1.5 font-medium">
+                  {t('app.name')}
+                </span>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2.5">
             {/* Sync indicator */}
-            <div className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all duration-300',
-              syncStatus.online
-                ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
-                : 'bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400'
-            )}>
+            <div
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all duration-300',
+                syncStatus.online
+                  ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400',
+              )}
+            >
               {syncStatus.online ? (
-                <><Wifi className="w-3 h-3" /> {t('settings.online')}</>
+                <>
+                  <Wifi className="w-3 h-3" /> {t('settings.online')}
+                </>
               ) : (
-                <><WifiOff className="w-3 h-3" /> {t('settings.offline')}</>
+                <>
+                  <WifiOff className="w-3 h-3" /> {t('settings.offline')}
+                </>
               )}
             </div>
             {syncStatus.pendingSync > 0 && (
@@ -71,9 +92,7 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Main content */}
       <main className="flex-1">
-        <div className="max-w-lg mx-auto px-4 py-5 pb-28 relative z-10">
-          {children}
-        </div>
+        <div className="max-w-lg mx-auto px-4 py-5 pb-28 relative z-10">{children}</div>
       </main>
 
       {/* Bottom navigation - Glassmorphism */}
@@ -100,7 +119,7 @@ export function AppShell({ children }: AppShellProps) {
                     'w-5 h-5 transition-all duration-200',
                     isActive
                       ? 'text-otis-600 dark:text-otis-400 scale-110'
-                      : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'
+                      : 'text-gray-400 dark:text-stone-400 group-hover:text-gray-600 dark:group-hover:text-gray-300',
                   )}
                 />
                 <span
@@ -108,7 +127,7 @@ export function AppShell({ children }: AppShellProps) {
                     'text-[10px] font-semibold transition-colors duration-200',
                     isActive
                       ? 'text-otis-600 dark:text-otis-400'
-                      : 'text-gray-400 dark:text-gray-500'
+                      : 'text-gray-400 dark:text-stone-400',
                   )}
                 >
                   {t(item.key)}

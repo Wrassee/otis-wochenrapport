@@ -8,9 +8,14 @@ import { WeeklyPage } from '@/pages/WeeklyPage'
 import { ExportPage } from '@/pages/ExportPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { useAppStore } from '@/stores/appStore'
+import { useShallow } from 'zustand/react/shallow'
 import { getCurrentSession } from '@/db/supabase'
 import { startBackgroundSync, stopBackgroundSync, onSyncStatusChange } from '@/db/sync'
-import { cacheLocations, cacheActivityCodes, getAllLocations as getLocalLocations } from '@/db/indexeddb'
+import {
+  cacheLocations,
+  cacheActivityCodes,
+  getAllLocations as getLocalLocations,
+} from '@/db/indexeddb'
 import { getLocations as getSupabaseLocations } from '@/db/supabase'
 import { ACTIVITY_CODES } from '@/lib/constants'
 import { scheduleMondayReminder, isReminderScheduled } from '@/db/notifications'
@@ -55,7 +60,16 @@ function AppNavigator() {
 export default function App() {
   const [initializing, setInitializing] = useState(true)
   const { t } = useTranslation()
-  const { setUser, initialize, setSyncStatus, setLocations, setActivityCodes, theme } = useAppStore()
+  const { setUser, initialize, setSyncStatus, setLocations, setActivityCodes, theme } = useAppStore(
+    useShallow((s) => ({
+      setUser: s.setUser,
+      initialize: s.initialize,
+      setSyncStatus: s.setSyncStatus,
+      setLocations: s.setLocations,
+      setActivityCodes: s.setActivityCodes,
+      theme: s.theme,
+    })),
+  )
 
   // Apply the selected theme on mount and when it changes
   useEffect(() => {

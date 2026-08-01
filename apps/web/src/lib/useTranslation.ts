@@ -4,15 +4,16 @@
 import { useCallback } from 'react'
 import { useAppStore } from '@/stores/appStore'
 import { translate } from './translations'
+import type { TranslationKey } from './translations'
 
 export function useTranslation() {
   const language = useAppStore((s) => s.language)
 
   const t = useCallback(
-    (key: string, params?: Record<string, string | number>): string => {
+    (key: TranslationKey, params?: Record<string, string | number>): string => {
       return translate(key, language, params)
     },
-    [language]
+    [language],
   )
 
   return { t, language }

@@ -21,6 +21,7 @@
 import { useEffect, useCallback } from 'react'
 import type { DailyExpense, DailyExpensesMap, ExpenseType } from '@/lib/types'
 import { useAppStore } from '@/stores/appStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useExpensesSync } from '@/hooks/useExpensesSync'
 import * as localDb from '@/db/indexeddb'
 
@@ -61,7 +62,14 @@ export function useDailyExpenses(
 ): UseDailyExpensesReturn {
   const { refreshOnMount = true } = options ?? {}
 
-  const { dailyExpenses, setDailyExpenses, toggleExpense, setExpenseValue } = useAppStore()
+  const { dailyExpenses, setDailyExpenses, toggleExpense, setExpenseValue } = useAppStore(
+    useShallow((s) => ({
+      dailyExpenses: s.dailyExpenses,
+      setDailyExpenses: s.setDailyExpenses,
+      toggleExpense: s.toggleExpense,
+      setExpenseValue: s.setExpenseValue,
+    })),
+  )
   const syncExpensesFn = useExpensesSync()
 
   // Stable serialisation so the effect only fires when dates actually change.

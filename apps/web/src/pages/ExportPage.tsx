@@ -4,6 +4,7 @@ import { ReceiptPhotos } from '@/components/export/ReceiptPhotos'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { useAppStore } from '@/stores/appStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
 import { getWeekDates, formatDateShort } from '@/lib/utils'
 import { cn } from '@/lib/cn'
@@ -20,7 +21,29 @@ import type { ExpensePhoto } from '@/lib/types'
 
 export function ExportPage() {
   const { t } = useTranslation()
-  const { currentWeek, weekSummary, loadWeekEntries, calculateWeekSummary, timeEntries, dailyExpenses, locations, favoriteLocations, user } = useAppStore()
+  const {
+    currentWeek,
+    weekSummary,
+    loadWeekEntries,
+    calculateWeekSummary,
+    timeEntries,
+    dailyExpenses,
+    locations,
+    favoriteLocations,
+    user,
+  } = useAppStore(
+    useShallow((s) => ({
+      currentWeek: s.currentWeek,
+      weekSummary: s.weekSummary,
+      loadWeekEntries: s.loadWeekEntries,
+      calculateWeekSummary: s.calculateWeekSummary,
+      timeEntries: s.timeEntries,
+      dailyExpenses: s.dailyExpenses,
+      locations: s.locations,
+      favoriteLocations: s.favoriteLocations,
+      user: s.user,
+    })),
+  )
   const [exporting, setExporting] = useState(false)
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
@@ -88,9 +111,7 @@ export function ExportPage() {
 
   /** Non-empty photo notes for the current week, in display order. */
   const collectPhotoNotes = (): string[] => {
-    return photos
-      .map((p) => p.note?.trim() || '')
-      .filter((n) => n.length > 0)
+    return photos.map((p) => p.note?.trim() || '').filter((n) => n.length > 0)
   }
 
   /**
@@ -154,7 +175,7 @@ export function ExportPage() {
     blob: Blob,
     filename: string,
     dialogTitle?: string,
-    attachments: { filename: string; dataUrl: string }[] = []
+    attachments: { filename: string; dataUrl: string }[] = [],
   ) => {
     const blobUrl = window.URL.createObjectURL(blob)
 
@@ -229,9 +250,10 @@ export function ExportPage() {
       const { blob, usedOffline } = await generateWeekBlob()
       const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
       await saveBlob(blob, filename, t('export.excel.btn'))
-      setStatus(usedOffline
-        ? `${t('export.success')} (${t('export.offline.generated')})`
-        : t('export.success'),
+      setStatus(
+        usedOffline
+          ? `${t('export.success')} (${t('export.offline.generated')})`
+          : t('export.success'),
       )
     } catch (err: any) {
       const msg = err?.message || 'Unknown error'
@@ -260,12 +282,14 @@ export function ExportPage() {
       // Open the native Share sheet — the user picks their email app from there,
       // same pattern as the export button.
       await saveBlob(blob, filename, t('export.email.btn'), attachments)
-      const photoNote = attachments.length > 0
-        ? ` (${t('export.email.attachments', { n: attachments.length })})`
-        : ''
-      setStatus(usedOffline
-        ? `${t('export.email.success')}${photoNote} (${t('export.offline.generated')})`
-        : `${t('export.email.success')}${photoNote}`,
+      const photoNote =
+        attachments.length > 0
+          ? ` (${t('export.email.attachments', { n: attachments.length })})`
+          : ''
+      setStatus(
+        usedOffline
+          ? `${t('export.email.success')}${photoNote} (${t('export.offline.generated')})`
+          : `${t('export.email.success')}${photoNote}`,
       )
     } catch (err: any) {
       console.error('Email send failed:', err)
@@ -289,14 +313,16 @@ export function ExportPage() {
           </div>
           <div className="flex-1">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-lg text-otis-800 dark:text-white">{t('export.title', { week: currentWeek.week })}</h2>
+              <h2 className="font-bold text-lg text-otis-800 dark:text-white">
+                {t('export.title', { week: currentWeek.week })}
+              </h2>
               <Badge variant={weekSummary.totalHours > 0 ? 'info' : 'warning'}>
                 {weekSummary.totalHours.toFixed(1)}h
               </Badge>
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <Calendar className="w-3.5 h-3.5 text-gray-400" />
-              <p className="text-xs text-gray-500">
+              <Calendar className="w-3.5 h-3.5 text-gray-400 dark:text-stone-300" />
+              <p className="text-xs text-gray-500 dark:text-stone-400">
                 {formatDateShort(dates[0])} – {formatDateShort(dates[4])}
               </p>
             </div>
@@ -308,10 +334,12 @@ export function ExportPage() {
       {status && (
         <Card variant={status.startsWith(t('common.error')) ? 'danger' : 'success'}>
           <div className="flex items-center gap-2">
-            <div className={cn(
-              'w-2 h-2 rounded-full flex-shrink-0',
-              status.startsWith(t('common.error')) ? 'bg-red-500' : 'bg-emerald-500'
-            )} />
+            <div
+              className={cn(
+                'w-2 h-2 rounded-full flex-shrink-0',
+                status.startsWith(t('common.error')) ? 'bg-red-500' : 'bg-emerald-500',
+              )}
+            />
             <p className="text-sm font-medium">{status}</p>
           </div>
         </Card>
@@ -362,7 +390,7 @@ export function ExportPage() {
       <Card variant="outline">
         <div className="flex items-start gap-2.5">
           <Info className="w-4 h-4 text-otis-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-gray-400 leading-relaxed">
+          <p className="text-xs text-gray-400 dark:text-stone-300 leading-relaxed">
             {t('export.info')}
           </p>
         </div>

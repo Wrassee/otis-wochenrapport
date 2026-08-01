@@ -9,10 +9,31 @@ import { BottomSheet } from '@/components/ui/BottomSheet'
 import { OtisDurationSelect } from '@/components/ui/OtisDurationSelect'
 import { ActivityPicker } from '@/components/daily/ActivityPicker'
 import { useAppStore } from '@/stores/appStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
 import type { TimeEntry, ActivityCode } from '@/lib/types'
-import { getWeekInfo, decimalToTime, timeToDecimal, formatOtisDuration, otisToStandard, snapToQuarter } from '@/lib/utils'
-import { Clock, ChevronLeft, ChevronRight, ChevronDown, CheckCircle2, UtensilsCrossed, Building2, Save, Euro, Wifi, WifiOff, RefreshCw } from 'lucide-react'
+import {
+  getWeekInfo,
+  decimalToTime,
+  timeToDecimal,
+  formatOtisDuration,
+  otisToStandard,
+  snapToQuarter,
+} from '@/lib/utils'
+import {
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  CheckCircle2,
+  UtensilsCrossed,
+  Building2,
+  Save,
+  Euro,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+} from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { TimelineView } from '@/components/ui/TimelineView'
 import { useExpensesSync } from '@/hooks/useExpensesSync'
@@ -23,14 +44,17 @@ import { ExpenseEditor } from '@/components/weekly/ExpenseEditor'
 
 export function DashboardPage() {
   const { t } = useTranslation()
-  const {
-    currentDate,
-    setCurrentDate,
-    currentWeek,
-    syncStatus,
-    setSyncStatus,
-    activityCodes,
-  } = useAppStore()
+  const { currentDate, setCurrentDate, currentWeek, syncStatus, setSyncStatus, activityCodes } =
+    useAppStore(
+      useShallow((s) => ({
+        currentDate: s.currentDate,
+        setCurrentDate: s.setCurrentDate,
+        currentWeek: s.currentWeek,
+        syncStatus: s.syncStatus,
+        setSyncStatus: s.setSyncStatus,
+        activityCodes: s.activityCodes,
+      })),
+    )
   const { timeEntries, addEntry, updateEntry, deleteEntry, quickAdd, loadWeek } = useTimeEntries()
   const info = getWeekInfo(currentDate)
   // Week's receipt photos (Spesen Belege) — shared store data, compact strip.
@@ -59,10 +83,9 @@ export function DashboardPage() {
   }, [currentDate, loadWeek])
 
   const todayEntries = useMemo(
-    () => timeEntries
-      .filter((e) => e.date === currentDate)
-      .sort((a, b) => a.start_time - b.start_time),
-    [timeEntries, currentDate]
+    () =>
+      timeEntries.filter((e) => e.date === currentDate).sort((a, b) => a.start_time - b.start_time),
+    [timeEntries, currentDate],
   )
   const workEntries = todayEntries.filter((e) => !e.is_lunch)
   const lunchEntries = todayEntries.filter((e) => e.is_lunch)
@@ -120,7 +143,9 @@ export function DashboardPage() {
     try {
       const start = timeToDecimal(editStart)
       const otisVal = parseFloat(editDuration)
-      const standardDur = isNaN(otisVal) ? editEntry.duration : Math.max(Math.round(otisToStandard(otisVal) * 4) / 4, 0.25)
+      const standardDur = isNaN(otisVal)
+        ? editEntry.duration
+        : Math.max(Math.round(otisToStandard(otisVal) * 4) / 4, 0.25)
       const updatedEntry: TimeEntry = {
         ...editEntry,
         start_time: start,
@@ -140,7 +165,11 @@ export function DashboardPage() {
 
   const dateObj = new Date(currentDate + 'T12:00:00')
   const dayName = dateObj.toLocaleDateString('de-DE', { weekday: 'long' })
-  const dateFormatted = dateObj.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
+  const dateFormatted = dateObj.toLocaleDateString('de-DE', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
 
   return (
     <div className="space-y-4">
@@ -148,45 +177,49 @@ export function DashboardPage() {
       <Card>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className={cn(
-              'w-9 h-9 rounded-xl flex items-center justify-center shadow-lg',
-              syncStatus.online
-                ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/20'
-                : 'bg-gradient-to-br from-red-400 to-red-600 shadow-red-500/20'
-            )}>
-              {syncStatus.online
-                ? <Wifi className="w-4 h-4 text-white" />
-                : <WifiOff className="w-4 h-4 text-white" />
-              }
+            <div
+              className={cn(
+                'w-9 h-9 rounded-xl flex items-center justify-center shadow-lg',
+                syncStatus.online
+                  ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/20'
+                  : 'bg-gradient-to-br from-red-400 to-red-600 shadow-red-500/20',
+              )}
+            >
+              {syncStatus.online ? (
+                <Wifi className="w-4 h-4 text-white" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-white" />
+              )}
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className={cn(
-                  'text-xs font-bold',
-                  syncStatus.online ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'
-                )}>
+                <span
+                  className={cn(
+                    'text-xs font-bold',
+                    syncStatus.online
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-red-500 dark:text-red-400',
+                  )}
+                >
                   {syncStatus.online ? t('settings.online') : t('settings.offline')}
                 </span>
                 {syncStatus.lastSync && (
-                  <span className="text-[10px] text-gray-400">
-                    {new Date(syncStatus.lastSync).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                  <span className="text-[10px] text-gray-400 dark:text-stone-300">
+                    {new Date(syncStatus.lastSync).toLocaleTimeString('de-DE', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] text-gray-400">
+              <span className="text-[10px] text-gray-400 dark:text-stone-300">
                 {syncStatus.pendingSync > 0
                   ? t('settings.pending.count', { n: syncStatus.pendingSync })
-                  : t('settings.pending.none')
-                }
+                  : t('settings.pending.none')}
               </span>
             </div>
           </div>
-          <Button
-            onClick={handleSync}
-            variant="primary"
-            size="sm"
-            disabled={syncStatus.syncing}
-          >
+          <Button onClick={handleSync} variant="primary" size="sm" disabled={syncStatus.syncing}>
             <RefreshCw className={cn('w-3.5 h-3.5', syncStatus.syncing && 'animate-spin')} />
             {syncStatus.syncing ? t('settings.syncing') : t('settings.sync.now')}
           </Button>
@@ -208,7 +241,7 @@ export function DashboardPage() {
               <Building2 className="w-4 h-4 text-otis-400" />
               <span className="font-bold text-lg text-otis-800 dark:text-white">{dayName}</span>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{dateFormatted}</p>
+            <p className="text-xs text-gray-500 dark:text-stone-300 mt-0.5">{dateFormatted}</p>
           </div>
 
           <button
@@ -224,20 +257,27 @@ export function DashboardPage() {
       <Card>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <div className={cn(
-              'w-10 h-10 rounded-2xl flex items-center justify-center',
-              isComplete
-                ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/20'
-                : 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/20'
-            )}>
-              {isComplete
-                ? <CheckCircle2 className="w-5 h-5 text-white" />
-                : <Clock className="w-5 h-5 text-white" />
-              }
+            <div
+              className={cn(
+                'w-10 h-10 rounded-2xl flex items-center justify-center',
+                isComplete
+                  ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/20'
+                  : 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/20',
+              )}
+            >
+              {isComplete ? (
+                <CheckCircle2 className="w-5 h-5 text-white" />
+              ) : (
+                <Clock className="w-5 h-5 text-white" />
+              )}
             </div>
             <div>
-              <span className="font-bold text-2xl text-otis-800 dark:text-white">{totalHours.toFixed(1)}h</span>
-              <span className="text-sm text-gray-400 ml-1">/ {requiredHours}h</span>
+              <span className="font-bold text-2xl text-otis-800 dark:text-white">
+                {totalHours.toFixed(1)}h
+              </span>
+              <span className="text-sm text-gray-400 dark:text-stone-300 ml-1">
+                / {requiredHours}h
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -258,7 +298,7 @@ export function DashboardPage() {
               'h-full rounded-full transition-all duration-500 ease-out',
               isComplete
                 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
-                : 'bg-gradient-to-r from-amber-400 to-amber-500'
+                : 'bg-gradient-to-r from-amber-400 to-amber-500',
             )}
             style={{ width: `${progress * 100}%` }}
           />
@@ -266,7 +306,7 @@ export function DashboardPage() {
 
         {/* Lunch info */}
         {lunchMinutes > 0 && (
-          <div className="flex items-center gap-1.5 mt-3 text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-1.5 mt-3 text-xs text-gray-500 dark:text-stone-300">
             <UtensilsCrossed className="w-3.5 h-3.5 text-amber-500" />
             <span>{t('dashboard.lunch', { min: Math.round(lunchMinutes) })}</span>
           </div>
@@ -282,13 +322,17 @@ export function DashboardPage() {
             <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
               <Euro className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('entry.spesen')}</span>
+            <span className="text-sm font-medium text-gray-600 dark:text-stone-300">
+              {t('entry.spesen')}
+            </span>
           </div>
-          <ChevronRight className="w-4 h-4 text-gray-400" />
+          <ChevronRight className="w-4 h-4 text-gray-400 dark:text-stone-300" />
         </button>
 
         <div className="flex items-center justify-between mt-2">
-          <span className="text-xs text-gray-400">{t('dashboard.entries', { count: todayEntries.length })}</span>
+          <span className="text-xs text-gray-400 dark:text-stone-300">
+            {t('dashboard.entries', { count: todayEntries.length })}
+          </span>
           {lunchEntries.length > 0 && (
             <span className="text-xs text-emerald-500">{t('dashboard.pause.recorded')}</span>
           )}
@@ -346,17 +390,25 @@ export function DashboardPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   {editEntry.location_anlagenummer && (
-                    <span className="font-bold text-sm text-otis-700 dark:text-otis-300">{editEntry.location_anlagenummer}</span>
+                    <span className="font-bold text-sm text-otis-700 dark:text-otis-300">
+                      {editEntry.location_anlagenummer}
+                    </span>
                   )}
                   {editEntry.location_project_id && (
-                    <span className="text-[11px] text-gray-400 font-mono">{editEntry.location_project_id}</span>
+                    <span className="text-[11px] text-gray-400 dark:text-stone-300 font-mono">
+                      {editEntry.location_project_id}
+                    </span>
                   )}
                   {editEntry.activity_code && (
-                    <Badge variant="info" size="sm">{editEntry.activity_code}</Badge>
+                    <Badge variant="info" size="sm">
+                      {editEntry.activity_code}
+                    </Badge>
                   )}
                 </div>
                 {editEntry.location_address && (
-                  <p className="text-[11px] text-gray-400 truncate mt-0.5">{editEntry.location_address}</p>
+                  <p className="text-[11px] text-gray-400 dark:text-stone-300 truncate mt-0.5">
+                    {editEntry.location_address}
+                  </p>
                 )}
               </div>
             </div>
@@ -375,11 +427,13 @@ export function DashboardPage() {
                   <div className="w-7 h-7 rounded-lg bg-otis-100/50 dark:bg-otis-800/30 flex items-center justify-center">
                     <Building2 className="w-3.5 h-3.5 text-otis-500 dark:text-otis-400" />
                   </div>
-                  <span className={`text-sm font-medium ${editActivityCode ? 'text-otis-800 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+                  <span
+                    className={`text-sm font-medium ${editActivityCode ? 'text-otis-800 dark:text-white' : 'text-gray-400 dark:text-stone-400'}`}
+                  >
                     {editActivityCode ? editActivityCode.code : t('entry.activity.select')}
                   </span>
                 </div>
-                <ChevronDown className="w-4 h-4 text-gray-400" />
+                <ChevronDown className="w-4 h-4 text-gray-400 dark:text-stone-300" />
               </button>
             </div>
 

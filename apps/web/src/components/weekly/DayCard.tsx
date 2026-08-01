@@ -1,7 +1,16 @@
 import type { DaySummary, TimeEntry } from '@/lib/types'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { CheckCircle2, XCircle, AlertTriangle, UtensilsCrossed, Clock, MapPin, Euro, ChevronRight } from 'lucide-react'
+import {
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  UtensilsCrossed,
+  Clock,
+  MapPin,
+  Euro,
+  ChevronRight,
+} from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { TimelineView } from '@/components/ui/TimelineView'
 import { useTranslation } from '@/lib/useTranslation'
@@ -14,25 +23,38 @@ interface DayCardProps {
   expenseCount?: number
 }
 
-export function DayCard({ day, onDeleteEntry, onEditEntry, onOpenExpenses, expenseCount }: DayCardProps) {
+export function DayCard({
+  day,
+  onDeleteEntry,
+  onEditEntry,
+  onOpenExpenses,
+  expenseCount,
+}: DayCardProps) {
   const { t } = useTranslation()
   return (
     <Card variant={day.isValid ? 'default' : 'danger'}>
       <CardHeader>
         <div className="flex items-center gap-2">
           <CardTitle className="flex items-center gap-2">
-            <div className={cn(
-              'w-6 h-6 rounded-lg flex items-center justify-center',
-              day.isValid ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'
-            )}>
-              {day.isValid
-                ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                : <XCircle className="w-3.5 h-3.5 text-red-500" />
-              }
+            <div
+              className={cn(
+                'w-6 h-6 rounded-lg flex items-center justify-center',
+                day.isValid
+                  ? 'bg-emerald-100 dark:bg-emerald-900/30'
+                  : 'bg-red-100 dark:bg-red-900/30',
+              )}
+            >
+              {day.isValid ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <XCircle className="w-3.5 h-3.5 text-red-500" />
+              )}
             </div>
             {day.dayName}
           </CardTitle>
-          <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">{day.date.slice(5)}</span>
+          <span className="text-xs text-gray-400 dark:text-stone-400 font-medium">
+            {day.date.slice(5)}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant={day.totalHours >= day.requiredHours ? 'success' : 'danger'} size="sm">
@@ -44,21 +66,31 @@ export function DayCard({ day, onDeleteEntry, onEditEntry, onOpenExpenses, expen
       <CardContent>
         {/* Hours summary */}
         <div className="flex items-center gap-3 mb-3">
-          <div className={cn(
-            'w-10 h-10 rounded-2xl flex items-center justify-center',
-            day.isValid
-              ? 'bg-emerald-50 dark:bg-emerald-900/20'
-              : 'bg-amber-50 dark:bg-amber-900/20'
-          )}>
-            <Clock className={cn(
-              'w-5 h-5',
-              day.isValid ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-            )} />
+          <div
+            className={cn(
+              'w-10 h-10 rounded-2xl flex items-center justify-center',
+              day.isValid
+                ? 'bg-emerald-50 dark:bg-emerald-900/20'
+                : 'bg-amber-50 dark:bg-amber-900/20',
+            )}
+          >
+            <Clock
+              className={cn(
+                'w-5 h-5',
+                day.isValid
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-amber-600 dark:text-amber-400',
+              )}
+            />
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="font-bold text-xl text-otis-800 dark:text-white">{day.totalHours.toFixed(1)}h</span>
-              <span className="text-sm text-gray-400">/ {day.requiredHours}h</span>
+              <span className="font-bold text-xl text-otis-800 dark:text-white">
+                {day.totalHours.toFixed(1)}h
+              </span>
+              <span className="text-sm text-gray-400 dark:text-stone-300">
+                / {day.requiredHours}h
+              </span>
             </div>
             {/* Progress bar */}
             <div className="w-32 h-1.5 rounded-full bg-otis-200/30 dark:bg-white/5 mt-1 overflow-hidden">
@@ -67,7 +99,7 @@ export function DayCard({ day, onDeleteEntry, onEditEntry, onOpenExpenses, expen
                   'h-full rounded-full transition-all duration-500',
                   day.isValid
                     ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
-                    : 'bg-gradient-to-r from-amber-400 to-amber-500'
+                    : 'bg-gradient-to-r from-amber-400 to-amber-500',
                 )}
                 style={{ width: `${Math.min(day.totalHours / day.requiredHours, 1) * 100}%` }}
               />
@@ -77,17 +109,23 @@ export function DayCard({ day, onDeleteEntry, onEditEntry, onOpenExpenses, expen
 
         {/* Lunch info */}
         <div className="flex items-center gap-1.5 mb-3">
-          <UtensilsCrossed className={cn(
-            'w-4 h-4',
-            day.hasLunch && day.lunchMinutes >= 30 && day.lunchMinutes <= 60
-              ? 'text-emerald-500'
-              : 'text-red-400'
-          )} />
-          <span className={cn(
-            'text-sm',
-            day.hasLunch ? 'text-gray-600 dark:text-gray-400' : 'text-red-500'
-          )}>
-            {day.hasLunch ? t('day.pause', { min: Math.round(day.lunchMinutes) }) : t('day.no.pause')}
+          <UtensilsCrossed
+            className={cn(
+              'w-4 h-4',
+              day.hasLunch && day.lunchMinutes >= 30 && day.lunchMinutes <= 60
+                ? 'text-emerald-500'
+                : 'text-red-400',
+            )}
+          />
+          <span
+            className={cn(
+              'text-sm',
+              day.hasLunch ? 'text-gray-600 dark:text-stone-300' : 'text-red-500',
+            )}
+          >
+            {day.hasLunch
+              ? t('day.pause', { min: Math.round(day.lunchMinutes) })
+              : t('day.no.pause')}
           </span>
           {day.hasLunch && (day.lunchMinutes < 30 || day.lunchMinutes > 60) && (
             <span className="text-xs text-amber-500 font-medium">
@@ -117,15 +155,21 @@ export function DayCard({ day, onDeleteEntry, onEditEntry, onOpenExpenses, expen
               <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
                 <Euro className="w-3.5 h-3.5 text-white" />
               </div>
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('day.spesen')}</span>
+              <span className="text-sm font-medium text-gray-600 dark:text-stone-300">
+                {t('day.spesen')}
+              </span>
               {expenseCount !== undefined && expenseCount > 0 && (
-                <Badge variant="info" size="sm">{expenseCount}</Badge>
+                <Badge variant="info" size="sm">
+                  {expenseCount}
+                </Badge>
               )}
               {expenseCount !== undefined && expenseCount === 0 && (
-                <span className="text-[10px] text-gray-400">{t('day.spesen.none')}</span>
+                <span className="text-[10px] text-gray-400 dark:text-stone-300">
+                  {t('day.spesen.none')}
+                </span>
               )}
             </div>
-            <ChevronRight className="w-4 h-4 text-gray-400" />
+            <ChevronRight className="w-4 h-4 text-gray-400 dark:text-stone-300" />
           </button>
         )}
 
@@ -147,7 +191,10 @@ export function DayCard({ day, onDeleteEntry, onEditEntry, onOpenExpenses, expen
         {day.errors.length > 0 && (
           <div className="mt-3 space-y-1 bg-red-50/50 dark:bg-red-900/10 rounded-xl p-3 border border-red-200/30 dark:border-red-700/20">
             {day.errors.map((error, i) => (
-              <div key={i} className="flex items-start gap-1.5 text-sm text-red-600 dark:text-red-400">
+              <div
+                key={i}
+                className="flex items-start gap-1.5 text-sm text-red-600 dark:text-red-400"
+              >
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <span>{t(error.key, error.params)}</span>
               </div>

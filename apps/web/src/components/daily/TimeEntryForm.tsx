@@ -9,23 +9,68 @@ import { FavoriteLifts } from './FavoriteLifts'
 import { ActivityPicker } from './ActivityPicker'
 import * as localDb from '@/db/indexeddb'
 import { useAppStore } from '@/stores/appStore'
-import { decimalToTime, timeToDecimal, standardToOtis, otisToStandard, formatOtisDuration, snapToQuarter, haversineDistance, calculateZone } from '@/lib/utils'
+import { useShallow } from 'zustand/react/shallow'
+import {
+  decimalToTime,
+  timeToDecimal,
+  standardToOtis,
+  otisToStandard,
+  formatOtisDuration,
+  snapToQuarter,
+  haversineDistance,
+  calculateZone,
+} from '@/lib/utils'
 import { REFERENCE_LAT, REFERENCE_LON } from '@/lib/constants'
 import { geocodeAddress } from '@/lib/geocode'
 import { useTranslation } from '@/lib/useTranslation'
-import { Plus, UtensilsCrossed, AlertTriangle, MapPin, Search, ChevronDown, PenLine, Clock } from 'lucide-react'
+import {
+  Plus,
+  UtensilsCrossed,
+  AlertTriangle,
+  MapPin,
+  Search,
+  ChevronDown,
+  PenLine,
+  Clock,
+} from 'lucide-react'
 
 interface TimeEntryFormProps {
   date: string
   defaultStartTime?: number
   existingEntries: TimeEntry[]
-  onSave: (entry: Omit<TimeEntry, 'id' | 'created_at' | 'updated_at' | 'synced'> & { is_lunch?: boolean }) => Promise<void>
+  onSave: (
+    entry: Omit<TimeEntry, 'id' | 'created_at' | 'updated_at' | 'synced'> & { is_lunch?: boolean },
+  ) => Promise<void>
   onOverlapClick?: (conflictingIds: string[]) => void
 }
 
-export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave, onOverlapClick }: TimeEntryFormProps) {
+export function TimeEntryForm({
+  date,
+  defaultStartTime,
+  existingEntries,
+  onSave,
+  onOverlapClick,
+}: TimeEntryFormProps) {
   const { t } = useTranslation()
-  const { locations, favoriteLocations, addRecentLocation, setLocations, setFavoriteLocations, activityCodes, searchLocations } = useAppStore()
+  const {
+    locations,
+    favoriteLocations,
+    addRecentLocation,
+    setLocations,
+    setFavoriteLocations,
+    activityCodes,
+    searchLocations,
+  } = useAppStore(
+    useShallow((s) => ({
+      locations: s.locations,
+      favoriteLocations: s.favoriteLocations,
+      addRecentLocation: s.addRecentLocation,
+      setLocations: s.setLocations,
+      setFavoriteLocations: s.setFavoriteLocations,
+      activityCodes: s.activityCodes,
+      searchLocations: s.searchLocations,
+    })),
+  )
 
   const [startTime, setStartTime] = useState(decimalToTime(defaultStartTime ?? 7.5))
   const [duration, setDuration] = useState('1.00')
@@ -79,7 +124,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
       setOverlapWarning(
         `${t('entry.overlap')} ${conflicting
           .map((e) => `${decimalToTime(e.start_time)}-${decimalToTime(e.start_time + e.duration)}`)
-          .join(', ')}`
+          .join(', ')}`,
       )
       setConflictingEntryIds(conflicting.map((e) => e.id))
     } else {
@@ -147,9 +192,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
   const saveManualLift = async (anlagenummer: string, projectId: string, address: string) => {
     try {
       const key = anlagenummer.toUpperCase()
-      const existingLoc = locations.find(
-        (l) => l.anlagenummer.toUpperCase() === key
-      )
+      const existingLoc = locations.find((l) => l.anlagenummer.toUpperCase() === key)
 
       if (existingLoc) {
         // Update existing location with new project/address
@@ -159,9 +202,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
           full_address: address,
         }
         await localDb.cacheLocations([updatedLoc])
-        setLocations(
-          locations.map((l) => (l.id === updatedLoc.id ? updatedLoc : l))
-        )
+        setLocations(locations.map((l) => (l.id === updatedLoc.id ? updatedLoc : l)))
       } else {
         // Create new location entry
         const newId = `manual_${key}_${Date.now()}`
@@ -221,22 +262,21 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
    * Background geocode the address and update the location + favorite in IndexedDB.
    * This is fire-and-forget after the entry is already saved.
    */
-  const geocodeAndUpdateLocation = async (anlagenummer: string, projectId: string, address: string) => {
+  const geocodeAndUpdateLocation = async (
+    anlagenummer: string,
+    projectId: string,
+    address: string,
+  ) => {
     try {
       const result = await geocodeAddress(address)
       if (!result) return
 
-      const distance = haversineDistance(
-        REFERENCE_LAT,
-        REFERENCE_LON,
-        result.lat,
-        result.lon
-      )
+      const distance = haversineDistance(REFERENCE_LAT, REFERENCE_LON, result.lat, result.lon)
       const zone = calculateZone(distance)
 
       // Update the location in IndexedDB if it was a manual entry
       const locToUpdate = locations.find(
-        (l) => l.anlagenummer.toUpperCase() === anlagenummer.toUpperCase()
+        (l) => l.anlagenummer.toUpperCase() === anlagenummer.toUpperCase(),
       )
       if (locToUpdate) {
         // If manual_zone is set, the user defined the zone manually in Settings
@@ -249,11 +289,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
           zone: effectiveZone,
         }
         await localDb.cacheLocations([updatedLoc])
-        setLocations(
-          locations.map((l) =>
-            l.id === updatedLoc.id ? updatedLoc : l
-          )
-        )
+        setLocations(locations.map((l) => (l.id === updatedLoc.id ? updatedLoc : l)))
       }
 
       // Update the favorite with correct coordinates + zone
@@ -271,7 +307,9 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
       const refreshed = await localDb.getFavoriteLocations()
       setFavoriteLocations(refreshed.slice(0, 5))
 
-      console.log(`📍 ${anlagenummer}: Zone ${zone} (${result.lat.toFixed(4)}, ${result.lon.toFixed(4)})`)
+      console.log(
+        `📍 ${anlagenummer}: Zone ${zone} (${result.lat.toFixed(4)}, ${result.lon.toFixed(4)})`,
+      )
     } catch (err) {
       console.warn('Background geocoding failed:', err)
     }
@@ -284,7 +322,9 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
     setSearchQuery(fav.anlagenummer)
     setShowSearchResults(false)
     // Case-insensitive lookup to match the location in the store
-    const loc = locations.find((l) => l.anlagenummer.toUpperCase() === fav.anlagenummer.toUpperCase())
+    const loc = locations.find(
+      (l) => l.anlagenummer.toUpperCase() === fav.anlagenummer.toUpperCase(),
+    )
     if (loc) {
       setSelectedLocation(loc)
     } else {
@@ -368,7 +408,9 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
       }
     }
 
-    const entry: Omit<TimeEntry, 'id' | 'created_at' | 'updated_at' | 'synced'> & { is_lunch?: boolean } = {
+    const entry: Omit<TimeEntry, 'id' | 'created_at' | 'updated_at' | 'synced'> & {
+      is_lunch?: boolean
+    } = {
       user_id: '',
       date,
       start_time: start,
@@ -409,7 +451,11 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
     setConflictingEntryIds([])
   }
 
-  const todayStr = new Date(date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
+  const todayStr = new Date(date + 'T12:00:00').toLocaleDateString('de-DE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
 
   return (
     <div className="space-y-4">
@@ -424,7 +470,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
           </div>
           <div>
             <div className="text-sm font-bold text-otis-800 dark:text-white">{todayStr}</div>
-            <p className="text-[10px] text-gray-400">{t('entry.title')}</p>
+            <p className="text-[10px] text-gray-400 dark:text-stone-300">{t('entry.title')}</p>
           </div>
         </div>
 
@@ -436,7 +482,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
             className={`w-full flex items-center justify-center gap-2 h-14 rounded-2xl border-2 font-semibold transition-all duration-200 ${
               isLunch
                 ? 'bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur border-amber-400/60 text-amber-700 dark:text-amber-300'
-                : 'glass dark:glass-dark border-otis-200/30 dark:border-white/5 text-gray-500 dark:text-gray-400 hover:border-amber-300/50 hover:text-amber-600 dark:hover:text-amber-400'
+                : 'glass dark:glass-dark border-otis-200/30 dark:border-white/5 text-gray-500 dark:text-stone-300 hover:border-amber-300/50 hover:text-amber-600 dark:hover:text-amber-400'
             }`}
           >
             <UtensilsCrossed className="w-5 h-5" />
@@ -449,7 +495,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
               {t('entry.anlagenummer')} <span className="text-red-400">*</span>
             </label>
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-stone-300" />
               <input
                 type="text"
                 value={searchQuery}
@@ -471,10 +517,16 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
                     className="w-full flex flex-col items-start p-3.5 hover:bg-otis-50 dark:hover:bg-white/5 border-b border-otis-200/20 dark:border-white/5 last:border-b-0 text-left transition-colors"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-otis-600 dark:text-otis-400">{loc.anlagenummer}</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{loc.project_id}</span>
+                      <span className="font-bold text-otis-600 dark:text-otis-400">
+                        {loc.anlagenummer}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-stone-300 font-medium">
+                        {loc.project_id}
+                      </span>
                     </div>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">{loc.full_address}</span>
+                    <span className="text-xs text-gray-400 dark:text-stone-400">
+                      {loc.full_address}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -488,7 +540,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
                 {t('entry.projekt')} <span className="text-red-400">*</span>
               </label>
               <div className="relative">
-                <PenLine className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <PenLine className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-stone-300" />
                 <input
                   type="text"
                   value={selectedProjectId}
@@ -509,7 +561,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
                 {t('entry.address')} <span className="text-red-400">*</span>
               </label>
               <div className="relative">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-stone-300" />
                 <input
                   type="text"
                   value={selectedAddress}
@@ -530,16 +582,22 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
                         className="w-full flex flex-col items-start p-3.5 hover:bg-otis-50 dark:hover:bg-white/5 border-b border-otis-200/20 dark:border-white/5 last:border-b-0 text-left transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-otis-600 dark:text-otis-400">{loc.anlagenummer}</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{loc.project_id}</span>
+                          <span className="font-bold text-otis-600 dark:text-otis-400">
+                            {loc.anlagenummer}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-stone-300 font-medium">
+                            {loc.project_id}
+                          </span>
                         </div>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">{loc.full_address}</span>
+                        <span className="text-xs text-gray-400 dark:text-stone-400">
+                          {loc.full_address}
+                        </span>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
-              <p className="text-[10px] text-gray-400 mt-1 pl-1">
+              <p className="text-[10px] text-gray-400 dark:text-stone-300 mt-1 pl-1">
                 {t('entry.address.hint')}
               </p>
             </div>
@@ -603,14 +661,16 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
                 {selectedActivityCode ? (
                   <div className="flex items-center gap-2">
                     <Badge variant="info">{selectedActivityCode.code}</Badge>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                    <span className="text-sm text-gray-500 dark:text-stone-300">
                       {selectedActivityCode.description_de}
                     </span>
                   </div>
                 ) : (
-                  <span className="text-gray-400">{t('entry.activity.select')}</span>
+                  <span className="text-gray-400 dark:text-stone-300">
+                    {t('entry.activity.select')}
+                  </span>
                 )}
-                <ChevronDown className="w-5 h-5 text-gray-400" />
+                <ChevronDown className="w-5 h-5 text-gray-400 dark:text-stone-300" />
               </button>
             </div>
           )}
@@ -626,7 +686,9 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
                 <AlertTriangle className="w-4 h-4 text-red-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-red-600 dark:text-red-300 font-medium">{overlapWarning}</p>
+                <p className="text-sm text-red-600 dark:text-red-300 font-medium">
+                  {overlapWarning}
+                </p>
                 <p className="text-[10px] text-red-400/70 dark:text-red-400/50 mt-0.5">
                   {t('entry.overlap.jump')}
                 </p>
@@ -652,7 +714,6 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
         codes={activityCodes}
         selectedCode={selectedActivityCode?.code}
       />
-
     </div>
   )
 }

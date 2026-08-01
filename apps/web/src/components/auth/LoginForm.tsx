@@ -77,7 +77,7 @@ export function LoginForm({ onLogin, onSwitchToRegister, error }: LoginFormProps
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-[42px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                className="absolute right-4 top-[42px] text-gray-400 dark:text-stone-300 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                 tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -109,7 +109,10 @@ export function LoginForm({ onLogin, onSwitchToRegister, error }: LoginFormProps
 
         <p className="text-center mt-8 text-otis-200/70 text-sm">
           {t('auth.no.account')}{' '}
-          <button onClick={onSwitchToRegister} className="text-white font-semibold hover:text-otis-100 transition-colors underline underline-offset-2">
+          <button
+            onClick={onSwitchToRegister}
+            className="text-white font-semibold hover:text-otis-100 transition-colors underline underline-offset-2"
+          >
             {t('auth.switch.register')}
           </button>
         </p>

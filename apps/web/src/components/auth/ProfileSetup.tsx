@@ -12,7 +12,12 @@ interface ProfileSetupProps {
   onSave: (fullName: string, personnelNumber: string, supervisorEmail: string) => Promise<void>
 }
 
-export function ProfileSetup({ initialName = '', initialPersonnel = '', initialSupervisorEmail = '', onSave }: ProfileSetupProps) {
+export function ProfileSetup({
+  initialName = '',
+  initialPersonnel = '',
+  initialSupervisorEmail = '',
+  onSave,
+}: ProfileSetupProps) {
   const { t } = useTranslation()
   const [fullName, setFullName] = useState(initialName)
   const [personnelNumber, setPersonnelNumber] = useState(initialPersonnel)
@@ -50,16 +55,16 @@ export function ProfileSetup({ initialName = '', initialPersonnel = '', initialS
           <User className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h2 className="text-lg font-bold text-otis-800 dark:text-white">
-            {t('profile.title')}
-          </h2>
-          <p className="text-xs text-gray-400 mt-0.5">{t('profile.subtitle')}</p>
+          <h2 className="text-lg font-bold text-otis-800 dark:text-white">{t('profile.title')}</h2>
+          <p className="text-xs text-gray-400 dark:text-stone-300 mt-0.5">
+            {t('profile.subtitle')}
+          </p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="relative">
-          <User className="absolute left-4 top-[42px] w-4 h-4 text-gray-400" />
+          <User className="absolute left-4 top-[42px] w-4 h-4 text-gray-400 dark:text-stone-300" />
           <Input
             id="profile-name"
             label={t('profile.name')}
@@ -73,7 +78,7 @@ export function ProfileSetup({ initialName = '', initialPersonnel = '', initialS
         </div>
 
         <div className="relative">
-          <Hash className="absolute left-4 top-[42px] w-4 h-4 text-gray-400" />
+          <Hash className="absolute left-4 top-[42px] w-4 h-4 text-gray-400 dark:text-stone-300" />
           <Input
             id="profile-personnel"
             label={t('profile.personnel')}
@@ -87,7 +92,7 @@ export function ProfileSetup({ initialName = '', initialPersonnel = '', initialS
         </div>
 
         <div className="relative">
-          <Mail className="absolute left-4 top-[42px] w-4 h-4 text-gray-400" />
+          <Mail className="absolute left-4 top-[42px] w-4 h-4 text-gray-400 dark:text-stone-300" />
           <Input
             id="profile-supervisor"
             label={t('profile.supervisor')}

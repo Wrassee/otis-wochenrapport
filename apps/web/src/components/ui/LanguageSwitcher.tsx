@@ -19,7 +19,7 @@ export function LanguageSwitcher() {
         </div>
         <div>
           <CardTitle>{t('language.title')}</CardTitle>
-          <p className="text-[10px] text-gray-400">{t('language.subtitle')}</p>
+          <p className="text-[10px] text-gray-400 dark:text-stone-300">{t('language.subtitle')}</p>
         </div>
       </div>
 
@@ -32,7 +32,7 @@ export function LanguageSwitcher() {
               'flex flex-col items-center justify-center gap-1 min-w-0 px-1 py-2.5 rounded-2xl border font-semibold transition-all duration-200 active:scale-95 overflow-hidden',
               language === lang.code
                 ? 'bg-otis-50 dark:bg-otis-900/30 border-otis-300/60 dark:border-otis-600/40 text-otis-700 dark:text-otis-300 shadow-sm'
-                : 'bg-white/50 dark:bg-white/5 border-gray-200/50 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-otis-200/50 hover:text-otis-600'
+                : 'bg-white/50 dark:bg-white/5 border-gray-200/50 dark:border-white/10 text-gray-500 dark:text-stone-300 hover:border-otis-200/50 hover:text-otis-600',
             )}
           >
             <Flag code={lang.code} />

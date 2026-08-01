@@ -30,7 +30,13 @@ interface ExportSummaryProps {
   sending: boolean
 }
 
-export function ExportSummary({ weekSummary, onExport, onSendEmail, exporting, sending }: ExportSummaryProps) {
+export function ExportSummary({
+  weekSummary,
+  onExport,
+  onSendEmail,
+  exporting,
+  sending,
+}: ExportSummaryProps) {
   const { t } = useTranslation()
   const [showPreview, setShowPreview] = useState(false)
   const validDays = weekSummary.days.filter((d) => d.isValid).length
@@ -60,25 +66,36 @@ export function ExportSummary({ weekSummary, onExport, onSendEmail, exporting, s
           <CardContent>
             <div className="space-y-2">
               {weekSummary.days.map((day) => (
-                <div key={day.date} className="flex items-center justify-between p-3 rounded-xl bg-otis-50/50 dark:bg-white/3 border border-otis-200/20 dark:border-white/5">
+                <div
+                  key={day.date}
+                  className="flex items-center justify-between p-3 rounded-xl bg-otis-50/50 dark:bg-white/3 border border-otis-200/20 dark:border-white/5"
+                >
                   <div className="flex items-center gap-2.5">
-                    <div className={cn(
-                      'w-2 h-2 rounded-full',
-                      day.isValid ? 'bg-emerald-500' : 'bg-amber-500'
-                    )} />
-                    <span className="font-semibold text-sm text-otis-800 dark:text-white min-w-[80px]">{day.dayName}</span>
+                    <div
+                      className={cn(
+                        'w-2 h-2 rounded-full',
+                        day.isValid ? 'bg-emerald-500' : 'bg-amber-500',
+                      )}
+                    />
+                    <span className="font-semibold text-sm text-otis-800 dark:text-white min-w-[80px]">
+                      {day.dayName}
+                    </span>
                     <div className="flex items-center gap-1.5 text-xs">
-                      <Clock className="w-3 h-3 text-gray-400" />
-                      <span className="text-gray-500 font-medium">{day.totalHours.toFixed(1)}h</span>
+                      <Clock className="w-3 h-3 text-gray-400 dark:text-stone-300" />
+                      <span className="text-gray-500 dark:text-stone-400 font-medium">
+                        {day.totalHours.toFixed(1)}h
+                      </span>
                     </div>
                     {day.hasLunch && (
-                      <div className="flex items-center gap-1 text-xs text-gray-400">
+                      <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-stone-300">
                         <UtensilsCrossed className="w-3 h-3" />
                         <span>{Math.round(day.lunchMinutes)}'</span>
                       </div>
                     )}
                     {day.maxZone > 0 && (
-                      <Badge variant="zone" size="sm">Z{day.maxZone}</Badge>
+                      <Badge variant="zone" size="sm">
+                        Z{day.maxZone}
+                      </Badge>
                     )}
                   </div>
                   {day.isValid ? (
@@ -96,15 +113,21 @@ export function ExportSummary({ weekSummary, onExport, onSendEmail, exporting, s
                 <div className="w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center">
                   <MapPin className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 </div>
-                <span className="font-semibold text-sm text-purple-700 dark:text-purple-300">{t('export.zones')}</span>
+                <span className="font-semibold text-sm text-purple-700 dark:text-purple-300">
+                  {t('export.zones')}
+                </span>
               </div>
               <div className="space-y-1.5 text-sm">
                 {weekSummary.days
                   .filter((d) => d.maxZone > 0)
                   .map((day) => (
                     <div key={day.date} className="flex justify-between items-center">
-                      <span className="text-purple-600 dark:text-purple-400">{day.dayName} ({formatDateShort(day.date)})</span>
-                      <Badge variant="zone" size="sm">{t('day.zone', { n: day.maxZone })}</Badge>
+                      <span className="text-purple-600 dark:text-purple-400">
+                        {day.dayName} ({formatDateShort(day.date)})
+                      </span>
+                      <Badge variant="zone" size="sm">
+                        {t('day.zone', { n: day.maxZone })}
+                      </Badge>
                     </div>
                   ))}
               </div>
@@ -132,7 +155,9 @@ export function ExportSummary({ weekSummary, onExport, onSendEmail, exporting, s
             <div className="flex items-start gap-2.5 p-3.5 bg-amber-500/10 backdrop-blur rounded-2xl border border-amber-400/20">
               <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
               <div>
-                <span className="text-sm font-medium text-amber-600 dark:text-amber-300">{t('export.incomplete.title')}</span>
+                <span className="text-sm font-medium text-amber-600 dark:text-amber-300">
+                  {t('export.incomplete.title')}
+                </span>
                 <p className="text-xs text-amber-500/80 mt-0.5">{t('export.incomplete.hint')}</p>
               </div>
             </div>

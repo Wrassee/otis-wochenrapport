@@ -54,7 +54,7 @@ export function FavoriteLifts({ favorites, onSelect }: FavoriteLiftsProps) {
                 'glass-card dark:glass-card-dark rounded-2xl',
                 'hover:border-otis-400/40 dark:hover:border-otis-400/30',
                 'active:scale-[0.97] transition-all duration-200',
-                'relative overflow-hidden group'
+                'relative overflow-hidden group',
               )}
             >
               {/* Background gradient */}
@@ -68,12 +68,14 @@ export function FavoriteLifts({ favorites, onSelect }: FavoriteLiftsProps) {
               <span className="font-bold text-sm text-otis-700 dark:text-otis-300 relative z-10">
                 {fav.anlagenummer}
               </span>
-              <span className="text-[11px] text-gray-500 dark:text-gray-400 truncate max-w-[160px] relative z-10 font-medium">
+              <span className="text-[11px] text-gray-500 dark:text-stone-300 truncate max-w-[160px] relative z-10 font-medium">
                 {fav.project_id}
               </span>
-              <div className="flex items-start gap-1 text-[10px] text-gray-400 dark:text-gray-500 relative z-10">
+              <div className="flex items-start gap-1 text-[10px] text-gray-400 dark:text-stone-400 relative z-10">
                 <MapPin className="w-3 h-3 flex-shrink-0 mt-0.5" />
-                <span className="text-pretty break-words leading-snug max-w-[160px]">{fav.full_address}</span>
+                <span className="text-pretty break-words leading-snug max-w-[160px]">
+                  {fav.full_address}
+                </span>
               </div>
               <div className="flex items-center gap-1 mt-0.5 relative z-10">
                 <TrendingUp className="w-2.5 h-2.5 text-otis-400/50" />

@@ -6,7 +6,15 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/lib/useTranslation'
-import { Calendar, ChevronLeft, ChevronRight, Clock, AlertTriangle, CheckCircle2, BarChart3 } from 'lucide-react'
+import {
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  BarChart3,
+} from 'lucide-react'
 import { formatDateShort } from '@/lib/utils'
 import { cn } from '@/lib/cn'
 
@@ -18,9 +26,15 @@ interface WeekOverviewProps {
   onEditEntry?: (entry: TimeEntry) => void
 }
 
-export function WeekOverview({ weekSummary, onPrevWeek, onNextWeek, onDeleteEntry, onEditEntry }: WeekOverviewProps) {
+export function WeekOverview({
+  weekSummary,
+  onPrevWeek,
+  onNextWeek,
+  onDeleteEntry,
+  onEditEntry,
+}: WeekOverviewProps) {
   const { t } = useTranslation()
-  const { dailyExpenses } = useAppStore()
+  const dailyExpenses = useAppStore((s) => s.dailyExpenses)
   const [expenseEditor, setExpenseEditor] = useState<{ date: string; dayName: string } | null>(null)
   const validDays = weekSummary.days.filter((d) => d.isValid).length
   const totalDays = weekSummary.days.length
@@ -47,10 +61,12 @@ export function WeekOverview({ weekSummary, onPrevWeek, onNextWeek, onDeleteEntr
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-otis-500 to-otis-700 flex items-center justify-center shadow-lg shadow-otis-500/20">
                 <Calendar className="w-4 h-4 text-white" />
               </div>
-              <span className="font-bold text-lg text-otis-800 dark:text-white">                    {t('week.title', { number: weekSummary.weekNumber })}
+              <span className="font-bold text-lg text-otis-800 dark:text-white">
+                {' '}
+                {t('week.title', { number: weekSummary.weekNumber })}
               </span>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-500 dark:text-stone-300 mt-0.5">
               {formatDateShort(weekSummary.startDate)} – {formatDateShort(weekSummary.endDate)}
             </p>
           </div>
@@ -68,23 +84,28 @@ export function WeekOverview({ weekSummary, onPrevWeek, onNextWeek, onDeleteEntr
       <Card variant={allValid ? 'success' : 'warning'}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={cn(
-              'w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg',
-              allValid
-                ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/20'
-                : 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-amber-500/20'
-            )}>
-              {allValid
-                ? <CheckCircle2 className="w-6 h-6 text-white" />
-                : <BarChart3 className="w-6 h-6 text-white" />
-              }
+            <div
+              className={cn(
+                'w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg',
+                allValid
+                  ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/20'
+                  : 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-amber-500/20',
+              )}
+            >
+              {allValid ? (
+                <CheckCircle2 className="w-6 h-6 text-white" />
+              ) : (
+                <BarChart3 className="w-6 h-6 text-white" />
+              )}
             </div>
             <div>
               <div className="flex items-baseline gap-1">
-                <span className="font-bold text-2xl text-otis-800 dark:text-white">{weekSummary.totalHours.toFixed(1)}h</span>
-                <span className="text-sm text-gray-400">{t('week.total')}</span>
+                <span className="font-bold text-2xl text-otis-800 dark:text-white">
+                  {weekSummary.totalHours.toFixed(1)}h
+                </span>
+                <span className="text-sm text-gray-400 dark:text-stone-300">{t('week.total')}</span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-gray-500 dark:text-stone-300">
                 {t('week.days.complete', { valid: validDays, total: totalDays })}
               </p>
             </div>
@@ -109,7 +130,7 @@ export function WeekOverview({ weekSummary, onPrevWeek, onNextWeek, onDeleteEntr
               'h-full rounded-full transition-all duration-700 ease-out',
               allValid
                 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
-                : 'bg-gradient-to-r from-amber-400 to-amber-500'
+                : 'bg-gradient-to-r from-amber-400 to-amber-500',
             )}
             style={{ width: `${(validDays / totalDays) * 100}%` }}
           />

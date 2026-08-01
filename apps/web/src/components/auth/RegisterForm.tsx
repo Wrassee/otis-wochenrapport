@@ -5,7 +5,12 @@ import { UserPlus, Eye, EyeOff, Building2 } from 'lucide-react'
 import { useTranslation } from '@/lib/useTranslation'
 
 interface RegisterFormProps {
-  onRegister: (email: string, password: string, fullName: string, personnelNumber: string) => Promise<void>
+  onRegister: (
+    email: string,
+    password: string,
+    fullName: string,
+    personnelNumber: string,
+  ) => Promise<void>
   onSwitchToLogin: () => void
   error?: string | null
 }
@@ -114,7 +119,7 @@ export function RegisterForm({ onRegister, onSwitchToLogin, error }: RegisterFor
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-[42px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                className="absolute right-4 top-[42px] text-gray-400 dark:text-stone-300 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                 tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -156,7 +161,10 @@ export function RegisterForm({ onRegister, onSwitchToLogin, error }: RegisterFor
 
         <p className="text-center mt-6 text-otis-200/70 text-sm">
           {t('auth.has.account')}{' '}
-          <button onClick={onSwitchToLogin} className="text-white font-semibold hover:text-otis-100 transition-colors underline underline-offset-2">
+          <button
+            onClick={onSwitchToLogin}
+            className="text-white font-semibold hover:text-otis-100 transition-colors underline underline-offset-2"
+          >
             {t('auth.switch.login')}
           </button>
         </p>

@@ -4,6 +4,7 @@ import { LoginForm } from '@/components/auth/LoginForm'
 import { RegisterForm } from '@/components/auth/RegisterForm'
 import { signIn, signUp, upsertProfile, getCurrentSession } from '@/db/supabase'
 import { useAppStore } from '@/stores/appStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
 
 export function LoginPage() {
@@ -12,7 +13,14 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const { setUser, setProfile, initialize, language } = useAppStore()
+  const { setUser, setProfile, initialize, language } = useAppStore(
+    useShallow((s) => ({
+      setUser: s.setUser,
+      setProfile: s.setProfile,
+      initialize: s.initialize,
+      language: s.language,
+    })),
+  )
 
   const handleLogin = async (email: string, password: string) => {
     setError(null)
@@ -31,7 +39,12 @@ export function LoginPage() {
     }
   }
 
-  const handleRegister = async (email: string, password: string, fullName: string, personnelNumber: string) => {
+  const handleRegister = async (
+    email: string,
+    password: string,
+    fullName: string,
+    personnelNumber: string,
+  ) => {
     setError(null)
     setLoading(true)
     try {

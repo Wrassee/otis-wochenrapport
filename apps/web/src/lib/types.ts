@@ -1,3 +1,5 @@
+import type { TranslationKey } from './translations'
+
 export interface Profile {
   id: string
   email: string
@@ -68,7 +70,7 @@ export type WeekDay = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
 
 /** A localized day-validation error: translation key + params (see week.error.*). */
 export interface DayError {
-  key: string
+  key: TranslationKey
   params?: Record<string, string | number>
 }
 

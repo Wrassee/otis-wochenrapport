@@ -13,6 +13,7 @@
 
 import { useCallback } from 'react'
 import { useAppStore } from '@/stores/appStore'
+import { useShallow } from 'zustand/react/shallow'
 import type { TimeEntry, WeekSummary } from '@/lib/types'
 
 interface UseTimeEntriesReturn {
@@ -61,7 +62,19 @@ export function useTimeEntries(): UseTimeEntriesReturn {
     quickAddDuration,
     loadWeekEntries,
     calculateWeekSummary,
-  } = useAppStore()
+  } = useAppStore(
+    useShallow((s) => ({
+      timeEntries: s.timeEntries,
+      weekSummary: s.weekSummary,
+      isLoading: s.isLoading,
+      addTimeEntry: s.addTimeEntry,
+      updateTimeEntry: s.updateTimeEntry,
+      deleteTimeEntry: s.deleteTimeEntry,
+      quickAddDuration: s.quickAddDuration,
+      loadWeekEntries: s.loadWeekEntries,
+      calculateWeekSummary: s.calculateWeekSummary,
+    })),
+  )
 
   /** Memoised wrapper — same behaviour as the store action. */
   const addEntry = useCallback(

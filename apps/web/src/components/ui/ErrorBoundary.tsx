@@ -1,7 +1,9 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { TriangleAlert, RotateCcw, RefreshCw } from 'lucide-react'
 import { useAppStore } from '@/stores/appStore'
-import { translations } from '@/lib/translations'
+import { translate } from '@/lib/translations'
+
+import type { TranslationKey } from '@/lib/translations'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -47,7 +49,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     // Read the current language imperatively — class components can't use hooks.
     const lang = useAppStore.getState().language
-    const t = (key: string): string => translations[key]?.[lang] ?? translations[key]?.de ?? key
+    const t = (key: TranslationKey): string => translate(key, lang)
 
     const { error } = this.state
     const message = error?.message || String(error)
@@ -64,7 +66,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <TriangleAlert className="w-6 h-6 text-red-500" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-otis-800 dark:text-white leading-tight">{t('error.title')}</h1>
+              <h1 className="text-lg font-bold text-otis-800 dark:text-white leading-tight">
+                {t('error.title')}
+              </h1>
               <p className="text-xs text-gray-500 dark:text-otis-300">{t('error.subtitle')}</p>
             </div>
           </div>

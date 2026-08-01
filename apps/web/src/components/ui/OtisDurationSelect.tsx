@@ -22,7 +22,11 @@ for (let i = 1; i <= 96; i++) {
   if (standard >= 1) {
     const h = Math.floor(standard)
     const m = Math.round((standard - h) * 60)
-    DURATION_OPTIONS.push({ otis, standard, display: `${h}h${m > 0 ? ` ${Math.round(m)}min` : ''}` })
+    DURATION_OPTIONS.push({
+      otis,
+      standard,
+      display: `${h}h${m > 0 ? ` ${Math.round(m)}min` : ''}`,
+    })
   } else {
     DURATION_OPTIONS.push({ otis, standard, display: `${Math.round(standard * 60)}min` })
   }
@@ -31,7 +35,13 @@ for (let i = 1; i <= 96; i++) {
 /** Most frequently selected OTIS durations shown as quick chips */
 const COMMON_CHIPS = ['0.30', '1.00', '1.30', '2.00', '4.00', '4.30']
 
-export function OtisDurationSelect({ value, onChange, label, disabled, required }: OtisDurationSelectProps) {
+export function OtisDurationSelect({
+  value,
+  onChange,
+  label,
+  disabled,
+  required,
+}: OtisDurationSelectProps) {
   const selectRef = useRef<HTMLSelectElement>(null)
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -69,7 +79,7 @@ export function OtisDurationSelect({ value, onChange, label, disabled, required 
             'text-otis-900 dark:text-white',
             'focus:outline-none focus:ring-2 focus:ring-otis-400/50',
             'disabled:opacity-50 disabled:cursor-not-allowed',
-            'cursor-pointer'
+            'cursor-pointer',
           )}
         >
           {DURATION_OPTIONS.map((opt) => (
@@ -81,8 +91,10 @@ export function OtisDurationSelect({ value, onChange, label, disabled, required 
 
         {/* Custom chevron + current value overlay (pointer-events: none so taps pass through to <select>) */}
         <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1">
-          <span className="text-sm font-bold text-otis-600 dark:text-otis-300 tabular-nums">{value}</span>
-          <ChevronDown className="w-4 h-4 text-gray-400" />
+          <span className="text-sm font-bold text-otis-600 dark:text-otis-300 tabular-nums">
+            {value}
+          </span>
+          <ChevronDown className="w-4 h-4 text-gray-400 dark:text-stone-300" />
         </div>
       </div>
 
@@ -97,7 +109,7 @@ export function OtisDurationSelect({ value, onChange, label, disabled, required 
               'px-3 py-1 text-xs font-semibold rounded-lg border transition-all duration-150 active:scale-90',
               value === otis
                 ? 'bg-otis-500/20 border-otis-400/40 text-otis-700 dark:text-otis-300'
-                : 'bg-otis-50/50 dark:bg-white/5 border-otis-200/30 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-otis-300/40 dark:hover:border-white/20'
+                : 'bg-otis-50/50 dark:bg-white/5 border-otis-200/30 dark:border-white/10 text-gray-500 dark:text-stone-300 hover:border-otis-300/40 dark:hover:border-white/20',
             )}
           >
             {otis}

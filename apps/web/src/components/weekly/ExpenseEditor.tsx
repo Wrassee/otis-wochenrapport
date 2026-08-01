@@ -4,8 +4,11 @@ import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Badge } from '@/components/ui/Badge'
 import { useTranslation } from '@/lib/useTranslation'
 import { useDailyExpenses } from '@/hooks/useDailyExpenses'
+import { useExpensePhotos } from '@/hooks/useExpensePhotos'
+import { EXPENSE_ITEM_STYLES } from '@/lib/expenseItems'
+import { getWeekInfo } from '@/lib/utils'
 import { cn } from '@/lib/cn'
-import { Clock, Bed, Car, RadioTower, Coins, Wrench, CarFront, Euro, CheckCircle2, type LucideIcon } from 'lucide-react'
+import { Camera, Euro, CheckCircle2 } from 'lucide-react'
 
 const SAVE_DEBOUNCE_MS = 500
 const SAVED_VISIBLE_MS = 2000
@@ -19,8 +22,16 @@ interface ExpenseEditorProps {
 
 export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorProps) {
   const { t } = useTranslation()
-  const { dailyExpenses, toggleExpense, setExpenseValue, refreshFromLocalDB, syncExpenses } = useDailyExpenses([date], { refreshOnMount: false })
+  const { dailyExpenses, toggleExpense, setExpenseValue, refreshFromLocalDB, syncExpenses } =
+    useDailyExpenses([date], { refreshOnMount: false })
   const dayExp = dailyExpenses[date] || []
+
+  // Week context for the Beleg camera — receipt photos are weekly, so the
+  // captured photo lands in the same week the Dashboard/Woche/Export show.
+  const weekInfo = getWeekInfo(date)
+  const { addPhoto, photos: weekPhotos } = useExpensePhotos(weekInfo.year, weekInfo.week)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const [photoBusy, setPhotoBusy] = useState(false)
 
   // Local value buffers for Material (CHF) and Privatfahrzeug (km)
   // so typing is instant — the debounced save syncs back to the store.
@@ -126,6 +137,20 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
     setLocalValues((prev) => ({ ...prev, [key]: raw }))
   }
 
+  const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setPhotoBusy(true)
+    try {
+      await addPhoto(file)
+    } catch (err) {
+      console.warn('Failed to add receipt photo:', err)
+    } finally {
+      setPhotoBusy(false)
+    }
+  }
+
   const getValue = (itemType: string): string => {
     const exp = dayExp.find((e: any) => e.expense_type === itemType)
     const localKey = `${itemType}::${itemType === 'material' ? 'CHF' : 'km'}`
@@ -133,34 +158,77 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
     return exp?.value !== undefined ? String(exp.value) : ''
   }
 
-  const EXPENSE_ITEMS: { type: ExpenseType; label: string; icon: LucideIcon; hasValue?: boolean; valueUnit?: string }[] = [
-    { type: 'entschaedigung_10h', label: t('spesen.10h'), icon: Clock },
-    { type: 'hotel', label: t('spesen.hotel'), icon: Bed },
-    { type: 'transport', label: t('spesen.transport'), icon: Car },
-    { type: 'pikettdienst', label: t('spesen.pikett'), icon: RadioTower },
-    { type: 'entschaedigung_pikett', label: t('spesen.pikett.ent'), icon: Coins },
-    { type: 'material', label: t('spesen.material'), icon: Wrench, hasValue: true, valueUnit: 'CHF' },
-    { type: 'privatfahrzeug', label: t('spesen.privat'), icon: CarFront, hasValue: true, valueUnit: 'km' },
+  const EXPENSE_ITEMS: {
+    type: ExpenseType
+    label: string
+    hasValue?: boolean
+    valueUnit?: string
+  }[] = [
+    { type: 'entschaedigung_10h', label: t('spesen.10h') },
+    { type: 'hotel', label: t('spesen.hotel') },
+    { type: 'transport', label: t('spesen.transport') },
+    { type: 'pikettdienst', label: t('spesen.pikett') },
+    { type: 'entschaedigung_pikett', label: t('spesen.pikett.ent') },
+    { type: 'material', label: t('spesen.material'), hasValue: true, valueUnit: 'CHF' },
+    { type: 'privatfahrzeug', label: t('spesen.privat'), hasValue: true, valueUnit: 'km' },
   ]
 
   return (
-    <BottomSheet open={open} onClose={handleClose} title={t('day.spesen.editor.title', { day: dayName })}>
+    <BottomSheet
+      open={open}
+      onClose={handleClose}
+      title={t('day.spesen.editor.title', { day: dayName })}
+    >
       <div className="flex items-center gap-2 mb-4">
         <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-sm">
           <Euro className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1">
-          <p className="text-xs text-gray-400">{date}</p>
-          <p className="text-[11px] text-gray-500">{t('day.spesen.count', { n: dayExp.length })}</p>
+          <p className="text-xs text-gray-500 dark:text-stone-200">{date}</p>
+          <p className="text-[11px] text-gray-500 dark:text-stone-300">
+            {t('day.spesen.count', { n: dayExp.length })}
+          </p>
+        </div>
+
+        {/* Beleg fotografieren — capture a receipt photo for this week */}
+        <div className="relative">
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handlePhotoCapture}
+          />
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            disabled={photoBusy}
+            className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center shadow-sm transition-all active:scale-90 disabled:opacity-50"
+            title={t('spesen.photos.add')}
+          >
+            {photoBusy ? (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Camera className="w-4 h-4 text-white" />
+            )}
+            {weekPhotos.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-white text-rose-600 text-[9px] font-bold flex items-center justify-center shadow">
+                {weekPhotos.length}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Auto-save indicator */}
-        <div className={cn(
-          'flex items-center gap-1.5 transition-all duration-300',
-          saveStatus === 'saved'
-            ? 'opacity-100 translate-x-0'
-            : 'opacity-0 translate-x-2 pointer-events-none'
-        )}>
+        <div
+          className={cn(
+            'flex items-center gap-1.5 transition-all duration-300',
+            saveStatus === 'saved'
+              ? 'opacity-100 translate-x-0'
+              : 'opacity-0 translate-x-2 pointer-events-none',
+          )}
+        >
           <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
             {t('common.saved')}
@@ -172,6 +240,8 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
         {EXPENSE_ITEMS.map((item) => {
           const exp = dayExp.find((e: any) => e.expense_type === item.type)
           const isActive = !!exp
+          const itemStyle = EXPENSE_ITEM_STYLES[item.type]
+          const ItemIcon = itemStyle.icon
           return (
             <div key={item.type} className="flex items-center gap-2">
               <button
@@ -182,15 +252,26 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
                   'flex-1 text-left',
                   isActive
                     ? 'bg-otis-50 dark:bg-otis-900/30 border-otis-300/60 dark:border-otis-600/40 text-otis-700 dark:text-otis-300 shadow-sm'
-                    : 'bg-white/50 dark:bg-white/5 border-gray-200/50 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-otis-200/50 hover:text-otis-600'
+                    : 'bg-white/50 dark:bg-white/5 border-gray-200/50 dark:border-white/10 text-gray-600 dark:text-stone-200 hover:border-otis-200/50 hover:text-otis-600',
                 )}
               >
-                <item.icon className="w-5 h-5 shrink-0" />
+                <div
+                  className={cn(
+                    'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+                    itemStyle.chip,
+                  )}
+                >
+                  <ItemIcon className="w-4 h-4" />
+                </div>
                 <span className="flex-1">{item.label}</span>
                 {isActive ? (
-                  <Badge variant="info" size="sm">{t('spesen.active')}</Badge>
+                  <Badge variant="info" size="sm">
+                    {t('spesen.active')}
+                  </Badge>
                 ) : (
-                  <span className="text-[11px] text-gray-300 dark:text-gray-600">{t('spesen.inactive')}</span>
+                  <span className="text-[11px] font-medium text-gray-500 dark:text-stone-200">
+                    {t('spesen.inactive')}
+                  </span>
                 )}
               </button>
 
@@ -206,7 +287,9 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
                     className="w-full h-[48px] px-3 rounded-xl text-sm glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none text-center font-mono"
                     placeholder={item.valueUnit === 'CHF' ? '0.00' : '0'}
                   />
-                  <p className="text-[9px] text-gray-400 text-center mt-0.5">{item.valueUnit}</p>
+                  <p className="text-[9px] text-gray-500 dark:text-stone-200 text-center mt-0.5">
+                    {item.valueUnit}
+                  </p>
                 </div>
               )}
             </div>
@@ -214,7 +297,7 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
         })}
       </div>
 
-      <p className="text-[10px] text-gray-400 mt-4 text-center">
+      <p className="text-[10px] text-gray-500 dark:text-stone-300 mt-4 text-center">
         {t('day.spesen.editor.hint')}
       </p>
     </BottomSheet>

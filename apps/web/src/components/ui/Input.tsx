@@ -12,7 +12,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label htmlFor={id} className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
+          <label
+            htmlFor={id}
+            className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5"
+          >
             {label}
           </label>
         )}
@@ -23,11 +26,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             'w-full h-14 px-4 rounded-2xl text-base',
             'glass-input dark:glass-input-dark',
             'text-otis-900 dark:text-white',
-            'placeholder:text-gray-400 dark:placeholder:text-gray-500',
+            'placeholder:text-gray-500 dark:placeholder:text-stone-300',
             'focus:outline-none',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             error && '!border-red-400 !shadow-red-500/10',
-            className
+            className,
           )}
           {...props}
         />
@@ -37,12 +40,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {error}
           </p>
         )}
-        {hint && !error && (
-          <p className="mt-1 text-xs text-gray-400">{hint}</p>
-        )}
+        {hint && !error && <p className="mt-1 text-xs text-gray-500 dark:text-stone-300">{hint}</p>}
       </div>
     )
-  }
+  },
 )
 
 Input.displayName = 'Input'

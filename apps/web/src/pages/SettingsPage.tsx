@@ -4,20 +4,61 @@ import { Card, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { useAppStore } from '@/stores/appStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
 import { upsertProfile } from '@/db/supabase'
 import * as localDb from '@/db/indexeddb'
-import { LogOut, Wifi, WifiOff, Smartphone, RefreshCw, Clock, Shield, Info, Settings, Bell, BellOff, Calendar, MapPin, Pencil, Check, X, Search, Trash2, AlertTriangle, Plus, Languages, Sun, Moon, Monitor } from 'lucide-react'
+import {
+  LogOut,
+  Wifi,
+  WifiOff,
+  Smartphone,
+  RefreshCw,
+  Clock,
+  Shield,
+  Info,
+  Settings,
+  Bell,
+  BellOff,
+  Calendar,
+  MapPin,
+  Pencil,
+  Check,
+  X,
+  Search,
+  Trash2,
+  AlertTriangle,
+  Plus,
+  Languages,
+  Sun,
+  Moon,
+  Monitor,
+} from 'lucide-react'
 import { forceSync } from '@/db/sync'
 import { useNavigate } from 'react-router-dom'
 import { signOut } from '@/db/supabase'
 import { cn } from '@/lib/cn'
-import { scheduleMondayReminder, cancelMondayReminder, isReminderScheduled, setReminderPreference } from '@/db/notifications'
+import {
+  scheduleMondayReminder,
+  cancelMondayReminder,
+  isReminderScheduled,
+  setReminderPreference,
+} from '@/db/notifications'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 
 export function SettingsPage() {
   const { t } = useTranslation()
-  const { profile, setProfile, user, setUser, syncStatus, setSyncStatus, language } = useAppStore()
+  const { profile, setProfile, user, setUser, syncStatus, setSyncStatus, language } = useAppStore(
+    useShallow((s) => ({
+      profile: s.profile,
+      setProfile: s.setProfile,
+      user: s.user,
+      setUser: s.setUser,
+      syncStatus: s.syncStatus,
+      setSyncStatus: s.setSyncStatus,
+      language: s.language,
+    })),
+  )
   const navigate = useNavigate()
   const [notificationEnabled, setNotificationEnabled] = useState(false)
   const [notificationLoading, setNotificationLoading] = useState(false)
@@ -27,7 +68,11 @@ export function SettingsPage() {
     isReminderScheduled().then(setNotificationEnabled)
   }, [])
 
-  const handleSaveProfile = async (fullName: string, personnelNumber: string, supervisorEmail: string) => {
+  const handleSaveProfile = async (
+    fullName: string,
+    personnelNumber: string,
+    supervisorEmail: string,
+  ) => {
     if (!user) return
     const updatedProfile = {
       id: user.id,
@@ -94,7 +139,7 @@ export function SettingsPage() {
         </div>
         <div>
           <h2 className="text-lg font-bold text-otis-800 dark:text-white">{t('nav.settings')}</h2>
-          <p className="text-xs text-gray-400">{t('nav.subtitle.settings')}</p>
+          <p className="text-xs text-gray-400 dark:text-stone-300">{t('nav.subtitle.settings')}</p>
         </div>
       </div>
 
@@ -110,20 +155,25 @@ export function SettingsPage() {
       <Card>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
-            <div className={cn(
-              'w-9 h-9 rounded-xl flex items-center justify-center shadow-lg',
-              notificationEnabled
-                ? 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-amber-500/20'
-                : 'bg-gradient-to-br from-gray-400 to-gray-500 shadow-gray-500/20'
-            )}>
-              {notificationEnabled
-                ? <Bell className="w-4 h-4 text-white" />
-                : <BellOff className="w-4 h-4 text-white" />
-              }
+            <div
+              className={cn(
+                'w-9 h-9 rounded-xl flex items-center justify-center shadow-lg',
+                notificationEnabled
+                  ? 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-amber-500/20'
+                  : 'bg-gradient-to-br from-gray-400 to-gray-500 shadow-gray-500/20',
+              )}
+            >
+              {notificationEnabled ? (
+                <Bell className="w-4 h-4 text-white" />
+              ) : (
+                <BellOff className="w-4 h-4 text-white" />
+              )}
             </div>
             <div>
               <CardTitle>{t('settings.reminder')}</CardTitle>
-              <p className="text-[10px] text-gray-400">{t('settings.reminder.subtitle')}</p>
+              <p className="text-[10px] text-gray-400 dark:text-stone-300">
+                {t('settings.reminder.subtitle')}
+              </p>
             </div>
           </div>
           <Badge variant={notificationEnabled ? 'success' : 'default'} size="sm">
@@ -134,13 +184,11 @@ export function SettingsPage() {
         <div className="p-3.5 bg-otis-50/50 dark:bg-white/3 rounded-2xl border border-otis-200/20 dark:border-white/5 mb-4">
           <div className="flex items-start gap-2.5">
             <Calendar className="w-4 h-4 text-otis-400 mt-0.5 flex-shrink-0" />
-            <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+            <div className="text-xs text-gray-500 dark:text-stone-300 space-y-1">
               <p className="font-medium text-otis-600 dark:text-otis-300">
                 {t('settings.reminder.desc')}
               </p>
-              <p>
-                {t('settings.reminder.detail')}
-              </p>
+              <p>{t('settings.reminder.detail')}</p>
             </div>
           </div>
         </div>
@@ -161,7 +209,9 @@ export function SettingsPage() {
           {notificationLoading ? (
             <span className="flex items-center gap-2">
               <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              {notificationEnabled ? t('settings.reminder.deactivating') : t('settings.reminder.activating')}
+              {notificationEnabled
+                ? t('settings.reminder.deactivating')
+                : t('settings.reminder.activating')}
             </span>
           ) : notificationEnabled ? (
             <span className="flex items-center gap-2">
@@ -195,7 +245,9 @@ export function SettingsPage() {
             </div>
             <div>
               <CardTitle>{t('settings.sync')}</CardTitle>
-              <p className="text-[10px] text-gray-400">{t('settings.sync.subtitle')}</p>
+              <p className="text-[10px] text-gray-400 dark:text-stone-300">
+                {t('settings.sync.subtitle')}
+              </p>
             </div>
           </div>
           <Badge variant={syncStatus.online ? 'success' : 'danger'}>
@@ -203,36 +255,44 @@ export function SettingsPage() {
           </Badge>
         </div>
 
-        <div className="space-y-2.5 text-sm text-gray-600 dark:text-gray-400 mb-4 p-3.5 bg-otis-50/50 dark:bg-white/3 rounded-2xl border border-otis-200/20 dark:border-white/5">
+        <div className="space-y-2.5 text-sm text-gray-600 dark:text-stone-300 mb-4 p-3.5 bg-otis-50/50 dark:bg-white/3 rounded-2xl border border-otis-200/20 dark:border-white/5">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5">
-              <Wifi className="w-4 h-4 text-gray-400" />
+              <Wifi className="w-4 h-4 text-gray-400 dark:text-stone-300" />
               {t('settings.status')}
             </span>
             <span className="flex items-center gap-1.5 font-medium">
               {syncStatus.online ? (
-                <><Wifi className="w-4 h-4 text-emerald-500" /> {t('settings.online')}</>
+                <>
+                  <Wifi className="w-4 h-4 text-emerald-500" /> {t('settings.online')}
+                </>
               ) : (
-                <><WifiOff className="w-4 h-4 text-red-500" /> {t('settings.offline')}</>
+                <>
+                  <WifiOff className="w-4 h-4 text-red-500" /> {t('settings.offline')}
+                </>
               )}
             </span>
           </div>
           {syncStatus.lastSync && (
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-gray-400" />
+                <Clock className="w-4 h-4 text-gray-400 dark:text-stone-300" />
                 {t('settings.last.sync')}
               </span>
-              <span className="font-medium">{new Date(syncStatus.lastSync).toLocaleTimeString('de-DE')}</span>
+              <span className="font-medium">
+                {new Date(syncStatus.lastSync).toLocaleTimeString('de-DE')}
+              </span>
             </div>
           )}
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5">
-              <Shield className="w-4 h-4 text-gray-400" />
+              <Shield className="w-4 h-4 text-gray-400 dark:text-stone-300" />
               {t('settings.pending')}
             </span>
             <Badge variant={syncStatus.pendingSync > 0 ? 'warning' : 'success'} size="sm">
-              {syncStatus.pendingSync > 0 ? t('settings.pending.count', { n: syncStatus.pendingSync }) : t('settings.pending.none')}
+              {syncStatus.pendingSync > 0
+                ? t('settings.pending.count', { n: syncStatus.pendingSync })
+                : t('settings.pending.none')}
             </Badge>
           </div>
         </div>
@@ -249,11 +309,23 @@ export function SettingsPage() {
           <div className="w-9 h-9 rounded-xl bg-otis-100/50 dark:bg-otis-800/30 flex items-center justify-center flex-shrink-0">
             <Info className="w-4 h-4 text-otis-500" />
           </div>
-          <div className="text-xs text-gray-400 space-y-1">
-            <p className="font-semibold text-otis-600 dark:text-otis-300">{t('settings.app.info')}</p>
+          <div className="text-xs text-gray-400 dark:text-stone-300 space-y-1">
+            <p className="font-semibold text-otis-600 dark:text-otis-300">
+              {t('settings.app.info')}
+            </p>
             <p>{t('settings.app.desc')}</p>
-            <p>{t('settings.reminder.state', { state: notificationEnabled ? t('settings.reminder.active') : t('settings.reminder.inactive') })}</p>
-            {user && <p className="font-mono text-[10px] text-gray-400">{t('settings.user', { email: user.email })}</p>}
+            <p>
+              {t('settings.reminder.state', {
+                state: notificationEnabled
+                  ? t('settings.reminder.active')
+                  : t('settings.reminder.inactive'),
+              })}
+            </p>
+            {user && (
+              <p className="font-mono text-[10px] text-gray-400 dark:text-stone-300">
+                {t('settings.user', { email: user.email })}
+              </p>
+            )}
           </div>
         </div>
       </Card>
@@ -269,7 +341,9 @@ export function SettingsPage() {
 
 function ThemeSwitcher() {
   const { t } = useTranslation()
-  const { theme, setTheme } = useAppStore()
+  const { theme, setTheme } = useAppStore(
+    useShallow((s) => ({ theme: s.theme, setTheme: s.setTheme })),
+  )
 
   const options: { value: 'system' | 'light' | 'dark'; label: string; icon: typeof Sun }[] = [
     { value: 'system', label: t('theme.system'), icon: Monitor },
@@ -291,7 +365,7 @@ function ThemeSwitcher() {
         </div>
         <div>
           <CardTitle>{t('theme.title')}</CardTitle>
-          <p className="text-[10px] text-gray-400">{t('theme.subtitle')}</p>
+          <p className="text-[10px] text-gray-400 dark:text-stone-300">{t('theme.subtitle')}</p>
         </div>
       </div>
 
@@ -307,11 +381,13 @@ function ThemeSwitcher() {
                 'flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-2xl border-2 transition-all duration-200 active:scale-95',
                 isActive
                   ? 'bg-otis-500/10 dark:bg-otis-500/20 border-otis-400/40 dark:border-otis-500/40 text-otis-700 dark:text-otis-300'
-                  : 'bg-otis-50/50 dark:bg-white/3 border-transparent text-gray-500 dark:text-gray-400 hover:border-otis-300/30 dark:hover:border-white/10 hover:text-otis-600 dark:hover:text-otis-300'
+                  : 'bg-otis-50/50 dark:bg-white/3 border-transparent text-gray-500 dark:text-stone-300 hover:border-otis-300/30 dark:hover:border-white/10 hover:text-otis-600 dark:hover:text-otis-300',
               )}
             >
               <Icon className={cn('w-5 h-5', isActive && 'text-otis-500')} />
-              <span className="text-[11px] font-semibold leading-tight text-center">{opt.label}</span>
+              <span className="text-[11px] font-semibold leading-tight text-center">
+                {opt.label}
+              </span>
             </button>
           )
         })}
@@ -330,7 +406,13 @@ interface LiftItem {
 
 function LiftZoneManager() {
   const { t } = useTranslation()
-  const { locations, setLocations, setFavoriteLocations } = useAppStore()
+  const { locations, setLocations, setFavoriteLocations } = useAppStore(
+    useShallow((s) => ({
+      locations: s.locations,
+      setLocations: s.setLocations,
+      setFavoriteLocations: s.setFavoriteLocations,
+    })),
+  )
   const [liftList, setLiftList] = useState<LiftItem[]>([])
   const [filteredList, setFilteredList] = useState<LiftItem[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -405,8 +487,8 @@ function LiftZoneManager() {
         (lift) =>
           lift.anlagenummer.toLowerCase().includes(q) ||
           lift.projectId.toLowerCase().includes(q) ||
-          lift.address.toLowerCase().includes(q)
-      )
+          lift.address.toLowerCase().includes(q),
+      ),
     )
   }, [searchQuery, liftList])
 
@@ -481,7 +563,12 @@ function LiftZoneManager() {
     }
   }
 
-  const addLift = async (anlagenummer: string, projectId: string, address: string, zone: number) => {
+  const addLift = async (
+    anlagenummer: string,
+    projectId: string,
+    address: string,
+    zone: number,
+  ) => {
     try {
       const key = anlagenummer.toUpperCase()
       const newId = `manual_${key}_${Date.now()}`
@@ -550,8 +637,11 @@ function LiftZoneManager() {
           </div>
           <div>
             <CardTitle>{t('lifts.title')}</CardTitle>
-            <p className="text-[10px] text-gray-400">
-              {t('lifts.count', { n: liftList.length })} {filteredList.length < liftList.length ? t('lifts.filtered', { n: filteredList.length }) : ''}
+            <p className="text-[10px] text-gray-400 dark:text-stone-300">
+              {t('lifts.count', { n: liftList.length })}{' '}
+              {filteredList.length < liftList.length
+                ? t('lifts.filtered', { n: filteredList.length })
+                : ''}
             </p>
           </div>
         </div>
@@ -577,14 +667,19 @@ function LiftZoneManager() {
             className="w-8 h-8 rounded-xl glass dark:glass-dark flex items-center justify-center hover:bg-white/20 transition-all"
             title={t('lifts.refresh')}
           >
-            <RefreshCw className={cn('w-4 h-4 text-gray-400', isLoading && 'animate-spin')} />
+            <RefreshCw
+              className={cn(
+                'w-4 h-4 text-gray-400 dark:text-stone-300',
+                isLoading && 'animate-spin',
+              )}
+            />
           </button>
         </div>
       </div>
 
       {/* Search filter */}
       <div className="relative mb-3">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-stone-300" />
         <input
           type="text"
           value={searchQuery}
@@ -597,21 +692,35 @@ function LiftZoneManager() {
             onClick={() => setSearchQuery('')}
             className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gray-200 dark:bg-white/10 flex items-center justify-center hover:bg-gray-300 dark:hover:bg-white/20 transition-all"
           >
-            <X className="w-3 h-3 text-gray-500" />
+            <X className="w-3 h-3 text-gray-500 dark:text-stone-400" />
           </button>
         )}
       </div>
 
       {/* Feedback banner */}
       {saveFeedback && (
-        <div className={cn(
-          'flex items-center gap-2 p-3 mb-3 backdrop-blur rounded-2xl border transition-all',
-          feedbackType === 'success'
-            ? 'bg-emerald-50/80 dark:bg-emerald-900/20 border-emerald-200/60 dark:border-emerald-700/40'
-            : 'bg-red-50/80 dark:bg-red-900/20 border-red-200/60 dark:border-red-700/40'
-        )}>
-          <Check className={cn('w-4 h-4', feedbackType === 'success' ? 'text-emerald-500' : 'text-red-500')} />
-          <p className={cn('text-xs font-medium', feedbackType === 'success' ? 'text-emerald-600 dark:text-emerald-300' : 'text-red-600 dark:text-red-300')}>
+        <div
+          className={cn(
+            'flex items-center gap-2 p-3 mb-3 backdrop-blur rounded-2xl border transition-all',
+            feedbackType === 'success'
+              ? 'bg-emerald-50/80 dark:bg-emerald-900/20 border-emerald-200/60 dark:border-emerald-700/40'
+              : 'bg-red-50/80 dark:bg-red-900/20 border-red-200/60 dark:border-red-700/40',
+          )}
+        >
+          <Check
+            className={cn(
+              'w-4 h-4',
+              feedbackType === 'success' ? 'text-emerald-500' : 'text-red-500',
+            )}
+          />
+          <p
+            className={cn(
+              'text-xs font-medium',
+              feedbackType === 'success'
+                ? 'text-emerald-600 dark:text-emerald-300'
+                : 'text-red-600 dark:text-red-300',
+            )}
+          >
             {saveFeedback}
           </p>
         </div>
@@ -730,15 +839,13 @@ function LiftZoneManager() {
       ) : filteredList.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <div className="w-12 h-12 rounded-2xl bg-otis-100/50 dark:bg-otis-800/30 flex items-center justify-center mb-2">
-            <MapPin className="w-6 h-6 text-gray-400" />
+            <MapPin className="w-6 h-6 text-gray-400 dark:text-stone-300" />
           </div>
-          <p className="text-sm text-gray-400 font-medium">
+          <p className="text-sm text-gray-400 dark:text-stone-300 font-medium">
             {searchQuery ? t('lifts.notfound') : t('lifts.empty')}
           </p>
-          <p className="text-[10px] text-gray-400 mt-0.5">
-            {searchQuery
-              ? t('lifts.notfound.hint')
-              : t('lifts.empty.hint')}
+          <p className="text-[10px] text-gray-400 dark:text-stone-300 mt-0.5">
+            {searchQuery ? t('lifts.notfound.hint') : t('lifts.empty.hint')}
           </p>
         </div>
       ) : (
@@ -750,7 +857,7 @@ function LiftZoneManager() {
                 'rounded-2xl border transition-all duration-200',
                 editingLift === lift.anlagenummer
                   ? 'bg-otis-50/80 dark:bg-otis-900/30 border-otis-300/40 dark:border-otis-600/40'
-                  : 'bg-otis-50/50 dark:bg-white/3 border-otis-200/20 dark:border-white/5 hover:border-otis-300/30 dark:hover:border-white/10'
+                  : 'bg-otis-50/50 dark:bg-white/3 border-otis-200/20 dark:border-white/5 hover:border-otis-300/30 dark:hover:border-white/10',
               )}
             >
               {editingLift === lift.anlagenummer ? (
@@ -849,7 +956,7 @@ function LiftZoneManager() {
                       </button>
                       <button
                         onClick={() => setDeleteConfirm(null)}
-                        className="h-7 px-3 rounded-lg bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-gray-300 text-xs font-semibold hover:bg-gray-300 dark:hover:bg-white/20 transition-all active:scale-95"
+                        className="h-7 px-3 rounded-lg bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-stone-200 text-xs font-semibold hover:bg-gray-300 dark:hover:bg-white/20 transition-all active:scale-95"
                       >
                         {t('lifts.delete.no')}
                       </button>
@@ -866,13 +973,13 @@ function LiftZoneManager() {
                         {lift.anlagenummer}
                       </span>
                       {lift.projectId && (
-                        <span className="text-[10px] font-mono font-medium text-gray-400 dark:text-gray-500 bg-otis-100/30 dark:bg-white/3 px-1.5 py-0.5 rounded-lg">
+                        <span className="text-[10px] font-mono font-medium text-gray-400 dark:text-stone-400 bg-otis-100/30 dark:bg-white/3 px-1.5 py-0.5 rounded-lg">
                           {lift.projectId}
                         </span>
                       )}
                     </div>
                     {lift.address && (
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5">
+                      <p className="text-[10px] text-gray-400 dark:text-stone-400 truncate mt-0.5">
                         {lift.address}
                       </p>
                     )}
@@ -882,7 +989,11 @@ function LiftZoneManager() {
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <Badge variant={lift.isManual ? 'warning' : 'zone'} size="sm">
                       Z{lift.effectiveZone}
-                      {lift.isManual && <span className="ml-0.5 text-[9px] text-amber-600 dark:text-amber-300">&bull;</span>}
+                      {lift.isManual && (
+                        <span className="ml-0.5 text-[9px] text-amber-600 dark:text-amber-300">
+                          &bull;
+                        </span>
+                      )}
                     </Badge>
                     <button
                       onClick={() => startEditing(lift)}

@@ -6,17 +6,25 @@ import { cn } from '@/lib/cn'
 import { useAppStore } from '@/stores/appStore'
 import { useDailyExpenses } from '@/hooks/useDailyExpenses'
 import { useExpensePhotos } from '@/hooks/useExpensePhotos'
+import { EXPENSE_ITEM_STYLES } from '@/lib/expenseItems'
 import { getWeekDates } from '@/lib/utils'
-import { Clock, Bed, Car, RadioTower, Coins, Wrench, CarFront, Euro, Check, X, Camera, Trash2, ImagePlus, StickyNote } from 'lucide-react'
+import type { ExpenseType } from '@/lib/types'
+import type { TranslationKey } from '@/lib/translations'
+import { Euro, Check, X, Camera, Trash2, ImagePlus, StickyNote } from 'lucide-react'
 
-const EXPENSE_ITEMS = [
-  { type: 'entschaedigung_10h' as const, labelKey: 'spesen.10h', icon: Clock },
-  { type: 'hotel' as const, labelKey: 'spesen.hotel', icon: Bed },
-  { type: 'transport' as const, labelKey: 'spesen.transport', icon: Car },
-  { type: 'pikettdienst' as const, labelKey: 'spesen.pikett', icon: RadioTower },
-  { type: 'entschaedigung_pikett' as const, labelKey: 'spesen.pikett.ent', icon: Coins },
-  { type: 'material' as const, labelKey: 'spesen.material', icon: Wrench, hasValue: true, valueUnit: 'CHF' },
-  { type: 'privatfahrzeug' as const, labelKey: 'spesen.privat', icon: CarFront, hasValue: true, valueUnit: 'km' },
+const EXPENSE_ITEMS: {
+  type: ExpenseType
+  labelKey: TranslationKey
+  hasValue?: boolean
+  valueUnit?: string
+}[] = [
+  { type: 'entschaedigung_10h', labelKey: 'spesen.10h' },
+  { type: 'hotel', labelKey: 'spesen.hotel' },
+  { type: 'transport', labelKey: 'spesen.transport' },
+  { type: 'pikettdienst', labelKey: 'spesen.pikett' },
+  { type: 'entschaedigung_pikett', labelKey: 'spesen.pikett.ent' },
+  { type: 'material', labelKey: 'spesen.material', hasValue: true, valueUnit: 'CHF' },
+  { type: 'privatfahrzeug', labelKey: 'spesen.privat', hasValue: true, valueUnit: 'km' },
 ]
 
 export function SpesenPage() {
@@ -24,13 +32,16 @@ export function SpesenPage() {
 
   // Single week source of truth — same currentWeek the Woche/Export pages use,
   // so the Spesen tab always shows the same week's expenses and Belege photos.
-  const { currentWeek } = useAppStore()
+  const currentWeek = useAppStore((s) => s.currentWeek)
   const dates = getWeekDates(currentWeek.year, currentWeek.week)
   const dayNames = t('week.days').split(' | ')
 
   const { dailyExpenses, toggleExpense, setExpenseValue, syncExpenses } = useDailyExpenses(dates)
 
-  const { photos, addPhoto, removePhoto, updatePhotoNote } = useExpensePhotos(currentWeek.year, currentWeek.week)
+  const { photos, addPhoto, removePhoto, updatePhotoNote } = useExpensePhotos(
+    currentWeek.year,
+    currentWeek.week,
+  )
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
@@ -76,11 +87,14 @@ export function SpesenPage() {
         </div>
         <div className="flex-1">
           <h2 className="text-lg font-bold text-otis-800 dark:text-white">{t('day.spesen')}</h2>
-          <p className="text-xs text-gray-400">
-            {t('week.title', { number: currentWeek.week })} — {t('day.spesen.count', { n: totalActive })}
+          <p className="text-xs text-gray-400 dark:text-stone-300">
+            {t('week.title', { number: currentWeek.week })} —{' '}
+            {t('day.spesen.count', { n: totalActive })}
           </p>
         </div>
-        <Badge variant="info" size="sm">{totalActive}</Badge>
+        <Badge variant="info" size="sm">
+          {totalActive}
+        </Badge>
       </div>
 
       {/* Info banner */}
@@ -99,7 +113,9 @@ export function SpesenPage() {
             </div>
             <div>
               <CardTitle>{t('spesen.photos.title')}</CardTitle>
-              <p className="text-[10px] text-gray-400">{t('spesen.photos.subtitle')}</p>
+              <p className="text-[10px] text-gray-400 dark:text-stone-300">
+                {t('spesen.photos.subtitle')}
+              </p>
             </div>
           </div>
           <Badge variant={photos.length > 0 ? 'info' : 'default'} size="sm">
@@ -130,9 +146,7 @@ export function SpesenPage() {
           {photoBusy ? t('spesen.photos.processing') : t('spesen.photos.add')}
         </button>
 
-        {photoError && (
-          <p className="text-[11px] text-red-500 mt-2 text-center">{photoError}</p>
-        )}
+        {photoError && <p className="text-[11px] text-red-500 mt-2 text-center">{photoError}</p>}
 
         {photos.length > 0 ? (
           <>
@@ -196,8 +210,11 @@ export function SpesenPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setNoteEditingId(null); setNoteDraft('') }}
-                    className="h-11 px-4 rounded-xl bg-white/60 dark:bg-white/10 text-gray-500 dark:text-gray-300 text-sm font-medium transition-all active:scale-[0.98]"
+                    onClick={() => {
+                      setNoteEditingId(null)
+                      setNoteDraft('')
+                    }}
+                    className="h-11 px-4 rounded-xl bg-white/60 dark:bg-white/10 text-gray-500 dark:text-stone-200 text-sm font-medium transition-all active:scale-[0.98]"
                   >
                     {t('spesen.photos.note.cancel')}
                   </button>
@@ -206,7 +223,7 @@ export function SpesenPage() {
             )}
           </>
         ) : (
-          <p className="text-[11px] text-gray-400 text-center mt-3">
+          <p className="text-[11px] text-gray-400 dark:text-stone-300 text-center mt-3">
             {t('spesen.photos.none')}
           </p>
         )}
@@ -221,18 +238,24 @@ export function SpesenPage() {
           <Card key={date}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
-                <div className={cn(
-                  'w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold',
-                  dayExp.length > 0
-                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                    : 'bg-otis-100/50 dark:bg-otis-800/30 text-gray-400 dark:text-gray-500'
-                )}>
+                <div
+                  className={cn(
+                    'w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold',
+                    dayExp.length > 0
+                      ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                      : 'bg-otis-100/50 dark:bg-otis-800/30 text-gray-500 dark:text-stone-300',
+                  )}
+                >
                   {dayName}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-otis-800 dark:text-white">{dayName}</span>
-                    <span className="text-[10px] text-gray-400 font-mono">{date.slice(5)}</span>
+                    <span className="font-bold text-sm text-otis-800 dark:text-white">
+                      {dayName}
+                    </span>
+                    <span className="text-[10px] text-gray-500 dark:text-stone-300 font-mono">
+                      {date.slice(5)}
+                    </span>
                   </div>
                   {dayExp.length > 0 && (
                     <p className="text-[10px] text-amber-500 font-medium">
@@ -241,18 +264,31 @@ export function SpesenPage() {
                   )}
                 </div>
               </div>
-              {dayExp.length > 0 && (
-                <Badge variant="info" size="sm">
-                  <Check className="w-3 h-3 mr-0.5" />
-                  {t('spesen.active')}
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {/* Beleg fotografieren — quick camera access on the day card */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center transition-all active:scale-90"
+                  title={t('spesen.photos.add')}
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+                {dayExp.length > 0 && (
+                  <Badge variant="info" size="sm">
+                    <Check className="w-3 h-3 mr-0.5" />
+                    {t('spesen.active')}
+                  </Badge>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
               {EXPENSE_ITEMS.map((item) => {
                 const exp = dayExp.find((e) => e.expense_type === item.type)
                 const isActive = !!exp
+                const itemStyle = EXPENSE_ITEM_STYLES[item.type]
+                const ItemIcon = itemStyle.icon
 
                 const handleToggle = () => {
                   toggleExpense(date, item.type)
@@ -260,9 +296,10 @@ export function SpesenPage() {
                 }
 
                 const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-                  const val = item.valueUnit === 'CHF'
-                    ? parseFloat(e.target.value) || 0
-                    : parseInt(e.target.value) || 0
+                  const val =
+                    item.valueUnit === 'CHF'
+                      ? parseFloat(e.target.value) || 0
+                      : parseInt(e.target.value) || 0
                   setExpenseValue(date, item.type, Math.max(0, val))
                   syncExpenses()
                 }
@@ -277,15 +314,22 @@ export function SpesenPage() {
                         'flex-1 text-left',
                         isActive
                           ? 'bg-otis-50 dark:bg-otis-900/30 border-otis-300/60 dark:border-otis-600/40 text-otis-700 dark:text-otis-300 shadow-sm'
-                          : 'bg-white/50 dark:bg-white/5 border-gray-200/50 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-otis-200/50 hover:text-otis-600'
+                          : 'bg-white/50 dark:bg-white/5 border-gray-200/50 dark:border-white/10 text-gray-600 dark:text-stone-200 hover:border-otis-200/50 hover:text-otis-600',
                       )}
                     >
-                      <item.icon className="w-5 h-5 shrink-0" />
-                      <span className="flex-1">{t(item.labelKey as any)}</span>
+                      <div
+                        className={cn(
+                          'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+                          itemStyle.chip,
+                        )}
+                      >
+                        <ItemIcon className="w-4 h-4" />
+                      </div>
+                      <span className="flex-1">{t(item.labelKey)}</span>
                       {isActive ? (
                         <Check className="w-4 h-4 text-otis-500" />
                       ) : (
-                        <X className="w-4 h-4 text-gray-200 dark:text-gray-700" />
+                        <X className="w-4 h-4 text-gray-300 dark:text-stone-400" />
                       )}
                     </button>
 
@@ -301,7 +345,9 @@ export function SpesenPage() {
                           className="w-full h-[48px] px-3 rounded-xl text-sm glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none text-center font-mono"
                           placeholder={item.valueUnit === 'CHF' ? '0.00' : '0'}
                         />
-                        <p className="text-[9px] text-gray-400 text-center mt-0.5">{item.valueUnit}</p>
+                        <p className="text-[9px] text-gray-500 dark:text-stone-200 text-center mt-0.5">
+                          {item.valueUnit}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -310,7 +356,7 @@ export function SpesenPage() {
             </div>
 
             {dayExp.length === 0 && (
-              <p className="text-[11px] text-gray-400 text-center mt-3">
+              <p className="text-[11px] text-gray-500 dark:text-stone-300 text-center mt-3">
                 {t('day.spesen.none')}
               </p>
             )}

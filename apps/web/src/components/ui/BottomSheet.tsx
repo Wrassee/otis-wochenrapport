@@ -50,7 +50,7 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
           'sm:rounded-2xl sm:max-h-[85dvh] sm:mx-4',
           'rounded-t-3xl shadow-2xl animate-slide-up flex flex-col',
           'max-h-[90dvh] overflow-hidden',
-          className
+          className,
         )}
       >
         {/* Handle bar + Title — always visible at top */}
@@ -63,7 +63,7 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
               className="flex-1 flex justify-end"
               aria-label={t('common.close')}
             >
-              <X className="w-6 h-6 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" />
+              <X className="w-6 h-6 text-gray-400 dark:text-stone-300 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" />
             </button>
           </div>
 
@@ -75,7 +75,10 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
         </div>
 
         {/* Scrollable content area — min-h-0 is required so flex-1 can shrink below content height */}
-        <div className="flex-1 overflow-y-auto px-6 min-h-0" style={{ paddingBottom: 'env(safe-area-inset-bottom, 48px)' }}>
+        <div
+          className="flex-1 overflow-y-auto px-6 min-h-0"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 48px)' }}
+        >
           {children}
         </div>
       </div>

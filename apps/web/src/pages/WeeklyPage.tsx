@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { WeekOverview } from '@/components/weekly/WeekOverview'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
@@ -7,9 +7,16 @@ import { Badge } from '@/components/ui/Badge'
 import { OtisDurationSelect } from '@/components/ui/OtisDurationSelect'
 import { ActivityPicker } from '@/components/daily/ActivityPicker'
 import { useAppStore } from '@/stores/appStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
 import type { TimeEntry, ActivityCode } from '@/lib/types'
-import { decimalToTime, timeToDecimal, otisToStandard, formatOtisDuration, snapToQuarter } from '@/lib/utils'
+import {
+  decimalToTime,
+  timeToDecimal,
+  otisToStandard,
+  formatOtisDuration,
+  snapToQuarter,
+} from '@/lib/utils'
 import { Save, Building2, ChevronDown } from 'lucide-react'
 import { useTimeEntries } from '@/hooks/useTimeEntries'
 import { useExpensePhotos } from '@/hooks/useExpensePhotos'
@@ -17,14 +24,32 @@ import { ReceiptPhotos } from '@/components/export/ReceiptPhotos'
 
 export function WeeklyPage() {
   const { t } = useTranslation()
-  const {
-    currentWeek,
-    setCurrentWeek,
-    activityCodes,
-  } = useAppStore()
-  const { timeEntries, weekSummary, isLoading, updateEntry, deleteEntry, loadWeek, recalculate } = useTimeEntries()
+  const { currentWeek, setCurrentWeek, activityCodes } = useAppStore(
+    useShallow((s) => ({
+      currentWeek: s.currentWeek,
+      setCurrentWeek: s.setCurrentWeek,
+      activityCodes: s.activityCodes,
+    })),
+  )
+  const { timeEntries, weekSummary, updateEntry, deleteEntry, loadWeek, recalculate } =
+    useTimeEntries()
   // Week's receipt photos (Spesen Belege) — shared store data, compact strip.
   const { photos: weekPhotos } = useExpensePhotos(currentWeek.year, currentWeek.week)
+
+  // Page-local loading state — independent from the app-wide initialize()
+  // flag, so the spinner reflects only THIS page's week load (not the whole
+  // app's init). If the store's global isLoading ever gets stuck, the Woche
+  // page can no longer be frozen by it.
+  const [weekLoading, setWeekLoading] = useState(false)
+
+  const handleLoadWeek = useCallback(async () => {
+    setWeekLoading(true)
+    try {
+      await loadWeek()
+    } finally {
+      setWeekLoading(false)
+    }
+  }, [loadWeek])
 
   // Edit state
   const [editEntry, setEditEntry] = useState<TimeEntry | null>(null)
@@ -35,8 +60,8 @@ export function WeeklyPage() {
   const [editIsSaving, setEditIsSaving] = useState(false)
 
   useEffect(() => {
-    loadWeek()
-  }, [currentWeek])
+    handleLoadWeek()
+  }, [currentWeek, handleLoadWeek])
 
   useEffect(() => {
     recalculate()
@@ -85,7 +110,9 @@ export function WeeklyPage() {
     try {
       const start = timeToDecimal(editStart)
       const otisVal = parseFloat(editDuration)
-      const standardDur = isNaN(otisVal) ? editEntry.duration : Math.max(Math.round(otisToStandard(otisVal) * 4) / 4, 0.25)
+      const standardDur = isNaN(otisVal)
+        ? editEntry.duration
+        : Math.max(Math.round(otisToStandard(otisVal) * 4) / 4, 0.25)
       const updatedEntry: TimeEntry = {
         ...editEntry,
         start_time: start,
@@ -103,18 +130,19 @@ export function WeeklyPage() {
     }
   }
 
-  if (isLoading) {
+  // Keep the spinner through both the week load AND the summary recalc, so no
+  // blank frame flashes between them (calculateWeekSummary always sets the
+  // summary, so this can never get stuck).
+  if (weekLoading || !weekSummary) {
     return (
       <div className="flex items-center justify-center min-h-[50dvh]">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500">{t('common.loading')}</p>
+          <p className="text-sm text-gray-500 dark:text-stone-400">{t('common.loading')}</p>
         </div>
       </div>
     )
   }
-
-  if (!weekSummary) return null
 
   return (
     <>
@@ -154,17 +182,25 @@ export function WeeklyPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   {editEntry.location_anlagenummer && (
-                    <span className="font-bold text-sm text-otis-700 dark:text-otis-300">{editEntry.location_anlagenummer}</span>
+                    <span className="font-bold text-sm text-otis-700 dark:text-otis-300">
+                      {editEntry.location_anlagenummer}
+                    </span>
                   )}
                   {editEntry.location_project_id && (
-                    <span className="text-[11px] text-gray-400 font-mono">{editEntry.location_project_id}</span>
+                    <span className="text-[11px] text-gray-400 dark:text-stone-300 font-mono">
+                      {editEntry.location_project_id}
+                    </span>
                   )}
                   {editEntry.activity_code && (
-                    <Badge variant="info" size="sm">{editEntry.activity_code}</Badge>
+                    <Badge variant="info" size="sm">
+                      {editEntry.activity_code}
+                    </Badge>
                   )}
                 </div>
                 {editEntry.location_address && (
-                  <p className="text-[11px] text-gray-400 truncate mt-0.5">{editEntry.location_address}</p>
+                  <p className="text-[11px] text-gray-400 dark:text-stone-300 truncate mt-0.5">
+                    {editEntry.location_address}
+                  </p>
                 )}
               </div>
             </div>
@@ -207,14 +243,16 @@ export function WeeklyPage() {
                   {editActivityCode ? (
                     <div className="flex items-center gap-2">
                       <Badge variant="info">{editActivityCode.code}</Badge>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                      <span className="text-sm text-gray-500 dark:text-stone-300">
                         {editActivityCode.description_de}
                       </span>
                     </div>
                   ) : (
-                    <span className="text-gray-400">{t('entry.activity.select')}</span>
+                    <span className="text-gray-400 dark:text-stone-300">
+                      {t('entry.activity.select')}
+                    </span>
                   )}
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
+                  <ChevronDown className="w-5 h-5 text-gray-400 dark:text-stone-300" />
                 </button>
               </div>
             )}

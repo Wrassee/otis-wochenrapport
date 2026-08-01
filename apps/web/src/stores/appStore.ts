@@ -1,11 +1,43 @@
 import { create } from 'zustand'
-import type { TimeEntry, Profile, Location, FavoriteLocation, WeekSummary, ActivityCode, SyncStatus, DailyExpense, DailyExpensesMap, ExpenseType, ExpensePhoto, DayError } from '@/lib/types'
+import type {
+  TimeEntry,
+  Profile,
+  Location,
+  FavoriteLocation,
+  WeekSummary,
+  ActivityCode,
+  SyncStatus,
+  DailyExpense,
+  DailyExpensesMap,
+  ExpenseType,
+  ExpensePhoto,
+  DayError,
+} from '@/lib/types'
 import * as localDb from '@/db/indexeddb'
-import { getToday, getWeekDates, getWeekInfo, getWeekKey, haversineDistance, calculateZone, generateId } from '@/lib/utils'
+import {
+  getToday,
+  getWeekDates,
+  getWeekInfo,
+  getWeekKey,
+  haversineDistance,
+  calculateZone,
+  generateId,
+} from '@/lib/utils'
 import { REFERENCE_LAT, REFERENCE_LON, ACTIVITY_CODES } from '@/lib/constants'
 import type { Language } from '@/lib/translations'
 import { DAY_NAMES } from '@/lib/translations'
-import { getProfile, upsertFavorite, getFavorites, getExpenses, upsertExpensePhoto, deleteExpensePhotoFromSupabase, subscribeExpensePhotoChanges, subscribeDailyExpenseChanges, subscribeFavoriteChanges, updateProfileLanguage } from '@/db/supabase'
+import {
+  getProfile,
+  upsertFavorite,
+  getFavorites,
+  getExpenses,
+  upsertExpensePhoto,
+  deleteExpensePhotoFromSupabase,
+  subscribeExpensePhotoChanges,
+  subscribeDailyExpenseChanges,
+  subscribeFavoriteChanges,
+  updateProfileLanguage,
+} from '@/db/supabase'
 import { syncExpenses as queueExpensesSync } from '@/lib/syncExpenses'
 import { loadWeekExpensePhotos, markPhotoDeleted, clearPhotoDeleted } from '@/lib/expensePhotos'
 import { fileToPhotoDataUrl } from '@/lib/photoUtils'
@@ -29,13 +61,31 @@ let expenseRealtimeTimer: ReturnType<typeof setTimeout> | null = null
 let favoriteRealtimeUnsubscribe: (() => void) | null = null
 
 /**
+ * Reject after N ms so a hanging network call can never block app init forever
+ * (the Woche page renders its spinner while the store's `isLoading` is true,
+ * so a stuck initialize() would leave it spinning indefinitely).
+ */
+function withTimeout<T>(promise: Promise<T>, ms = 8000, label = 'supabase'): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    promise.then(
+      (v) => {
+        clearTimeout(timer)
+        resolve(v)
+      },
+      (e) => {
+        clearTimeout(timer)
+        reject(e)
+      },
+    )
+  })
+}
+
+/**
  * Collect all expenses from the dailyExpenses map into a flat array
  * and queue a background sync to Supabase (debounced 2 s).
  */
-function queueAllExpensesSync(
-  dailyExpenses: Record<string, DailyExpense[]>,
-  userId: string,
-): void {
+function queueAllExpensesSync(dailyExpenses: Record<string, DailyExpense[]>, userId: string): void {
   const all: Array<{ date: string; expense_type: string; value: number }> = []
   for (const [d, exps] of Object.entries(dailyExpenses)) {
     for (const exp of exps) {
@@ -85,7 +135,9 @@ interface AppState {
   setActivityCodes: (codes: ActivityCode[]) => void
 
   // Entry operations
-  addTimeEntry: (entry: Omit<TimeEntry, 'id' | 'created_at' | 'updated_at' | 'synced'>) => Promise<void>
+  addTimeEntry: (
+    entry: Omit<TimeEntry, 'id' | 'created_at' | 'updated_at' | 'synced'>,
+  ) => Promise<void>
   updateTimeEntry: (entry: TimeEntry) => Promise<void>
   deleteTimeEntry: (entryId: string) => Promise<void>
   quickAddDuration: (existingEntry: TimeEntry, extraDuration: number) => Promise<void>
@@ -436,7 +488,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               {
                 date,
                 expense_type: expenseType,
-                value: expenseType === 'privatfahrzeug' ? 10 : (expenseType === 'material' ? 0 : 1),
+                value: expenseType === 'privatfahrzeug' ? 10 : expenseType === 'material' ? 0 : 1,
               },
             ],
           },
@@ -445,9 +497,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     })()
     set(newState)
     // Persist to IndexedDB
-    localDb.saveDailyExpenses(newState.dailyExpenses).catch((e) =>
-      console.warn('Failed to persist expenses to IndexedDB:', e)
-    )
+    localDb
+      .saveDailyExpenses(newState.dailyExpenses)
+      .catch((e) => console.warn('Failed to persist expenses to IndexedDB:', e))
 
     // Queue background sync to Supabase
     const { user } = get()
@@ -464,9 +516,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return {
           dailyExpenses: {
             ...get().dailyExpenses,
-            [date]: current.map((e) =>
-              e.expense_type === expenseType ? { ...e, value } : e
-            ),
+            [date]: current.map((e) => (e.expense_type === expenseType ? { ...e, value } : e)),
           },
         }
       }
@@ -474,9 +524,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     })()
     set(newState)
     // Persist to IndexedDB
-    localDb.saveDailyExpenses(newState.dailyExpenses).catch((e) =>
-      console.warn('Failed to persist expenses to IndexedDB:', e)
-    )
+    localDb
+      .saveDailyExpenses(newState.dailyExpenses)
+      .catch((e) => console.warn('Failed to persist expenses to IndexedDB:', e))
 
     // Queue background sync to Supabase
     const { user } = get()
@@ -652,340 +702,367 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   initialize: async (userId) => {
     set({ isLoading: true })
-
-    // Load profile from local
-    const profile = await localDb.getLocalProfile()
-    if (profile) {
-      set({ profile })
-      // Apply language from locally cached profile
-      if (profile.language) {
-        const lang = profile.language as Language
-        localStorage.setItem('otis_language', lang)
-        set({ language: lang })
-      }
-    }
-
-    // Try to fetch the full profile from Supabase — the cloud is the source
-    // of truth, so a brand-new device immediately shows the saved profile
-    // (name, personnel number, supervisor email, language). Remote wins for
-    // each field, but we fall back to the locally cached value (not an empty
-    // string) so an incomplete remote row never wipes offline-first data.
-    if (navigator.onLine) {
-      try {
-        const remoteProfile = await getProfile(userId)
-        if (remoteProfile) {
-          const currentProfile = get().profile
-          // Offline-first guard: if the local profile was edited more recently
-          // (e.g. saved while offline), don't let a stale remote row overwrite it.
-          const localUpdated = currentProfile?.updated_at
-            ? new Date(currentProfile.updated_at).getTime()
-            : 0
-          const remoteUpdated = remoteProfile.updated_at
-            ? new Date(remoteProfile.updated_at).getTime()
-            : 0
-          if (localUpdated <= remoteUpdated) {
-            const mergedProfile: Profile = {
-              id: remoteProfile.id,
-              email: remoteProfile.email || currentProfile?.email || '',
-              full_name: remoteProfile.full_name || currentProfile?.full_name || '',
-              personnel_number: remoteProfile.personnel_number || currentProfile?.personnel_number || '',
-              supervisor_email: remoteProfile.supervisor_email || currentProfile?.supervisor_email || '',
-              language: remoteProfile.language || currentProfile?.language || get().language,
-              created_at: remoteProfile.created_at || currentProfile?.created_at || new Date().toISOString(),
-              updated_at: remoteProfile.updated_at || new Date().toISOString(),
-            }
-            // Reuse the store action: sets state, persists to IndexedDB and
-            // applies the language preference if it differs.
-            get().setProfile(mergedProfile)
-          }
-          // If the local profile is NEWER (e.g. edited offline), keep it —
-          // a stale remote row must not overwrite it. Either way the rest of
-          // the initialization (locations, favorites, expenses, entries,
-          // realtime) still runs to completion.
+    try {
+      // Load profile from local
+      const profile = await localDb.getLocalProfile()
+      if (profile) {
+        set({ profile })
+        // Apply language from locally cached profile
+        if (profile.language) {
+          const lang = profile.language as Language
+          localStorage.setItem('otis_language', lang)
+          set({ language: lang })
         }
-      } catch (e) {
-        console.warn('Failed to fetch profile from Supabase:', e)
       }
-    }
 
-    // Load locations from local
-    const locations = await localDb.getAllLocations()
-    if (locations.length > 0) set({ locations })
+      // Try to fetch the full profile from Supabase — the cloud is the source
+      // of truth, so a brand-new device immediately shows the saved profile
+      // (name, personnel number, supervisor email, language). Remote wins for
+      // each field, but we fall back to the locally cached value (not an empty
+      // string) so an incomplete remote row never wipes offline-first data.
+      if (navigator.onLine) {
+        try {
+          const remoteProfile = await withTimeout(getProfile(userId), 8000, 'getProfile')
+          if (remoteProfile) {
+            const currentProfile = get().profile
+            // Offline-first guard: if the local profile was edited more recently
+            // (e.g. saved while offline), don't let a stale remote row overwrite it.
+            const localUpdated = currentProfile?.updated_at
+              ? new Date(currentProfile.updated_at).getTime()
+              : 0
+            const remoteUpdated = remoteProfile.updated_at
+              ? new Date(remoteProfile.updated_at).getTime()
+              : 0
+            if (localUpdated <= remoteUpdated) {
+              const mergedProfile: Profile = {
+                id: remoteProfile.id,
+                email: remoteProfile.email || currentProfile?.email || '',
+                full_name: remoteProfile.full_name || currentProfile?.full_name || '',
+                personnel_number:
+                  remoteProfile.personnel_number || currentProfile?.personnel_number || '',
+                supervisor_email:
+                  remoteProfile.supervisor_email || currentProfile?.supervisor_email || '',
+                language: remoteProfile.language || currentProfile?.language || get().language,
+                created_at:
+                  remoteProfile.created_at ||
+                  currentProfile?.created_at ||
+                  new Date().toISOString(),
+                updated_at: remoteProfile.updated_at || new Date().toISOString(),
+              }
+              // Reuse the store action: sets state, persists to IndexedDB and
+              // applies the language preference if it differs.
+              get().setProfile(mergedProfile)
+            }
+            // If the local profile is NEWER (e.g. edited offline), keep it —
+            // a stale remote row must not overwrite it. Either way the rest of
+            // the initialization (locations, favorites, expenses, entries,
+            // realtime) still runs to completion.
+          }
+        } catch (e) {
+          console.warn('Failed to fetch profile from Supabase:', e)
+        }
+      }
 
-    // Load favorites — try Supabase first, then local
-    let mergedFavorites: FavoriteLocation[] = []
-    if (navigator.onLine) {
+      // Load locations from local
+      const locations = await localDb.getAllLocations()
+      if (locations.length > 0) set({ locations })
+
+      // Load favorites — try Supabase first, then local
+      let mergedFavorites: FavoriteLocation[] = []
+      if (navigator.onLine) {
+        try {
+          const remoteFavorites = await withTimeout(getFavorites(userId), 8000, 'getFavorites')
+          if (remoteFavorites.length > 0) {
+            const localFavorites = await localDb.getFavoriteLocations()
+            // Merge: remote wins, but keep local-only and preserve use_count
+            const seen = new Set<string>()
+            const merged: FavoriteLocation[] = []
+            // Remote first
+            for (const rf of remoteFavorites) {
+              seen.add(rf.anlagenummer.toUpperCase())
+              merged.push({
+                id: rf.id || `fav_${rf.anlagenummer}`,
+                user_id: rf.user_id,
+                anlagenummer: rf.anlagenummer,
+                project_id: rf.project_id || '',
+                full_address: rf.full_address || '',
+                latitude: rf.latitude || 0,
+                longitude: rf.longitude || 0,
+                zone: rf.zone || 0,
+                manual_zone: rf.manual_zone,
+                use_count: Math.max(rf.use_count || 1, 1),
+                last_used: rf.last_used,
+                created_at: rf.created_at,
+                updated_at: rf.updated_at,
+              })
+            }
+            // Local-only items
+            for (const lf of localFavorites) {
+              if (!seen.has(lf.anlagenummer.toUpperCase())) {
+                merged.push(lf)
+              }
+            }
+            mergedFavorites = merged
+            // Sync merged favorites back to local DB
+            for (const fav of merged) {
+              await localDb.addFavoriteLocation(fav)
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to sync favorites from Supabase:', e)
+        }
+      }
+      if (mergedFavorites.length === 0) {
+        const localFavorites = await localDb.getFavoriteLocations()
+        mergedFavorites = localFavorites
+      }
+      set({ favoriteLocations: mergedFavorites.slice(0, 5) })
+
+      // Load activity codes
+      const codes = await localDb.getActivityCodes()
+      if (codes.length > 0) set({ activityCodes: codes })
+
+      // Load saved daily expenses — try Supabase first for a full view, merge with local
+      let mergedExpenses: Record<string, any[]> = {}
+      if (navigator.onLine) {
+        try {
+          const { currentWeek } = get()
+          const dates = getWeekDates(currentWeek.year, currentWeek.week)
+          const remoteExpenses = await withTimeout(
+            getExpenses(userId, dates[0], dates[4]),
+            8000,
+            'getExpenses',
+          )
+          if (remoteExpenses.length > 0) {
+            // Group by date
+            for (const re of remoteExpenses) {
+              if (!mergedExpenses[re.date]) mergedExpenses[re.date] = []
+              mergedExpenses[re.date].push(re)
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to sync expenses from Supabase:', e)
+        }
+      }
+      // Merge local expenses (local-only items preserved, remote wins conflicts)
+      const localExpenses = await localDb.getDailyExpenses()
+      for (const [date, exps] of Object.entries(localExpenses)) {
+        if (!mergedExpenses[date]) {
+          mergedExpenses[date] = exps
+        } else {
+          // Merge local-only expense types for this date
+          const remoteTypes = new Set(mergedExpenses[date].map((e) => e.expense_type))
+          for (const exp of exps) {
+            if (!remoteTypes.has(exp.expense_type)) {
+              mergedExpenses[date].push(exp)
+            }
+          }
+        }
+      }
+      if (Object.keys(mergedExpenses).length > 0) {
+        set({ dailyExpenses: mergedExpenses })
+        // Save merged back to IndexedDB
+        localDb
+          .saveDailyExpenses(mergedExpenses)
+          .catch((e) => console.warn('Failed to save merged expenses to IndexedDB:', e))
+      } else if (Object.keys(localExpenses).length > 0) {
+        set({ dailyExpenses: localExpenses })
+      }
+
+      // Load week entries
+      await get().loadWeekEntries()
+      await get().calculateWeekSummary()
+
+      // Live cross-device photo sync — Supabase Realtime. When another device
+      // adds/updates/deletes an expense photo, reflect it immediately (no manual
+      // sync / app restart needed). Inserts/updates debounce into a week reload;
+      // deletes are applied directly (a reload would resurrect the local copy,
+      // because the merge deliberately preserves local-only rows).
       try {
-        const remoteFavorites = await getFavorites(userId)
-        if (remoteFavorites.length > 0) {
-          const localFavorites = await localDb.getFavoriteLocations()
-          // Merge: remote wins, but keep local-only and preserve use_count
-          const seen = new Set<string>()
-          const merged: FavoriteLocation[] = []
-          // Remote first
-          for (const rf of remoteFavorites) {
-            seen.add(rf.anlagenummer.toUpperCase())
-            merged.push({
-              id: rf.id || `fav_${rf.anlagenummer}`,
-              user_id: rf.user_id,
-              anlagenummer: rf.anlagenummer,
-              project_id: rf.project_id || '',
-              full_address: rf.full_address || '',
-              latitude: rf.latitude || 0,
-              longitude: rf.longitude || 0,
-              zone: rf.zone || 0,
-              manual_zone: rf.manual_zone,
-              use_count: Math.max(rf.use_count || 1, 1),
-              last_used: rf.last_used,
-              created_at: rf.created_at,
-              updated_at: rf.updated_at,
+        if (photoRealtimeUnsubscribe) {
+          photoRealtimeUnsubscribe()
+          photoRealtimeUnsubscribe = null
+        }
+        photoRealtimeUnsubscribe = subscribeExpensePhotoChanges(userId, (payload) => {
+          if (payload.eventType === 'DELETE') {
+            const id = String(payload.old?.id || '')
+            const year = Number(payload.old?.year)
+            const week = Number(payload.old?.week)
+            if (!id || !Number.isFinite(year) || !Number.isFinite(week)) return
+            // Remote delete → drop the photo here too (store + IndexedDB), so it
+            // can't resurrect on the next merge.
+            localDb
+              .deleteExpensePhoto(id)
+              .catch((e) =>
+                console.warn('Failed to remove photo from IndexedDB on realtime delete:', e),
+              )
+            set((state) => {
+              const key = getWeekKey(year, week)
+              return {
+                expensePhotos: {
+                  ...state.expensePhotos,
+                  [key]: (state.expensePhotos[key] || []).filter((p) => p.id !== id),
+                },
+              }
             })
+            return
           }
-          // Local-only items
-          for (const lf of localFavorites) {
-            if (!seen.has(lf.anlagenummer.toUpperCase())) {
-              merged.push(lf)
-            }
-          }
-          mergedFavorites = merged
-          // Sync merged favorites back to local DB
-          for (const fav of merged) {
-            await localDb.addFavoriteLocation(fav)
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to sync favorites from Supabase:', e)
+
+          // INSERT / UPDATE — reload the touched week (new row carries year/week).
+          const rec = payload.new
+          const year = Number(rec?.year)
+          const week = Number(rec?.week)
+          if (!Number.isFinite(year) || !Number.isFinite(week)) return
+
+          if (photoRealtimeTimer) clearTimeout(photoRealtimeTimer)
+          photoRealtimeTimer = setTimeout(() => {
+            photoRealtimeTimer = null
+            get()
+              .loadExpensePhotos(year, week, true)
+              .catch((e) => console.warn('Failed to reload photos on realtime event:', e))
+          }, 300)
+        })
+      } catch (err) {
+        console.warn('Failed to set up photo realtime subscription:', err)
       }
-    }
-    if (mergedFavorites.length === 0) {
-      const localFavorites = await localDb.getFavoriteLocations()
-      mergedFavorites = localFavorites
-    }
-    set({ favoriteLocations: mergedFavorites.slice(0, 5) })
 
-    // Load activity codes
-    const codes = await localDb.getActivityCodes()
-    if (codes.length > 0) set({ activityCodes: codes })
-
-    // Load saved daily expenses — try Supabase first for a full view, merge with local
-    let mergedExpenses: Record<string, any[]> = {}
-    if (navigator.onLine) {
+      // Live cross-device expense sync — Supabase Realtime. Rows are applied
+      // directly (not via week reload): the sync strategy is full-replace
+      // (delete-all + insert-fresh), so a reload would fight the merge logic
+      // that deliberately preserves local-only rows.
+      // NOTE: this device's OWN full-replace sync echoes DELETE+INSERT events
+      // back into this handler — that is intentional and idempotent (each event
+      // upserts/removes one specific date+type key, and the handler never
+      // triggers a sync itself), so no echo-guard is needed.
       try {
-        const { currentWeek } = get()
-        const dates = getWeekDates(currentWeek.year, currentWeek.week)
-        const remoteExpenses = await getExpenses(userId, dates[0], dates[4])
-        if (remoteExpenses.length > 0) {
-          // Group by date
-          for (const re of remoteExpenses) {
-            if (!mergedExpenses[re.date]) mergedExpenses[re.date] = []
-            mergedExpenses[re.date].push(re)
-          }
+        if (expenseRealtimeUnsubscribe) {
+          expenseRealtimeUnsubscribe()
+          expenseRealtimeUnsubscribe = null
         }
-      } catch (e) {
-        console.warn('Failed to sync expenses from Supabase:', e)
-      }
-    }
-    // Merge local expenses (local-only items preserved, remote wins conflicts)
-    const localExpenses = await localDb.getDailyExpenses()
-    for (const [date, exps] of Object.entries(localExpenses)) {
-      if (!mergedExpenses[date]) {
-        mergedExpenses[date] = exps
-      } else {
-        // Merge local-only expense types for this date
-        const remoteTypes = new Set(mergedExpenses[date].map((e) => e.expense_type))
-        for (const exp of exps) {
-          if (!remoteTypes.has(exp.expense_type)) {
-            mergedExpenses[date].push(exp)
-          }
-        }
-      }
-    }
-    if (Object.keys(mergedExpenses).length > 0) {
-      set({ dailyExpenses: mergedExpenses })
-      // Save merged back to IndexedDB
-      localDb.saveDailyExpenses(mergedExpenses).catch((e) =>
-        console.warn('Failed to save merged expenses to IndexedDB:', e)
-      )
-    } else if (Object.keys(localExpenses).length > 0) {
-      set({ dailyExpenses: localExpenses })
-    }
+        expenseRealtimeUnsubscribe = subscribeDailyExpenseChanges(userId, (payload) => {
+          const rec = payload.eventType === 'DELETE' ? payload.old : payload.new
+          const date = String(rec?.date || '')
+          const expenseType = String(rec?.expense_type || '')
+          if (!date || !expenseType) return
 
-    // Load week entries
-    await get().loadWeekEntries()
-    await get().calculateWeekSummary()
+          set((state) => {
+            const current = state.dailyExpenses[date] || []
+            if (payload.eventType === 'DELETE') {
+              return {
+                dailyExpenses: {
+                  ...state.dailyExpenses,
+                  [date]: current.filter((e) => e.expense_type !== expenseType),
+                },
+              }
+            }
+            // INSERT / UPDATE — upsert the row for this date + type.
+            // Note: a legit `0` (e.g. Material) must survive — Number.isFinite
+            // handles both JSON numbers and "0" strings correctly.
+            const entry: DailyExpense = {
+              date,
+              expense_type: expenseType as ExpenseType,
+              value: Number.isFinite(Number(rec?.value)) ? Number(rec?.value) : 1,
+            }
+            const exists = current.some((e) => e.expense_type === expenseType)
+            return {
+              dailyExpenses: {
+                ...state.dailyExpenses,
+                [date]: exists
+                  ? current.map((e) => (e.expense_type === expenseType ? entry : e))
+                  : [...current, entry],
+              },
+            }
+          })
 
-    // Live cross-device photo sync — Supabase Realtime. When another device
-    // adds/updates/deletes an expense photo, reflect it immediately (no manual
-    // sync / app restart needed). Inserts/updates debounce into a week reload;
-    // deletes are applied directly (a reload would resurrect the local copy,
-    // because the merge deliberately preserves local-only rows).
-    if (photoRealtimeUnsubscribe) {
-      photoRealtimeUnsubscribe()
-      photoRealtimeUnsubscribe = null
-    }
-    photoRealtimeUnsubscribe = subscribeExpensePhotoChanges(userId, (payload) => {
-      if (payload.eventType === 'DELETE') {
-        const id = String(payload.old?.id || '')
-        const year = Number(payload.old?.year)
-        const week = Number(payload.old?.week)
-        if (!id || !Number.isFinite(year) || !Number.isFinite(week)) return
-        // Remote delete → drop the photo here too (store + IndexedDB), so it
-        // can't resurrect on the next merge.
-        localDb.deleteExpensePhoto(id).catch((e) =>
-          console.warn('Failed to remove photo from IndexedDB on realtime delete:', e)
-        )
-        set((state) => {
-          const key = getWeekKey(year, week)
-          return {
-            expensePhotos: {
-              ...state.expensePhotos,
-              [key]: (state.expensePhotos[key] || []).filter((p) => p.id !== id),
-            },
-          }
+          // Batch IndexedDB persistence — a full-replace sync emits a burst of
+          // DELETE+INSERT events; collapse them into one write.
+          if (expenseRealtimeTimer) clearTimeout(expenseRealtimeTimer)
+          expenseRealtimeTimer = setTimeout(() => {
+            expenseRealtimeTimer = null
+            localDb
+              .saveDailyExpenses(get().dailyExpenses)
+              .catch((e) => console.warn('Failed to persist realtime expenses to IndexedDB:', e))
+          }, 300)
         })
-        return
+      } catch (err) {
+        console.warn('Failed to set up expense realtime subscription:', err)
       }
 
-      // INSERT / UPDATE — reload the touched week (new row carries year/week).
-      const rec = payload.new
-      const year = Number(rec?.year)
-      const week = Number(rec?.week)
-      if (!Number.isFinite(year) || !Number.isFinite(week)) return
+      // Live cross-device favorites sync — Supabase Realtime. When another
+      // device uses a lift, its user_favorites row is upserted (use_count /
+      // last_used change) — reflect it immediately so "Letzte Anlagen" stays
+      // in sync. INSERT/UPDATE rows are applied directly (the payload carries
+      // every column, so no reload is needed); DELETE is applied directly too
+      // (a reload+merge would resurrect the row, since the merge deliberately
+      // preserves local-only favorites).
+      // NOTE: this device's OWN upsert (addRecentLocation → upsertFavorite)
+      // echoes back as an INSERT/UPDATE event — that is intentional and
+      // idempotent (re-saving the same row + refreshing the top-5), and the
+      // handler never triggers a sync itself, so no echo-guard is needed.
+      try {
+        if (favoriteRealtimeUnsubscribe) {
+          favoriteRealtimeUnsubscribe()
+          favoriteRealtimeUnsubscribe = null
+        }
+        favoriteRealtimeUnsubscribe = subscribeFavoriteChanges(userId, (payload) => {
+          const rec = payload.eventType === 'DELETE' ? payload.old : payload.new
+          const anlagenummer = String(rec?.anlagenummer || '')
+          if (!anlagenummer) return
 
-      if (photoRealtimeTimer) clearTimeout(photoRealtimeTimer)
-      photoRealtimeTimer = setTimeout(() => {
-        photoRealtimeTimer = null
-        get()
-          .loadExpensePhotos(year, week, true)
-          .catch((e) => console.warn('Failed to reload photos on realtime event:', e))
-      }, 300)
-    })
-
-    // Live cross-device expense sync — Supabase Realtime. Rows are applied
-    // directly (not via week reload): the sync strategy is full-replace
-    // (delete-all + insert-fresh), so a reload would fight the merge logic
-    // that deliberately preserves local-only rows.
-    // NOTE: this device's OWN full-replace sync echoes DELETE+INSERT events
-    // back into this handler — that is intentional and idempotent (each event
-    // upserts/removes one specific date+type key, and the handler never
-    // triggers a sync itself), so no echo-guard is needed.
-    if (expenseRealtimeUnsubscribe) {
-      expenseRealtimeUnsubscribe()
-      expenseRealtimeUnsubscribe = null
-    }
-    expenseRealtimeUnsubscribe = subscribeDailyExpenseChanges(userId, (payload) => {
-      const rec = payload.eventType === 'DELETE' ? payload.old : payload.new
-      const date = String(rec?.date || '')
-      const expenseType = String(rec?.expense_type || '')
-      if (!date || !expenseType) return
-
-      set((state) => {
-        const current = state.dailyExpenses[date] || []
-        if (payload.eventType === 'DELETE') {
-          return {
-            dailyExpenses: {
-              ...state.dailyExpenses,
-              [date]: current.filter((e) => e.expense_type !== expenseType),
-            },
+          if (payload.eventType === 'DELETE') {
+            // Remote delete → drop locally too, so it can't resurrect via the
+            // local-preserving merge on the next load.
+            localDb
+              .removeFavoriteLocation(anlagenummer)
+              .catch((e) =>
+                console.warn('Failed to remove favorite from IndexedDB on realtime delete:', e),
+              )
+            set((state) => ({
+              favoriteLocations: state.favoriteLocations.filter(
+                (f) => f.anlagenummer.toUpperCase() !== anlagenummer.toUpperCase(),
+              ),
+            }))
+            return
           }
-        }
-        // INSERT / UPDATE — upsert the row for this date + type.
-        // Note: a legit `0` (e.g. Material) must survive — Number.isFinite
-        // handles both JSON numbers and "0" strings correctly.
-        const entry: DailyExpense = {
-          date,
-          expense_type: expenseType as ExpenseType,
-          value: Number.isFinite(Number(rec?.value)) ? Number(rec?.value) : 1,
-        }
-        const exists = current.some((e) => e.expense_type === expenseType)
-        return {
-          dailyExpenses: {
-            ...state.dailyExpenses,
-            [date]: exists
-              ? current.map((e) => (e.expense_type === expenseType ? entry : e))
-              : [...current, entry],
-          },
-        }
-      })
 
-      // Batch IndexedDB persistence — a full-replace sync emits a burst of
-      // DELETE+INSERT events; collapse them into one write.
-      if (expenseRealtimeTimer) clearTimeout(expenseRealtimeTimer)
-      expenseRealtimeTimer = setTimeout(() => {
-        expenseRealtimeTimer = null
-        localDb.saveDailyExpenses(get().dailyExpenses).catch((e) =>
-          console.warn('Failed to persist realtime expenses to IndexedDB:', e)
-        )
-      }, 300)
-    })
-
-    // Live cross-device favorites sync — Supabase Realtime. When another
-    // device uses a lift, its user_favorites row is upserted (use_count /
-    // last_used change) — reflect it immediately so "Letzte Anlagen" stays
-    // in sync. INSERT/UPDATE rows are applied directly (the payload carries
-    // every column, so no reload is needed); DELETE is applied directly too
-    // (a reload+merge would resurrect the row, since the merge deliberately
-    // preserves local-only favorites).
-    // NOTE: this device's OWN upsert (addRecentLocation → upsertFavorite)
-    // echoes back as an INSERT/UPDATE event — that is intentional and
-    // idempotent (re-saving the same row + refreshing the top-5), and the
-    // handler never triggers a sync itself, so no echo-guard is needed.
-    if (favoriteRealtimeUnsubscribe) {
-      favoriteRealtimeUnsubscribe()
-      favoriteRealtimeUnsubscribe = null
-    }
-    favoriteRealtimeUnsubscribe = subscribeFavoriteChanges(userId, (payload) => {
-      const rec = payload.eventType === 'DELETE' ? payload.old : payload.new
-      const anlagenummer = String(rec?.anlagenummer || '')
-      if (!anlagenummer) return
-
-      if (payload.eventType === 'DELETE') {
-        // Remote delete → drop locally too, so it can't resurrect via the
-        // local-preserving merge on the next load.
-        localDb.removeFavoriteLocation(anlagenummer).catch((e) =>
-          console.warn('Failed to remove favorite from IndexedDB on realtime delete:', e)
-        )
-        set((state) => ({
-          favoriteLocations: state.favoriteLocations.filter(
-            (f) => f.anlagenummer.toUpperCase() !== anlagenummer.toUpperCase()
-          ),
-        }))
-        return
-      }
-
-      // INSERT / UPDATE — upsert the row locally (preserving the higher
-      // use_count, so a device that used the lift more often wins) and
-      // refresh the top-5 list. When the row already exists locally, write
-      // under its existing anlagenummer key — the favorites store is keyed
-      // by anlagenummer and the codebase is case-inconsistent, so saving
-      // with the remote casing could create a duplicate row.
-      localDb.getFavoriteLocations().then((localFavs) => {
-        const existing = localFavs.find(
-          (f) => f.anlagenummer.toUpperCase() === anlagenummer.toUpperCase()
-        )
-        const fav = {
-          anlagenummer: existing?.anlagenummer || String(rec?.anlagenummer || ''),
-          project_id: String(rec?.project_id || ''),
-          full_address: String(rec?.full_address || ''),
-          latitude: Number(rec?.latitude) || 0,
-          longitude: Number(rec?.longitude) || 0,
-          zone: Number(rec?.zone) || 0,
-          manual_zone: rec?.manual_zone != null ? Number(rec.manual_zone) : undefined,
-          use_count: Math.max(Number(rec?.use_count) || 1, existing?.use_count || 1),
-          last_used: String(rec?.last_used || new Date().toISOString()),
-        }
-        return localDb.saveFavoriteLocation(fav).then(() =>
-          localDb.getFavoriteLocations()
-        )
-      })
-        .then((refreshed) => {
-          set({ favoriteLocations: refreshed.slice(0, 5) })
+          // INSERT / UPDATE — upsert the row locally (preserving the higher
+          // use_count, so a device that used the lift more often wins) and
+          // refresh the top-5 list. When the row already exists locally, write
+          // under its existing anlagenummer key — the favorites store is keyed
+          // by anlagenummer and the codebase is case-inconsistent, so saving
+          // with the remote casing could create a duplicate row.
+          localDb
+            .getFavoriteLocations()
+            .then((localFavs) => {
+              const existing = localFavs.find(
+                (f) => f.anlagenummer.toUpperCase() === anlagenummer.toUpperCase(),
+              )
+              const fav = {
+                anlagenummer: existing?.anlagenummer || String(rec?.anlagenummer || ''),
+                project_id: String(rec?.project_id || ''),
+                full_address: String(rec?.full_address || ''),
+                latitude: Number(rec?.latitude) || 0,
+                longitude: Number(rec?.longitude) || 0,
+                zone: Number(rec?.zone) || 0,
+                manual_zone: rec?.manual_zone != null ? Number(rec.manual_zone) : undefined,
+                use_count: Math.max(Number(rec?.use_count) || 1, existing?.use_count || 1),
+                last_used: String(rec?.last_used || new Date().toISOString()),
+              }
+              return localDb.saveFavoriteLocation(fav).then(() => localDb.getFavoriteLocations())
+            })
+            .then((refreshed) => {
+              set({ favoriteLocations: refreshed.slice(0, 5) })
+            })
+            .catch((e) => console.warn('Failed to apply realtime favorite update:', e))
         })
-        .catch((e) =>
-          console.warn('Failed to apply realtime favorite update:', e)
-        )
-    })
-
-    set({ isLoading: false })
+      } catch (err) {
+        console.warn('Failed to set up favorites realtime subscription:', err)
+      }
+    } finally {
+      // Always clear the loading flag — even if a step above threw (e.g.
+      // IndexedDB blocked, a Supabase call failed), the Woche page must not
+      // spin forever on the global isLoading flag.
+      set({ isLoading: false })
+    }
   },
 }))

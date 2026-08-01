@@ -5,6 +5,7 @@
  * and falls back to Service Worker Notification API for PWA.
  */
 import { translate } from '@/lib/translations'
+import type { TranslationKey } from '@/lib/translations'
 import { useAppStore } from '@/stores/appStore'
 
 type ScheduleResult = { scheduled: boolean; error?: string }
@@ -13,7 +14,7 @@ type ScheduleResult = { scheduled: boolean; error?: string }
  * Translate a key in the CURRENT app language (notifications.ts is not a
  * React component, so it reads the language directly from the store).
  */
-function tr(key: string): string {
+function tr(key: TranslationKey): string {
   const lang = useAppStore.getState().language
   return translate(key, lang)
 }
@@ -36,7 +37,9 @@ export async function scheduleMondayReminder(): Promise<ScheduleResult> {
         return { scheduled: true } // Already scheduled recently
       }
     }
-  } catch { /* localStorage unavailable */ }
+  } catch {
+    /* localStorage unavailable */
+  }
 
   // Try Capacitor Local Notifications (native Android)
   if (isCapacitorNative()) {
@@ -164,14 +167,18 @@ export async function cancelMondayReminder(): Promise<void> {
     try {
       const { LocalNotifications } = await import('@capacitor/local-notifications')
       await LocalNotifications.cancel({ notifications: [{ id: 1 }] })
-    } catch { /* plugin not available */ }
+    } catch {
+      /* plugin not available */
+    }
   }
 
   // Cancel via SW
   try {
     const registration = await navigator.serviceWorker.ready
     registration.active?.postMessage({ type: 'CANCEL_NOTIFICATION' })
-  } catch { /* SW not available */ }
+  } catch {
+    /* SW not available */
+  }
 
   // Clear stored preference
   localStorage.removeItem(STORAGE_KEY)

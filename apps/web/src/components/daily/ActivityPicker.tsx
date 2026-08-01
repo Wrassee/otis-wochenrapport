@@ -3,6 +3,7 @@ import type { ActivityCode } from '@/lib/types'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { cn } from '@/lib/cn'
 import { useTranslation } from '@/lib/useTranslation'
+import type { TranslationKey } from '@/lib/translations'
 import { Wrench, XCircle, Clock, Check, ChevronDown } from 'lucide-react'
 
 interface ActivityPickerProps {
@@ -42,7 +43,7 @@ const CODE_GROUPS: Record<string, Array<{ label: string; codeIds: string[] }>> =
   ],
 }
 
-function getCategoryConfig(t: (k: string) => string) {
+function getCategoryConfig(t: (k: TranslationKey) => string) {
   return {
     productive: {
       label: t('activity.productive'),
@@ -63,7 +64,8 @@ function getCategoryConfig(t: (k: string) => string) {
       selectedBg: 'bg-amber-50/80 dark:bg-amber-900/40',
       selectedBorder: 'border-amber-300/60 dark:border-amber-600/40',
       selectedRing: 'ring-amber-400',
-      highlight: 'bg-amber-500/10 dark:bg-amber-500/20 border-amber-300/30 dark:border-amber-600/30',
+      highlight:
+        'bg-amber-500/10 dark:bg-amber-500/20 border-amber-300/30 dark:border-amber-600/30',
       gradient: 'from-amber-50 to-amber-100/50 dark:from-amber-900/30 dark:to-amber-800/20',
     },
     absence: {
@@ -74,13 +76,20 @@ function getCategoryConfig(t: (k: string) => string) {
       selectedBg: 'bg-purple-50/80 dark:bg-purple-900/40',
       selectedBorder: 'border-purple-300/60 dark:border-purple-600/40',
       selectedRing: 'ring-purple-400',
-      highlight: 'bg-purple-500/10 dark:bg-purple-500/20 border-purple-300/30 dark:border-purple-600/30',
+      highlight:
+        'bg-purple-500/10 dark:bg-purple-500/20 border-purple-300/30 dark:border-purple-600/30',
       gradient: 'from-purple-50 to-purple-100/50 dark:from-purple-900/30 dark:to-purple-800/20',
     },
   }
 }
 
-export function ActivityPicker({ open, onClose, onSelect, codes, selectedCode }: ActivityPickerProps) {
+export function ActivityPicker({
+  open,
+  onClose,
+  onSelect,
+  codes,
+  selectedCode,
+}: ActivityPickerProps) {
   const { t } = useTranslation()
   const categoryConfig = getCategoryConfig(t)
   const categories = ['productive', 'non_productive', 'absence'] as const
@@ -130,24 +139,28 @@ export function ActivityPicker({ open, onClose, onSelect, codes, selectedCode }:
                   'w-full flex items-center gap-2.5 p-3 rounded-xl transition-all duration-150 border',
                   isOpen || hasAnySelected
                     ? `${config.highlight}`
-                    : 'glass dark:glass-dark border-transparent hover:border-otis-300/20'
+                    : 'glass dark:glass-dark border-transparent hover:border-otis-300/20',
                 )}
               >
-                <div className={cn(
-                  'w-8 h-8 rounded-xl flex items-center justify-center bg-gradient-to-br flex-shrink-0',
-                  config.gradient
-                )}>
+                <div
+                  className={cn(
+                    'w-8 h-8 rounded-xl flex items-center justify-center bg-gradient-to-br flex-shrink-0',
+                    config.gradient,
+                  )}
+                >
                   <Icon className={cn('w-4 h-4', config.color)} />
                 </div>
                 <div className="flex-1 text-left">
                   <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className={cn('font-semibold text-sm', config.color)}>{config.label}</span>
-                    <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium">
+                    <span className={cn('font-semibold text-sm', config.color)}>
+                      {config.label}
+                    </span>
+                    <span className="text-[9px] text-gray-400 dark:text-stone-400 font-medium">
                       {config.sublabel}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] text-gray-400">
+                    <span className="text-[10px] text-gray-400 dark:text-stone-300">
                       {t('activity.options', { n: groups.length })}
                     </span>
                     {hasAnySelected && (
@@ -159,8 +172,8 @@ export function ActivityPicker({ open, onClose, onSelect, codes, selectedCode }:
                 </div>
                 <ChevronDown
                   className={cn(
-                    'w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0',
-                    isOpen && 'rotate-180'
+                    'w-4 h-4 text-gray-400 dark:text-stone-300 transition-transform duration-200 flex-shrink-0',
+                    isOpen && 'rotate-180',
                   )}
                 />
               </button>
@@ -169,7 +182,7 @@ export function ActivityPicker({ open, onClose, onSelect, codes, selectedCode }:
               <div
                 className={cn(
                   'transition-all duration-200 ease-in-out overflow-hidden',
-                  isOpen ? 'max-h-[600px] opacity-100 mt-2' : 'max-h-0 opacity-0 mt-0'
+                  isOpen ? 'max-h-[600px] opacity-100 mt-2' : 'max-h-0 opacity-0 mt-0',
                 )}
               >
                 <div className="grid grid-cols-2 gap-1.5 px-0.5">
@@ -187,22 +200,26 @@ export function ActivityPicker({ open, onClose, onSelect, codes, selectedCode }:
                           'min-h-[44px] relative overflow-hidden group',
                           isSelected
                             ? `${config.selectedBg} ${config.selectedBorder} ring-2 ${config.selectedRing} ring-offset-1 dark:ring-offset-otis-900`
-                            : 'glass dark:glass-dark border-otis-200/20 dark:border-white/5 hover:border-otis-300/30'
+                            : 'glass dark:glass-dark border-otis-200/20 dark:border-white/5 hover:border-otis-300/30',
                         )}
                       >
                         <div className="flex items-center gap-2 relative z-10 min-w-0">
-                          <div className={cn(
-                            'w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0',
-                            isSelected
-                              ? `${config.color} bg-white dark:bg-white/20`
-                              : 'bg-white/60 dark:bg-white/10 text-gray-500'
-                          )}>
+                          <div
+                            className={cn(
+                              'w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0',
+                              isSelected
+                                ? `${config.color} bg-white dark:bg-white/20`
+                                : 'bg-white/60 dark:bg-white/10 text-gray-500 dark:text-stone-400',
+                            )}
+                          >
                             {badgeLetter}
                           </div>
-                          <span className={cn(
-                            'font-semibold text-xs truncate',
-                            isSelected ? config.color : 'text-otis-800 dark:text-white/80'
-                          )}>
+                          <span
+                            className={cn(
+                              'font-semibold text-xs truncate',
+                              isSelected ? config.color : 'text-otis-800 dark:text-white/80',
+                            )}
+                          >
                             {group.label}
                           </span>
                         </div>
