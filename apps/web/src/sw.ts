@@ -20,7 +20,7 @@ declare const self: ServiceWorkerGlobalScope
 // ── Notification Scheduling ─────────────────────────────────────────────────
 
 interface ScheduleConfig {
-  days: number[]   // 0=Sunday, 1=Monday, ..., 6=Saturday
+  days: number[] // 0=Sunday, 1=Monday, ..., 6=Saturday
   hour: number
   minute: number
   title: string
@@ -125,18 +125,12 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
   switch (type) {
     case 'SCHEDULE_NOTIFICATION':
       startScheduler(payload as ScheduleConfig)
-      source?.postMessage(
-        { type: 'NOTIFICATION_SCHEDULED', success: true },
-        { targetOrigin: '*' }
-      )
+      source?.postMessage({ type: 'NOTIFICATION_SCHEDULED', success: true }, { targetOrigin: '*' })
       break
 
     case 'CANCEL_NOTIFICATION':
       stopScheduler()
-      source?.postMessage(
-        { type: 'NOTIFICATION_CANCELLED', success: true },
-        { targetOrigin: '*' }
-      )
+      source?.postMessage({ type: 'NOTIFICATION_CANCELLED', success: true }, { targetOrigin: '*' })
       break
 
     case 'STATUS':
@@ -147,7 +141,7 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
           config: scheduleConfig,
           lastNotified: lastNotifiedDate,
         },
-        { targetOrigin: '*' }
+        { targetOrigin: '*' },
       )
       break
   }
@@ -167,18 +161,16 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
 
   // Open or focus the app on the export page
   event.waitUntil(
-    self.clients
-      .matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => {
-        for (const client of clientList) {
-          if (client.url.includes(self.location.origin) && 'focus' in client) {
-            // The app.tsx handles this message to navigate via React Router
-            client.postMessage({ type: 'NAVIGATE', url: urlToOpen })
-            return client.focus()
-          }
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          // The app.tsx handles this message to navigate via React Router
+          client.postMessage({ type: 'NAVIGATE', url: urlToOpen })
+          return client.focus()
         }
-        // Open new window
-        return self.clients.openWindow(self.location.origin + urlToOpen)
-      })
+      }
+      // Open new window
+      return self.clients.openWindow(self.location.origin + urlToOpen)
+    }),
   )
 })

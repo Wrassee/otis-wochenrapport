@@ -23,7 +23,13 @@ interface FlagProps {
  * attribute — that is invalid SVG/CSS syntax and would render the rect with
  * height 0 → blank flags.
  */
-function Stripes({ vertical = false, colors }: { vertical?: boolean; colors: [string, string, string] }) {
+function Stripes({
+  vertical = false,
+  colors,
+}: {
+  vertical?: boolean
+  colors: [string, string, string]
+}) {
   const stripe = 16 / 3
   return vertical ? (
     <>

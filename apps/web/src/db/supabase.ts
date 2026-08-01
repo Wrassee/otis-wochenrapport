@@ -15,7 +15,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
  * Get current user session
  */
 export async function getCurrentSession() {
-  const { data: { session }, error } = await supabase.auth.getSession()
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession()
   if (error) throw error
   return session
 }
@@ -50,11 +53,7 @@ export async function signOut() {
  * Get user profile
  */
 export async function getProfile(userId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single()
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
   if (error) throw error
   return data
 }
@@ -70,11 +69,7 @@ export async function upsertProfile(profile: {
   supervisor_email: string
   language?: string
 }) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .upsert(profile)
-    .select()
-    .single()
+  const { data, error } = await supabase.from('profiles').upsert(profile).select().single()
   if (error) throw error
   return data
 }
@@ -85,10 +80,7 @@ export async function upsertProfile(profile: {
  * queue (language_sync — retried later when connectivity returns).
  */
 export async function updateProfileLanguage(userId: string, language: string) {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ language })
-    .eq('id', userId)
+  const { error } = await supabase.from('profiles').update({ language }).eq('id', userId)
   if (error) throw error
 }
 
@@ -96,10 +88,7 @@ export async function updateProfileLanguage(userId: string, language: string) {
  * Get all locations (elevators) for autocomplete
  */
 export async function getLocations() {
-  const { data, error } = await supabase
-    .from('locations')
-    .select('*')
-    .order('anlagenummer')
+  const { data, error } = await supabase.from('locations').select('*').order('anlagenummer')
   if (error) throw error
   return data || []
 }
@@ -112,10 +101,12 @@ export async function getWeekEntries(userId: string, startDate: string, endDate:
   // are still returned — location fields will be null.
   const { data, error } = await supabase
     .from('time_entries')
-    .select(`
+    .select(
+      `
       *,
       locations!left(anlagenummer, project_id, full_address, zone)
-    `)
+    `,
+    )
     .eq('user_id', userId)
     .gte('date', startDate)
     .lte('date', endDate)
@@ -141,10 +132,7 @@ export async function syncEntries(entries: any[]) {
  * Delete a time entry from server
  */
 export async function deleteEntry(entryId: string) {
-  const { error } = await supabase
-    .from('time_entries')
-    .delete()
-    .eq('id', entryId)
+  const { error } = await supabase.from('time_entries').delete().eq('id', entryId)
   if (error) throw error
 }
 
@@ -175,10 +163,7 @@ export async function upsertLocation(location: {
  * Delete a location from server by anlagenummer.
  */
 export async function deleteLocationByAnlagenummer(anlagenummer: string) {
-  const { error } = await supabase
-    .from('locations')
-    .delete()
-    .eq('anlagenummer', anlagenummer)
+  const { error } = await supabase.from('locations').delete().eq('anlagenummer', anlagenummer)
   if (error) throw error
 }
 
@@ -246,11 +231,7 @@ export async function syncExpensesToSupabase(
   const dates = [...new Set(expenses.map((e) => e.date))]
 
   // Delete all existing rows for those dates
-  await supabase
-    .from('daily_expenses')
-    .delete()
-    .eq('user_id', userId)
-    .in('date', dates)
+  await supabase.from('daily_expenses').delete().eq('user_id', userId).in('date', dates)
 
   // Insert fresh rows
   const rows = expenses.map((e) => ({
@@ -260,9 +241,7 @@ export async function syncExpensesToSupabase(
     value: e.value,
   }))
 
-  const { error } = await supabase
-    .from('daily_expenses')
-    .insert(rows)
+  const { error } = await supabase.from('daily_expenses').insert(rows)
   if (error) throw error
 }
 
@@ -332,10 +311,7 @@ export async function getExpensePhotosFromSupabase(userId: string, year: number,
  * Delete a receipt photo from the server.
  */
 export async function deleteExpensePhotoFromSupabase(id: string) {
-  const { error } = await supabase
-    .from('expense_photos')
-    .delete()
-    .eq('id', id)
+  const { error } = await supabase.from('expense_photos').delete().eq('id', id)
   if (error) throw error
 }
 

@@ -13,13 +13,17 @@ export function Card({ className, variant = 'default', noPadding, children, ...p
         'rounded-2xl transition-all duration-200',
         variant === 'default' && 'glass-card dark:glass-card-dark',
         variant === 'glass' && 'glass dark:glass-dark',
-        variant === 'dark' && 'bg-otis-800/10 dark:bg-white/5 border border-otis-200/20 dark:border-white/5',
+        variant === 'dark' &&
+          'bg-otis-800/10 dark:bg-white/5 border border-otis-200/20 dark:border-white/5',
         variant === 'outline' && 'bg-transparent border-2 border-otis-200/40 dark:border-white/10',
-        variant === 'warning' && 'bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur border-2 border-amber-300/60 dark:border-amber-700/50',
-        variant === 'success' && 'bg-emerald-50/80 dark:bg-emerald-900/20 backdrop-blur border-2 border-emerald-300/60 dark:border-emerald-700/50',
-        variant === 'danger' && 'bg-red-50/80 dark:bg-red-900/20 backdrop-blur border-2 border-red-300/60 dark:border-red-700/50',
+        variant === 'warning' &&
+          'bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur border-2 border-amber-300/60 dark:border-amber-700/50',
+        variant === 'success' &&
+          'bg-emerald-50/80 dark:bg-emerald-900/20 backdrop-blur border-2 border-emerald-300/60 dark:border-emerald-700/50',
+        variant === 'danger' &&
+          'bg-red-50/80 dark:bg-red-900/20 backdrop-blur border-2 border-red-300/60 dark:border-red-700/50',
         noPadding ? 'p-0' : 'p-5',
-        className
+        className,
       )}
       {...props}
     >

@@ -102,7 +102,7 @@ export function hasOverlap(
   start1: number,
   duration1: number,
   start2: number,
-  duration2: number
+  duration2: number,
 ): boolean {
   const end1 = start1 + duration1
   const end2 = start2 + duration2
@@ -112,7 +112,10 @@ export function hasOverlap(
 /**
  * Check if a total hours value meets the daily requirement
  */
-export function meetsDailyRequirement(totalHours: number, dayOfWeek: number): { meets: boolean; required: number } {
+export function meetsDailyRequirement(
+  totalHours: number,
+  dayOfWeek: number,
+): { meets: boolean; required: number } {
   // dayOfWeek: 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday
   const required = dayOfWeek === 5 ? 8.0 : 8.5
   return { meets: totalHours >= required, required }
@@ -131,12 +134,7 @@ export function calculateZone(distanceKm: number): number {
 /**
  * Haversine distance in km
  */
-export function haversineDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
+export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371 // Earth's radius in km
   const dLat = ((lat2 - lat1) * Math.PI) / 180
   const dLon = ((lon2 - lon1) * Math.PI) / 180

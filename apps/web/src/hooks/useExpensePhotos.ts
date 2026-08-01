@@ -42,17 +42,17 @@ export function useExpensePhotos(year: number, week: number) {
 
   const addPhoto = useCallback(
     (file: File) => addExpensePhoto(file, year, week),
-    [addExpensePhoto, year, week]
+    [addExpensePhoto, year, week],
   )
 
   const updatePhotoNote = useCallback(
     (id: string, note: string) => updateExpensePhotoNote(year, week, id, note),
-    [updateExpensePhotoNote, year, week]
+    [updateExpensePhotoNote, year, week],
   )
 
   const removePhoto = useCallback(
     (id: string) => removeExpensePhoto(year, week, id),
-    [removeExpensePhoto, year, week]
+    [removeExpensePhoto, year, week],
   )
 
   return { photos, isLoading, addPhoto, removePhoto, updatePhotoNote, reload: load }

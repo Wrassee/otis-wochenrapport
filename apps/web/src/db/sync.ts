@@ -1,10 +1,22 @@
 import { getUnsyncedEntries, markEntrySynced, getSyncQueue, clearSyncQueue } from './indexeddb'
-import { syncEntries, deleteEntry as deleteRemoteEntry, upsertLocation, deleteLocationByAnlagenummer, syncExpensesToSupabase, updateProfileLanguage } from './supabase'
+import {
+  syncEntries,
+  deleteEntry as deleteRemoteEntry,
+  upsertLocation,
+  deleteLocationByAnlagenummer,
+  syncExpensesToSupabase,
+  updateProfileLanguage,
+} from './supabase'
 
 let syncInterval: ReturnType<typeof setInterval> | null = null
 let isSyncing = false
 
-export type SyncListener = (status: { online: boolean; syncing: boolean; pending: number; lastSync: string | null }) => void
+export type SyncListener = (status: {
+  online: boolean
+  syncing: boolean
+  pending: number
+  lastSync: string | null
+}) => void
 
 const listeners: Set<SyncListener> = new Set()
 
@@ -13,7 +25,12 @@ export function onSyncStatusChange(listener: SyncListener): () => void {
   return () => listeners.delete(listener)
 }
 
-function notifyListeners(status: { online: boolean; syncing: boolean; pending: number; lastSync: string | null }) {
+function notifyListeners(status: {
+  online: boolean
+  syncing: boolean
+  pending: number
+  lastSync: string | null
+}) {
   listeners.forEach((l) => l(status))
 }
 

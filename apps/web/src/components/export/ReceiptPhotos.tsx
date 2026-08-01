@@ -36,7 +36,12 @@ export function ReceiptPhotos({ photos, compact = false, cols = 4 }: ReceiptPhot
   }
 
   const strip = (
-    <div className={cn('grid gap-2', cols === 2 ? 'grid-cols-2' : cols === 3 ? 'grid-cols-3' : 'grid-cols-4')}>
+    <div
+      className={cn(
+        'grid gap-2',
+        cols === 2 ? 'grid-cols-2' : cols === 3 ? 'grid-cols-3' : 'grid-cols-4',
+      )}
+    >
       {photos.map((photo, idx) => (
         <button
           key={photo.id}
@@ -45,11 +50,7 @@ export function ReceiptPhotos({ photos, compact = false, cols = 4 }: ReceiptPhot
           className="relative w-full aspect-square min-h-0 rounded-lg overflow-hidden border border-otis-200/20 dark:border-white/10 bg-otis-100/30 dark:bg-otis-900/30 p-0 transition-transform active:scale-95"
           title={photo.note || photo.filename}
         >
-          <img
-            src={photo.dataUrl}
-            alt={photo.filename}
-            className="w-full h-full object-cover"
-          />
+          <img src={photo.dataUrl} alt={photo.filename} className="w-full h-full object-cover" />
           {photo.note && (
             <span className="absolute bottom-0 inset-x-0 px-1 py-0.5 bg-black/55 text-white text-[7px] leading-tight truncate">
               {photo.note}
@@ -91,7 +92,10 @@ export function ReceiptPhotos({ photos, compact = false, cols = 4 }: ReceiptPhot
             </span>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); setPreviewIndex(null) }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setPreviewIndex(null)
+              }}
               className="w-10 h-10 min-h-0 rounded-full bg-white/10 text-white flex items-center justify-center transition-colors hover:bg-white/20 active:scale-95"
               title={t('export.photo.close')}
             >
@@ -122,7 +126,10 @@ export function ReceiptPhotos({ photos, compact = false, cols = 4 }: ReceiptPhot
             <>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); showPrev() }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  showPrev()
+                }}
                 className="absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 min-h-0 rounded-full bg-white/10 text-white flex items-center justify-center transition-colors hover:bg-white/20 active:scale-95"
                 title={t('export.photo.prev')}
               >
@@ -130,7 +137,10 @@ export function ReceiptPhotos({ photos, compact = false, cols = 4 }: ReceiptPhot
               </button>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); showNext() }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  showNext()
+                }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 min-h-0 rounded-full bg-white/10 text-white flex items-center justify-center transition-colors hover:bg-white/20 active:scale-95"
                 title={t('export.photo.next')}
               >

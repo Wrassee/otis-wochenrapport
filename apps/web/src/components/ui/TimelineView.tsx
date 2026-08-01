@@ -16,7 +16,13 @@ interface TimelineViewProps {
 const ROW_HEIGHT = 52 // px — touch-friendly tap target
 const MIN_BAR_WIDTH_PCT = 2.5 // minimum % width so 15-min bars are visible
 
-export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions = true, conflictEntryIds = [] }: TimelineViewProps) {
+export function TimelineView({
+  entries,
+  onEditEntry,
+  onDeleteEntry,
+  showActions = true,
+  conflictEntryIds = [],
+}: TimelineViewProps) {
   const { t } = useTranslation()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const prevConflictRef = useRef<string[]>([])
@@ -99,11 +105,12 @@ export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions 
 
   return (
     <div className="select-none overflow-hidden">
-      {/* Single scrollable container: ruler + content scroll together */}        <div
-          ref={scrollContainerRef}
-          className="overflow-x-auto overscroll-x-contain timeline-scrollbar"
-          style={{ WebkitOverflowScrolling: 'touch' }}
-        >
+      {/* Single scrollable container: ruler + content scroll together */}{' '}
+      <div
+        ref={scrollContainerRef}
+        className="overflow-x-auto overscroll-x-contain timeline-scrollbar"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         <div style={{ minWidth: `${totalHours * 112}px` }}>
           {/* ⏱ Hour ruler */}
           <div className="h-7 flex items-end px-3 border-b border-otis-100/20 dark:border-white/5 flex-shrink-0">
@@ -142,119 +149,131 @@ export function TimelineView({ entries, onEditEntry, onDeleteEntry, showActions 
                 const bar = barStyle(entry.start_time, entry.duration)
                 const isConflict = conflictEntryIds.includes(entry.id)
                 return (
-                <div
-                  key={entry.id}
-                  id={`timeline-entry-${entry.id}`}
-                  onClick={() => onEditEntry?.(entry)}
-                  className={cn(
-                    'relative flex items-center px-3 transition-colors duration-150 cursor-pointer',
-                    !isLunch && 'hover:bg-otis-50/30 dark:hover:bg-white/[0.015]',
-                    isLunch && 'hover:bg-amber-50/40 dark:hover:bg-amber-900/10',
-                    isConflict && '!bg-red-50/50 dark:!bg-red-950/30'
-                  )}
-                  style={{ minHeight: ROW_HEIGHT }}
-                >
-                  {/* Horizontal bar — positioned via percentage */}
                   <div
+                    key={entry.id}
+                    id={`timeline-entry-${entry.id}`}
+                    onClick={() => onEditEntry?.(entry)}
                     className={cn(
-                      'absolute rounded-full transition-all duration-150 shadow-sm',
-                      isLunch
-                        ? 'bg-gradient-to-r from-amber-400/85 to-amber-500/70 dark:from-amber-500/55 dark:to-amber-600/45'
-                        : 'bg-gradient-to-r from-otis-500/85 to-otis-400/75 dark:from-otis-400/65 dark:to-otis-500/55',
-                      conflictEntryIds.includes(entry.id) &&
-                        (isLunch
-                          ? 'from-red-400/90 to-red-500/80 dark:from-red-500/65 dark:to-red-600/55 ring-2 ring-red-300 dark:ring-red-600'
-                          : 'from-red-400/90 to-red-500/80 dark:from-red-500/65 dark:to-red-600/55 ring-2 ring-red-300 dark:ring-red-600')
+                      'relative flex items-center px-3 transition-colors duration-150 cursor-pointer',
+                      !isLunch && 'hover:bg-otis-50/30 dark:hover:bg-white/[0.015]',
+                      isLunch && 'hover:bg-amber-50/40 dark:hover:bg-amber-900/10',
+                      isConflict && '!bg-red-50/50 dark:!bg-red-950/30',
                     )}
-                    style={{
-                      left: bar.left,
-                      width: bar.width,
-                      height: '30px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                    }}
-                    data-timeline-bar
-                  />
-
-                  {/* Entry info: icon + label + time + duration + actions — all inline */}
-                  <div
-                    className="flex items-center gap-1.5 relative z-10"
-                    style={{ marginLeft: bar.left }}
+                    style={{ minHeight: ROW_HEIGHT }}
                   >
-                    {/* Icon */}
+                    {/* Horizontal bar — positioned via percentage */}
                     <div
                       className={cn(
-                        'w-6 h-6 rounded-xl flex items-center justify-center flex-shrink-0',
+                        'absolute rounded-full transition-all duration-150 shadow-sm',
                         isLunch
-                          ? 'bg-amber-100/80 dark:bg-amber-900/30'
-                          : 'bg-otis-100/80 dark:bg-otis-800/30'
+                          ? 'bg-gradient-to-r from-amber-400/85 to-amber-500/70 dark:from-amber-500/55 dark:to-amber-600/45'
+                          : 'bg-gradient-to-r from-otis-500/85 to-otis-400/75 dark:from-otis-400/65 dark:to-otis-500/55',
+                        conflictEntryIds.includes(entry.id) &&
+                          (isLunch
+                            ? 'from-red-400/90 to-red-500/80 dark:from-red-500/65 dark:to-red-600/55 ring-2 ring-red-300 dark:ring-red-600'
+                            : 'from-red-400/90 to-red-500/80 dark:from-red-500/65 dark:to-red-600/55 ring-2 ring-red-300 dark:ring-red-600'),
                       )}
+                      style={{
+                        left: bar.left,
+                        width: bar.width,
+                        height: '30px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                      }}
+                      data-timeline-bar
+                    />
+
+                    {/* Entry info: icon + label + time + duration + actions — all inline */}
+                    <div
+                      className="flex items-center gap-1.5 relative z-10"
+                      style={{ marginLeft: bar.left }}
                     >
-                      {isLunch ? (
-                        <UtensilsCrossed className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                      ) : (
-                        <Building2 className="w-3 h-3 text-otis-600 dark:text-otis-400" />
-                      )}
-                    </div>
-
-                    {/* Text label — truncated */}
-                    <span
-                      className={cn(
-                        'text-sm font-semibold truncate leading-none max-w-[80px]',
-                        isLunch
-                          ? 'text-amber-700 dark:text-amber-200'
-                          : 'text-otis-700 dark:text-white'
-                      )}
-                    >
-                      {isLunch ? t('timeline.lunch') : (entry.location_anlagenummer || '—')}
-                    </span>
-
-                    {/* Time range — always visible */}
-                    <span className={cn(
-                      'text-[11px] font-medium whitespace-nowrap ml-1',
-                      isLunch
-                        ? 'text-amber-500 dark:text-amber-300'
-                        : 'text-gray-400 dark:text-white'
-                    )}>
-                      {decimalToTime(entry.start_time)}–{decimalToTime(endTime)}
-                    </span>
-
-                    {/* Duration badge */}
-                    <span className={cn(
-                      'text-[11px] font-bold whitespace-nowrap px-2 py-0.5 rounded-md',
-                      isLunch
-                        ? 'bg-amber-100/40 dark:bg-amber-900/20 text-amber-600 dark:text-amber-200'
-                        : 'bg-otis-100/40 dark:bg-otis-800/20 text-otis-500 dark:text-white'
-                    )}>
-                      {isLunch ? `${(entry.duration * 60).toFixed(0)} Min.` : formatOtisDuration(entry.duration)}
-                    </span>
-
-                    {/* Action buttons — for ALL entries including lunch */}
-                    {showActions && (
-                      <div className="flex items-center gap-1 ml-1 flex-shrink-0">
-                        {onEditEntry && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onEditEntry(entry) }}
-                            className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-otis-100/50 dark:hover:bg-otis-800/30 transition-all active:scale-90"
-                            title={t('timeline.edit')}
-                          >
-                            <Pencil className="w-3.5 h-3.5 text-otis-400" />
-                          </button>
+                      {/* Icon */}
+                      <div
+                        className={cn(
+                          'w-6 h-6 rounded-xl flex items-center justify-center flex-shrink-0',
+                          isLunch
+                            ? 'bg-amber-100/80 dark:bg-amber-900/30'
+                            : 'bg-otis-100/80 dark:bg-otis-800/30',
                         )}
-                        {onDeleteEntry && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onDeleteEntry(entry.id) }}
-                            className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-red-50/50 dark:hover:bg-red-900/20 transition-all active:scale-90"
-                            title={t('timeline.delete')}
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                          </button>
+                      >
+                        {isLunch ? (
+                          <UtensilsCrossed className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                        ) : (
+                          <Building2 className="w-3 h-3 text-otis-600 dark:text-otis-400" />
                         )}
                       </div>
-                    )}
+
+                      {/* Text label — truncated */}
+                      <span
+                        className={cn(
+                          'text-sm font-semibold truncate leading-none max-w-[80px]',
+                          isLunch
+                            ? 'text-amber-700 dark:text-amber-200'
+                            : 'text-otis-700 dark:text-white',
+                        )}
+                      >
+                        {isLunch ? t('timeline.lunch') : entry.location_anlagenummer || '—'}
+                      </span>
+
+                      {/* Time range — always visible */}
+                      <span
+                        className={cn(
+                          'text-[11px] font-medium whitespace-nowrap ml-1',
+                          isLunch
+                            ? 'text-amber-500 dark:text-amber-300'
+                            : 'text-gray-400 dark:text-white',
+                        )}
+                      >
+                        {decimalToTime(entry.start_time)}–{decimalToTime(endTime)}
+                      </span>
+
+                      {/* Duration badge */}
+                      <span
+                        className={cn(
+                          'text-[11px] font-bold whitespace-nowrap px-2 py-0.5 rounded-md',
+                          isLunch
+                            ? 'bg-amber-100/40 dark:bg-amber-900/20 text-amber-600 dark:text-amber-200'
+                            : 'bg-otis-100/40 dark:bg-otis-800/20 text-otis-500 dark:text-white',
+                        )}
+                      >
+                        {isLunch
+                          ? `${(entry.duration * 60).toFixed(0)} Min.`
+                          : formatOtisDuration(entry.duration)}
+                      </span>
+
+                      {/* Action buttons — for ALL entries including lunch */}
+                      {showActions && (
+                        <div className="flex items-center gap-1 ml-1 flex-shrink-0">
+                          {onEditEntry && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onEditEntry(entry)
+                              }}
+                              className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-otis-100/50 dark:hover:bg-otis-800/30 transition-all active:scale-90"
+                              title={t('timeline.edit')}
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-otis-400" />
+                            </button>
+                          )}
+                          {onDeleteEntry && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onDeleteEntry(entry.id)
+                              }}
+                              className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-red-50/50 dark:hover:bg-red-900/20 transition-all active:scale-90"
+                              title={t('timeline.delete')}
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )
+                )
               })}
             </div>
           </div>

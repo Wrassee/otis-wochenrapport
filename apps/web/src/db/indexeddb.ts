@@ -1,5 +1,12 @@
 import { openDB, type IDBPDatabase } from 'idb'
-import type { TimeEntry, Location, Profile, ActivityCode, FavoriteLocation, ExpensePhoto } from '@/lib/types'
+import type {
+  TimeEntry,
+  Location,
+  Profile,
+  ActivityCode,
+  FavoriteLocation,
+  ExpensePhoto,
+} from '@/lib/types'
 
 const DB_NAME = 'otis-rapport-db'
 const DB_VERSION = 2
@@ -58,7 +65,11 @@ function getDb() {
 
 // ===================== TIME ENTRIES =====================
 
-export async function getAllEntriesForWeek(userId: string, startDate: string, endDate: string): Promise<TimeEntry[]> {
+export async function getAllEntriesForWeek(
+  userId: string,
+  startDate: string,
+  endDate: string,
+): Promise<TimeEntry[]> {
   const db = await getDb()
   const tx = db.transaction('time_entries', 'readonly')
   const store = tx.objectStore('time_entries')
@@ -157,7 +168,7 @@ export async function searchLocations(query: string): Promise<Location[]> {
     (loc) =>
       loc.anlagenummer.toLowerCase().includes(q) ||
       loc.project_id.toLowerCase().includes(q) ||
-      loc.full_address.toLowerCase().includes(q)
+      loc.full_address.toLowerCase().includes(q),
   )
 }
 
@@ -171,7 +182,7 @@ export async function getLocalProfile(): Promise<Profile | undefined> {
   // record — relying on all[0] could return the wrong entry depending on key
   // sort order, which made the Settings profile fields appear empty.
   return all.find(
-    (p: any) => p && typeof p.full_name === 'string' && typeof p.email === 'string'
+    (p: any) => p && typeof p.full_name === 'string' && typeof p.email === 'string',
   ) as Profile | undefined
 }
 
@@ -188,14 +199,14 @@ export async function saveLocalProfile(profile: Profile): Promise<void> {
 export async function updateLocationZone(
   anlagenummer: string,
   zone: number,
-  manualZone?: number
+  manualZone?: number,
 ): Promise<void> {
   const db = await getDb()
 
   // Update in locations store
   const allLocs = await db.getAll('locations')
   const loc = allLocs.find(
-    (l: Location) => l.anlagenummer.toUpperCase() === anlagenummer.toUpperCase()
+    (l: Location) => l.anlagenummer.toUpperCase() === anlagenummer.toUpperCase(),
   )
   if (loc) {
     const updated = { ...loc, zone, manual_zone: manualZone }
@@ -278,9 +289,7 @@ export async function saveFavoriteLocation(fav: {
 export async function removeFavoriteLocation(anlagenummer: string): Promise<void> {
   const db = await getDb()
   const all = await db.getAll('favorites')
-  const target = all.find(
-    (f) => f.anlagenummer?.toUpperCase() === anlagenummer.toUpperCase()
-  )
+  const target = all.find((f) => f.anlagenummer?.toUpperCase() === anlagenummer.toUpperCase())
   if (target) {
     await db.delete('favorites', target.anlagenummer)
   }
@@ -319,7 +328,7 @@ export async function deleteLocation(anlagenummer: string): Promise<void> {
  */
 export async function updateLocationDetails(
   anlagenummer: string,
-  updates: { project_id?: string; full_address?: string }
+  updates: { project_id?: string; full_address?: string },
 ): Promise<void> {
   const db = await getDb()
   const key = anlagenummer.toUpperCase()

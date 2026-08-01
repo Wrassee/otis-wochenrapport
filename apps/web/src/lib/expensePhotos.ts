@@ -1,9 +1,6 @@
 import type { ExpensePhoto } from '@/lib/types'
 import * as localDb from '@/db/indexeddb'
-import {
-  getExpensePhotosFromSupabase,
-  deleteExpensePhotoFromSupabase,
-} from '@/db/supabase'
+import { getExpensePhotosFromSupabase, deleteExpensePhotoFromSupabase } from '@/db/supabase'
 
 /**
  * Deletion tombstones.
@@ -54,7 +51,7 @@ export function clearPhotoDeleted(userId: string, id: string) {
 export async function loadWeekExpensePhotos(
   userId: string | undefined,
   year: number,
-  week: number
+  week: number,
 ): Promise<ExpensePhoto[]> {
   const local = await localDb.getExpensePhotos(year, week)
 
@@ -68,8 +65,8 @@ export async function loadWeekExpensePhotos(
     if (tombstoned.length > 0) {
       await Promise.allSettled(
         tombstoned.map((id) =>
-          deleteExpensePhotoFromSupabase(id).then(() => clearPhotoDeleted(userId, id))
-        )
+          deleteExpensePhotoFromSupabase(id).then(() => clearPhotoDeleted(userId, id)),
+        ),
       )
     }
 

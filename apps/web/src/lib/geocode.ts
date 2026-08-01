@@ -30,9 +30,7 @@ export interface GeocodeResult {
  * Geocode an address using OpenStreetMap Nominatim API.
  * Returns null if geocoding fails or no results found.
  */
-export async function geocodeAddress(
-  address: string
-): Promise<GeocodeResult | null> {
+export async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
   if (!address || address.length < 5) {
     return null
   }
@@ -44,7 +42,7 @@ export async function geocodeAddress(
     const response = await fetch(url, {
       headers: {
         'User-Agent': USER_AGENT,
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
     })
 
@@ -77,5 +75,3 @@ export async function geocodeAddress(
     return null
   }
 }
-
-

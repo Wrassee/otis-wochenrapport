@@ -25,12 +25,29 @@ const SPESEN_DAY_COLUMNS: Record<number, string> = {
 const ZONE_ROWS: Record<number, number> = { 1: 10, 2: 12, 3: 15, 4: 18 }
 
 const ACTIVITY_COLUMNS: Record<string, string> = {
-  NK: 'J', S: 'J', T: 'J',
-  'T Clot': 'K', O: 'L', QI: 'M',
-  I04: 'N', I5S: 'N', I5Q: 'N', I5T: 'N', I5A: 'N',
-  A01: 'N', A02: 'N', A03: 'N', A04: 'N', A05: 'N', A07: 'N',
-  VM: 'O', VP: 'P',
-  NM: 'Q', NTC: 'Q', NF: 'Q', VC: 'Q',
+  NK: 'J',
+  S: 'J',
+  T: 'J',
+  'T Clot': 'K',
+  O: 'L',
+  QI: 'M',
+  I04: 'N',
+  I5S: 'N',
+  I5Q: 'N',
+  I5T: 'N',
+  I5A: 'N',
+  A01: 'N',
+  A02: 'N',
+  A03: 'N',
+  A04: 'N',
+  A05: 'N',
+  A07: 'N',
+  VM: 'O',
+  VP: 'P',
+  NM: 'Q',
+  NTC: 'Q',
+  NF: 'Q',
+  VC: 'Q',
   'QI SCOTT': 'R',
 }
 
@@ -360,9 +377,7 @@ function fillSpesenrapport(
  * @param options - Generation options (year, week, entries, etc.)
  * @returns A Promise resolving to the XLSX Blob
  */
-export async function generateExcelOffline(
-  options: OfflineGenerateOptions,
-): Promise<Blob> {
+export async function generateExcelOffline(options: OfflineGenerateOptions): Promise<Blob> {
   const { year, week_number, personnel_number, full_name, entries, expenses, photo_notes } = options
 
   // 1. Decode the embedded template from base64
@@ -382,10 +397,22 @@ export async function generateExcelOffline(
 
   // 4. Fill with data
   const sheet1Filled = fillStundenrapport(
-    sheet1Raw, year, week_number, personnel_number, full_name, entries,
+    sheet1Raw,
+    year,
+    week_number,
+    personnel_number,
+    full_name,
+    entries,
   )
   const sheet2Filled = fillSpesenrapport(
-    sheet2Raw, year, week_number, personnel_number, full_name, entries, expenses, photo_notes,
+    sheet2Raw,
+    year,
+    week_number,
+    personnel_number,
+    full_name,
+    entries,
+    expenses,
+    photo_notes,
   )
 
   // 5. Update the ZIP
