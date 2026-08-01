@@ -115,9 +115,19 @@ def _set_cell_str(xml: str, ref: str, value: str) -> str:
 
 
 def _set_cell_marker(xml: str, ref: str) -> str:
-    """Set a cell to the activity marker 'ü' (inline string)."""
+    """Set a cell to the activity marker 'ü' (inline string).
+
+    The marker is written as a rich-text run with an explicit Wingdings font,
+    so 'ü' renders as a checkmark ✓ even in columns whose cell style uses a
+    regular font (the template's N/O/P/Q/R columns use an Arial style while
+    only J/K/L/M use the Wingdings style). The cell's own style is preserved
+    for borders/alignment; only the run's font is forced.
+    """
     style = _get_cell_style(xml, ref)
-    new = f'<c r="{ref}" s="{style}" t="inlineStr"><is><t>ü</t></is></c>'
+    new = (
+        f'<c r="{ref}" s="{style}" t="inlineStr">'
+        f'<is><r><rPr><rFont val="Wingdings"/></rPr><t>ü</t></r></is></c>'
+    )
     return _replace_cell(xml, ref, new)
 
 

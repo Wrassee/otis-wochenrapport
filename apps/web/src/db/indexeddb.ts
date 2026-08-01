@@ -114,6 +114,37 @@ export async function saveEntries(entries: TimeEntry[]): Promise<void> {
   }
 }
 
+/**
+ * Write entries to IndexedDB WITHOUT flipping the `synced` flag or touching
+ * the sync queue. Used by the cross-device merge in loadWeekEntries: rows
+ * pulled from Supabase are already synced (they must NOT be re-uploaded or
+ * re-queued), and locally-unsynced rows keep their flag so the background
+ * sync still pushes them.
+ */
+export async function saveEntriesPreservingSync(entries: TimeEntry[]): Promise<void> {
+  const db = await getDb()
+  const tx = db.transaction('time_entries', 'readwrite')
+  for (const entry of entries) {
+    await tx.store.put(entry)
+  }
+  await tx.done
+}
+
+/**
+ * Delete entries locally WITHOUT touching the sync queue. Used by the
+ * cross-device merge: a row that is synced here but missing from Supabase was
+ * deleted on another device — it must be dropped locally so it can't
+ * resurrect, and no delete needs to be queued (the cloud already removed it).
+ */
+export async function removeEntriesLocally(entryIds: string[]): Promise<void> {
+  const db = await getDb()
+  const tx = db.transaction('time_entries', 'readwrite')
+  for (const id of entryIds) {
+    await tx.store.delete(id)
+  }
+  await tx.done
+}
+
 export async function deleteEntry(entryId: string): Promise<void> {
   const db = await getDb()
   await db.delete('time_entries', entryId)

@@ -31,6 +31,7 @@ import {
   upsertFavorite,
   getFavorites,
   getExpenses,
+  getWeekEntries,
   upsertExpensePhoto,
   deleteExpensePhotoFromSupabase,
   subscribeExpensePhotoChanges,
@@ -79,11 +80,9 @@ function withTimeout<T>(promise: Promise<T>, ms = 8000, label = 'supabase'): Pro
       },
     )
   })
-}
-
-/**
+}/**
  * Collect all expenses from the dailyExpenses map into a flat array
- * and queue a background sync to Supabase (debounced 2 s).
+ * and queue a background sync to Supabase (debounced 2 s).
  */
 function queueAllExpensesSync(dailyExpenses: Record<string, DailyExpense[]>, userId: string): void {
   const all: Array<{ date: string; expense_type: string; value: number }> = []
@@ -93,6 +92,33 @@ function queueAllExpensesSync(dailyExpenses: Record<string, DailyExpense[]>, use
     }
   }
   queueExpensesSync(all, userId)
+}
+
+/**
+ * Map a Supabase time_entries row (with the `locations!left` join) into the
+ * local TimeEntry shape used by the store and the Excel generator.
+ */
+function remoteRowToTimeEntry(row: Record<string, any>): TimeEntry {
+  const loc = (row.locations as Record<string, any> | null) || {}
+  return {
+    id: String(row.id),
+    user_id: String(row.user_id),
+    date: String(row.date),
+    start_time: Number(row.start_time) || 0,
+    duration: Number(row.duration) || 0,
+    location_id: row.location_id != null ? String(row.location_id) : null,
+    activity_code_id: row.activity_code_id != null ? String(row.activity_code_id) : null,
+    activity_code: row.activity_code != null ? String(row.activity_code) : null,
+    is_lunch: !!row.is_lunch,
+    notes: row.notes || '',
+    synced: true, // pulled from the cloud — already uploaded, don't re-queue
+    created_at: row.created_at || new Date().toISOString(),
+    updated_at: row.updated_at || new Date().toISOString(),
+    location_anlagenummer: loc.anlagenummer != null ? String(loc.anlagenummer) : undefined,
+    location_project_id: loc.project_id != null ? String(loc.project_id) : undefined,
+    location_address: loc.full_address != null ? String(loc.full_address) : undefined,
+    location_zone: loc.zone != null ? Number(loc.zone) : undefined,
+  }
 }
 
 interface AppState {
@@ -386,8 +412,67 @@ export const useAppStore = create<AppState>((set, get) => ({
     const startDate = dates[0]
     const endDate = dates[4]
 
-    const entries = await localDb.getAllEntriesForWeek(user.id, startDate, endDate)
-    set({ timeEntries: entries })
+    // Local-first: load what's on this device immediately (offline-safe).
+    const localEntries = await localDb.getAllEntriesForWeek(user.id, startDate, endDate)
+    set({ timeEntries: localEntries })
+
+    // Cross-device pull: when online, merge the same week from Supabase so
+    // entries recorded on another device (e.g. the phone) appear here too.
+    // Remote wins for conflicts; locally-unsynced rows are kept (they'll be
+    // pushed by the background sync); synced rows missing remotely were
+    // deleted elsewhere and are dropped locally so they can't resurrect.
+    if (navigator.onLine) {
+      try {
+        const remoteRows = await withTimeout(
+          getWeekEntries(user.id, startDate, endDate),
+          8000,
+          'getWeekEntries',
+        )
+        // Empty remote result is NOT "everything was deleted elsewhere" — it
+        // can be a transient network/RLS oddity. Guard: only merge (and only
+        // drop synced-remote-missing rows) when the fetch actually returned
+        // rows, otherwise keep the local week untouched.
+        if (remoteRows.length > 0) {
+          const byId = new Map<string, TimeEntry>(localEntries.map((e) => [e.id, e]))
+          const merged: TimeEntry[] = []
+          const seenRemote = new Set<string>()
+          const pendingDelete: string[] = []
+
+          for (const row of remoteRows) {
+            seenRemote.add(String(row.id))
+            const local = byId.get(String(row.id))
+            if (local && !local.synced) {
+              // Local has unsynced edits → local wins, will be pushed soon.
+              merged.push(local)
+            } else {
+              merged.push(remoteRowToTimeEntry(row))
+            }
+          }
+          // Local-only rows: keep unsynced (pending) ones; drop synced rows
+          // that no longer exist remotely (deleted on another device).
+          for (const local of localEntries) {
+            if (!seenRemote.has(local.id)) {
+              if (!local.synced) {
+                merged.push(local)
+              } else {
+                pendingDelete.push(local.id)
+              }
+            }
+          }
+
+          if (pendingDelete.length > 0) {
+            await localDb.removeEntriesLocally(pendingDelete)
+          }
+          // Persist the merge without re-queueing (pulled rows keep synced=true).
+          await localDb.saveEntriesPreservingSync(merged)
+          // Stable display order: date, then start time.
+          merged.sort((a, b) => a.date.localeCompare(b.date) || a.start_time - b.start_time)
+          set({ timeEntries: merged })
+        }
+      } catch (e) {
+        console.warn('Failed to pull week entries from Supabase:', e)
+      }
+    }
   },
 
   calculateWeekSummary: async () => {

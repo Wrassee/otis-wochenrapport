@@ -148,10 +148,18 @@ function setCellStr(xml: string, ref: string, value: string): string {
   return replaceCell(xml, ref, newXml)
 }
 
-/** Set a cell to the activity marker 'ü' (inline string) */
+/**
+ * Set a cell to the activity marker 'ü' (inline string).
+ *
+ * The marker is written as a rich-text run with an explicit Wingdings font,
+ * so 'ü' renders as a checkmark ✓ even in columns whose cell style uses a
+ * regular font (the template's N/O/P/Q/R columns use an Arial style — style
+ * 161 — while only J/K/L/M use the Wingdings style). The cell's own style is
+ * preserved for borders/alignment; only the run's font is forced.
+ */
 function setCellMarker(xml: string, ref: string): string {
   const style = getCellStyle(xml, ref)
-  const newXml = `<c r="${ref}" s="${style}" t="inlineStr"><is><t>ü</t></is></c>`
+  const newXml = `<c r="${ref}" s="${style}" t="inlineStr"><is><r><rPr><rFont val="Wingdings"/></rPr><t>ü</t></r></is></c>`
   return replaceCell(xml, ref, newXml)
 }
 
