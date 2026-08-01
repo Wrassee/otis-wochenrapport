@@ -80,7 +80,9 @@ function withTimeout<T>(promise: Promise<T>, ms = 8000, label = 'supabase'): Pro
       },
     )
   })
-}/**
+}
+
+/**
  * Collect all expenses from the dailyExpenses map into a flat array
  * and queue a background sync to Supabase (debounced 2 s).
  */
