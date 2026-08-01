@@ -151,6 +151,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    defaults:
+      run:
+        working-directory: apps/web
 
     steps:
       - uses: actions/checkout@v4
@@ -168,20 +171,20 @@ jobs:
           cache: 'gradle'
 
       - name: Install dependencies
-        working-directory: apps/web
         run: npm ci --no-audit --no-fund
 
       # npm run build runs: tsc -b && vite build (includes type-check + PWA)
       - name: Build web app (TypeScript + Vite + PWA)
-        working-directory: apps/web
         run: npm run build
 
       - name: Sync Capacitor assets
-        working-directory: apps/web
         run: npx cap sync android
 
       - name: Build debug APK
         working-directory: apps/web/android
+        # chmod is NOT redundant here: gradlew is tracked with mode 100644 in
+        # git (repo developed on Windows), so checkout gives it no exec bit on
+        # the Linux runner — without this the build fails with Permission denied.
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug
@@ -212,15 +215,12 @@ jobs:
                 echo "  keep: $TAG"
                 ;;
               apk-[0-9]*)
-                echo "  deleting draft $TAG..."
-                ID=$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" \
-                  --jq '.id' 2>/dev/null || true)
-                if [ -n "$ID" ]; then
-                  gh api -X DELETE "repos/${{ github.repository }}/releases/$ID" >/dev/null 2>&1 || true
-                fi
-                # Delete the git tag after the release is gone (GitHub blocks
-                # tag deletion while a release points at it).
-                gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$TAG" >/dev/null 2>&1 || true
+                echo "  deleting draft $TAG (release + tag)..."
+                # One call instead of release-ID + delete + ref-delete: gh
+                # resolves the tag to the release, deletes it, and --cleanup-tag
+                # removes the git tag too (handling the ordering internally —
+                # GitHub blocks tag deletion while a release points at it).
+                gh release delete "$TAG" --yes --cleanup-tag >/dev/null 2>&1 || true
                 echo "  deleted $TAG"
                 ;;
               *) ;;
@@ -252,7 +252,6 @@ jobs:
           files: apps/web/android/app/build/outputs/apk/debug/app-debug.apk
           draft: true
           allowUpdates: true
-          fail_on_unmatched_files: true
 
   notify:
     name: Notify — Deploy complete
