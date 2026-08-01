@@ -5,13 +5,19 @@ import { getToday, getWeekDates, getWeekInfo, getWeekKey, haversineDistance, cal
 import { REFERENCE_LAT, REFERENCE_LON, ACTIVITY_CODES } from '@/lib/constants'
 import type { Language } from '@/lib/translations'
 import { DAY_NAMES } from '@/lib/translations'
-import { supabase, getProfile, upsertFavorite, getFavorites, syncExpensesToSupabase, getExpenses, upsertExpensePhoto, deleteExpensePhotoFromSupabase } from '@/db/supabase'
+import { supabase, getProfile, upsertFavorite, getFavorites, syncExpensesToSupabase, getExpenses, upsertExpensePhoto, deleteExpensePhotoFromSupabase, subscribeExpensePhotoChanges } from '@/db/supabase'
 import { syncExpenses as queueExpensesSync } from '@/lib/syncExpenses'
 import { loadWeekExpensePhotos, markPhotoDeleted, clearPhotoDeleted } from '@/lib/expensePhotos'
 import { fileToPhotoDataUrl } from '@/lib/photoUtils'
 
 /** In-flight guard: prevents duplicate parallel loads of the same photo week. */
 const photoLoadsInFlight = new Set<string>()
+
+/** Realtime photo-change subscription cleanup handle (per signed-in user). */
+let photoRealtimeUnsubscribe: (() => void) | null = null
+
+/** Debounce timer for realtime photo reloads — batches rapid events into one fetch. */
+let photoRealtimeTimer: ReturnType<typeof setTimeout> | null = null
 
 /**
  * Collect all expenses from the dailyExpenses map into a flat array
@@ -85,7 +91,7 @@ interface AppState {
   setExpenseValue: (date: string, expenseType: ExpenseType, value: number) => void
 
   // Expense photo operations (Spesen Belege)
-  loadExpensePhotos: (year: number, week: number) => Promise<void>
+  loadExpensePhotos: (year: number, week: number, force?: boolean) => Promise<void>
   addExpensePhoto: (file: File, year: number, week: number) => Promise<ExpensePhoto | null>
   updateExpensePhotoNote: (year: number, week: number, id: string, note: string) => Promise<void>
   removeExpensePhoto: (year: number, week: number, id: string) => Promise<void>
@@ -154,6 +160,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setUser: (user) => {
+    // Logged out — tear down the realtime photo subscription for this user
+    // and cancel any pending debounced reload.
+    if (!user && photoRealtimeUnsubscribe) {
+      photoRealtimeUnsubscribe()
+      photoRealtimeUnsubscribe = null
+    }
+    if (!user && photoRealtimeTimer) {
+      clearTimeout(photoRealtimeTimer)
+      photoRealtimeTimer = null
+    }
     set({ user, isAuthenticated: !!user })
   },
 
@@ -417,11 +433,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  loadExpensePhotos: async (year, week) => {
+  loadExpensePhotos: async (year, week, force = false) => {
     // In-flight guard — Dashboard, Woche, Spesen and Export each call this on
     // mount; without it the same week would be fetched 4× in parallel.
+    // Realtime events pass force=true so a fresh photo is never missed, even
+    // if a mount load for the same week is currently running.
     const key = getWeekKey(year, week)
-    if (photoLoadsInFlight.has(key)) return
+    if (!force && photoLoadsInFlight.has(key)) return
     photoLoadsInFlight.add(key)
     try {
       const { user } = get()
@@ -739,6 +757,53 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Load week entries
     await get().loadWeekEntries()
     await get().calculateWeekSummary()
+
+    // Live cross-device photo sync — Supabase Realtime. When another device
+    // adds/updates/deletes an expense photo, reflect it immediately (no manual
+    // sync / app restart needed). Inserts/updates debounce into a week reload;
+    // deletes are applied directly (a reload would resurrect the local copy,
+    // because the merge deliberately preserves local-only rows).
+    if (photoRealtimeUnsubscribe) {
+      photoRealtimeUnsubscribe()
+      photoRealtimeUnsubscribe = null
+    }
+    photoRealtimeUnsubscribe = subscribeExpensePhotoChanges(userId, (payload) => {
+      if (payload.eventType === 'DELETE') {
+        const id = String(payload.old?.id || '')
+        const year = Number(payload.old?.year)
+        const week = Number(payload.old?.week)
+        if (!id || !Number.isFinite(year) || !Number.isFinite(week)) return
+        // Remote delete → drop the photo here too (store + IndexedDB), so it
+        // can't resurrect on the next merge.
+        localDb.deleteExpensePhoto(id).catch((e) =>
+          console.warn('Failed to remove photo from IndexedDB on realtime delete:', e)
+        )
+        set((state) => {
+          const key = getWeekKey(year, week)
+          return {
+            expensePhotos: {
+              ...state.expensePhotos,
+              [key]: (state.expensePhotos[key] || []).filter((p) => p.id !== id),
+            },
+          }
+        })
+        return
+      }
+
+      // INSERT / UPDATE — reload the touched week (new row carries year/week).
+      const rec = payload.new
+      const year = Number(rec?.year)
+      const week = Number(rec?.week)
+      if (!Number.isFinite(year) || !Number.isFinite(week)) return
+
+      if (photoRealtimeTimer) clearTimeout(photoRealtimeTimer)
+      photoRealtimeTimer = setTimeout(() => {
+        photoRealtimeTimer = null
+        get()
+          .loadExpensePhotos(year, week, true)
+          .catch((e) => console.warn('Failed to reload photos on realtime event:', e))
+      }, 300)
+    })
 
     set({ isLoading: false })
   },

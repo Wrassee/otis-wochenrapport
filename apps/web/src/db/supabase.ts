@@ -325,3 +325,39 @@ export async function deleteExpensePhotoFromSupabase(id: string) {
     .eq('id', id)
   if (error) throw error
 }
+
+/**
+ * Subscribe to realtime changes on the user's expense_photos rows.
+ *
+ * Requires the table to be in the `supabase_realtime` publication and
+ * REPLICA IDENTITY FULL (see migration 006). The channel is filtered by
+ * user_id, so only this user's photos trigger the callback.
+ *
+ * Returns an unsubscribe function.
+ */
+export function subscribeExpensePhotoChanges(
+  userId: string,
+  onPhotoChange: (payload: {
+    eventType: 'INSERT' | 'UPDATE' | 'DELETE'
+    new?: Record<string, any>
+    old?: Record<string, any>
+  }) => void,
+): () => void {
+  const channel = supabase
+    .channel(`expense-photos-${userId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'expense_photos',
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => onPhotoChange(payload),
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
