@@ -195,6 +195,14 @@ export function getToday(): string {
 }
 
 /**
+ * Single shared week key (e.g. "2026-31") — used to group per-week data
+ * (receipt photos, etc.) so every page addresses the same week identically.
+ */
+export function getWeekKey(year: number, week: number): string {
+  return `${year}-${week}`
+}
+
+/**
  * Generate a simple UUID v4
  */
 export function generateId(): string {

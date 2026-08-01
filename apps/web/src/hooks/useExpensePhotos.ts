@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { ExpensePhoto } from '@/lib/types'
 import { useAppStore } from '@/stores/appStore'
+import { getWeekKey } from '@/lib/utils'
 
 /**
  * Weekly receipt photos (Spesen Belege) — thin store wrapper.
@@ -15,7 +16,7 @@ import { useAppStore } from '@/stores/appStore'
  */
 export function useExpensePhotos(year: number, week: number) {
   const user = useAppStore((s) => s.user)
-  const photos = useAppStore((s) => s.expensePhotos[`${year}-${week}`] || [])
+  const photos = useAppStore((s) => s.expensePhotos[getWeekKey(year, week)] || [])
   const loadExpensePhotos = useAppStore((s) => s.loadExpensePhotos)
   const addExpensePhoto = useAppStore((s) => s.addExpensePhoto)
   const updateExpensePhotoNote = useAppStore((s) => s.updateExpensePhotoNote)

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { TimeEntry, Profile, Location, FavoriteLocation, WeekSummary, ActivityCode, SyncStatus, DailyExpense, DailyExpensesMap, ExpenseType, ExpensePhoto } from '@/lib/types'
 import * as localDb from '@/db/indexeddb'
-import { getToday, getWeekDates, getWeekInfo, haversineDistance, calculateZone, generateId } from '@/lib/utils'
+import { getToday, getWeekDates, getWeekInfo, getWeekKey, haversineDistance, calculateZone, generateId } from '@/lib/utils'
 import { REFERENCE_LAT, REFERENCE_LON, ACTIVITY_CODES } from '@/lib/constants'
 import type { Language } from '@/lib/translations'
 import { DAY_NAMES } from '@/lib/translations'
@@ -170,9 +170,30 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  setCurrentDate: (date) => set({ currentDate: date }),
+  /**
+   * Set the displayed day AND keep the week context in sync — photos, entries
+   * and summaries are all grouped by week, so when the day crosses a week
+   * boundary the active week must follow it (single source of truth).
+   */
+  setCurrentDate: (date) => {
+    const info = getWeekInfo(date)
+    set((state) => ({
+      currentDate: date,
+      currentWeek:
+        info.year !== state.currentWeek.year || info.week !== state.currentWeek.week
+          ? { year: info.year, week: info.week }
+          : state.currentWeek,
+    }))
+  },
 
-  setCurrentWeek: (year, week) => set({ currentWeek: { year, week } }),
+  /**
+   * Set the active week AND keep the displayed day in sync — the Dashboard is
+   * day-based, so the day must jump to the Monday of the selected week.
+   * Together with setCurrentDate (which syncs the week), this keeps one single
+   * week context across Dashboard / Woche / Spesen / Export.
+   */
+  setCurrentWeek: (year, week) =>
+    set({ currentWeek: { year, week }, currentDate: getWeekDates(year, week)[0] }),
 
   setSyncStatus: (status) =>
     set((state) => ({
@@ -399,7 +420,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadExpensePhotos: async (year, week) => {
     // In-flight guard — Dashboard, Woche, Spesen and Export each call this on
     // mount; without it the same week would be fetched 4× in parallel.
-    const key = `${year}-${week}`
+    const key = getWeekKey(year, week)
     if (photoLoadsInFlight.has(key)) return
     photoLoadsInFlight.add(key)
     try {
@@ -433,7 +454,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       expensePhotos: {
         ...state.expensePhotos,
-        [`${year}-${week}`]: [photo, ...(state.expensePhotos[`${year}-${week}`] || [])],
+        [getWeekKey(year, week)]: [photo, ...(state.expensePhotos[getWeekKey(year, week)] || [])],
       },
     }))
     if (navigator.onLine) {
@@ -455,7 +476,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateExpensePhotoNote: async (year, week, id, note) => {
-    const key = `${year}-${week}`
+    const key = getWeekKey(year, week)
     let current = get().expensePhotos[key]?.find((p) => p.id === id)
     // Defensive fallback: if the week isn't loaded into the store yet (e.g. the
     // note button was tapped right after mount), look the photo up in the local
@@ -505,7 +526,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // delete succeeds (see lib/expensePhotos.ts).
     markPhotoDeleted(user.id, id)
     await localDb.deleteExpensePhoto(id)
-    const key = `${year}-${week}`
+    const key = getWeekKey(year, week)
     set((state) => ({
       expensePhotos: {
         ...state.expensePhotos,

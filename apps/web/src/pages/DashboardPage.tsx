@@ -26,6 +26,7 @@ export function DashboardPage() {
   const {
     currentDate,
     setCurrentDate,
+    currentWeek,
     syncStatus,
     setSyncStatus,
     activityCodes,
@@ -33,7 +34,9 @@ export function DashboardPage() {
   const { timeEntries, addEntry, updateEntry, deleteEntry, quickAdd, loadWeek } = useTimeEntries()
   const info = getWeekInfo(currentDate)
   // Week's receipt photos (Spesen Belege) — shared store data, compact strip.
-  const { photos: weekPhotos } = useExpensePhotos(info.year, info.week)
+  // Single week source of truth: the store's currentWeek (kept in sync with
+  // the day via setCurrentDate), so all pages address the same week.
+  const { photos: weekPhotos } = useExpensePhotos(currentWeek.year, currentWeek.week)
   const handleSync = async () => {
     const { forceSync } = await import('@/db/sync')
     setSyncStatus({ syncing: true })

@@ -3,9 +3,10 @@ import { useTranslation } from '@/lib/useTranslation'
 import { Card, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/cn'
+import { useAppStore } from '@/stores/appStore'
 import { useDailyExpenses } from '@/hooks/useDailyExpenses'
 import { useExpensePhotos } from '@/hooks/useExpensePhotos'
-import { getWeekDates, getToday, getWeekInfo } from '@/lib/utils'
+import { getWeekDates } from '@/lib/utils'
 import { Euro, Check, X, Camera, Trash2, ImagePlus, StickyNote } from 'lucide-react'
 
 const EXPENSE_ITEMS = [
@@ -21,14 +22,15 @@ const EXPENSE_ITEMS = [
 export function SpesenPage() {
   const { t } = useTranslation()
 
-  const today = getToday()
-  const weekInfo = getWeekInfo(today)
-  const dates = getWeekDates(weekInfo.year, weekInfo.week)
+  // Single week source of truth — same currentWeek the Woche/Export pages use,
+  // so the Spesen tab always shows the same week's expenses and Belege photos.
+  const { currentWeek } = useAppStore()
+  const dates = getWeekDates(currentWeek.year, currentWeek.week)
   const dayNames = t('week.days').split(' | ')
 
   const { dailyExpenses, toggleExpense, setExpenseValue, syncExpenses } = useDailyExpenses(dates)
 
-  const { photos, addPhoto, removePhoto, updatePhotoNote } = useExpensePhotos(weekInfo.year, weekInfo.week)
+  const { photos, addPhoto, removePhoto, updatePhotoNote } = useExpensePhotos(currentWeek.year, currentWeek.week)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
@@ -75,7 +77,7 @@ export function SpesenPage() {
         <div className="flex-1">
           <h2 className="text-lg font-bold text-otis-800 dark:text-white">{t('day.spesen')}</h2>
           <p className="text-xs text-gray-400">
-            {t('week.title', { number: weekInfo.week })} — {t('day.spesen.count', { n: totalActive })}
+            {t('week.title', { number: currentWeek.week })} — {t('day.spesen.count', { n: totalActive })}
           </p>
         </div>
         <Badge variant="info" size="sm">{totalActive}</Badge>
