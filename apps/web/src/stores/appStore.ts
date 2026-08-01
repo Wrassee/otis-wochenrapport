@@ -1,12 +1,17 @@
 import { create } from 'zustand'
-import type { TimeEntry, Profile, Location, FavoriteLocation, WeekSummary, ActivityCode, SyncStatus, DailyExpense, DailyExpensesMap, ExpenseType } from '@/lib/types'
+import type { TimeEntry, Profile, Location, FavoriteLocation, WeekSummary, ActivityCode, SyncStatus, DailyExpense, DailyExpensesMap, ExpenseType, ExpensePhoto } from '@/lib/types'
 import * as localDb from '@/db/indexeddb'
 import { getToday, getWeekDates, getWeekInfo, haversineDistance, calculateZone, generateId } from '@/lib/utils'
 import { REFERENCE_LAT, REFERENCE_LON, ACTIVITY_CODES } from '@/lib/constants'
 import type { Language } from '@/lib/translations'
 import { DAY_NAMES } from '@/lib/translations'
-import { supabase, getProfile, upsertFavorite, getFavorites, syncExpensesToSupabase, getExpenses } from '@/db/supabase'
+import { supabase, getProfile, upsertFavorite, getFavorites, syncExpensesToSupabase, getExpenses, upsertExpensePhoto, deleteExpensePhotoFromSupabase } from '@/db/supabase'
 import { syncExpenses as queueExpensesSync } from '@/lib/syncExpenses'
+import { loadWeekExpensePhotos, markPhotoDeleted, clearPhotoDeleted } from '@/lib/expensePhotos'
+import { fileToPhotoDataUrl } from '@/lib/photoUtils'
+
+/** In-flight guard: prevents duplicate parallel loads of the same photo week. */
+const photoLoadsInFlight = new Set<string>()
 
 /**
  * Collect all expenses from the dailyExpenses map into a flat array
@@ -37,6 +42,8 @@ interface AppState {
   activityCodes: ActivityCode[]
   favoriteLocations: FavoriteLocation[]
   dailyExpenses: DailyExpensesMap
+  /** Receipt photos (Spesen Belege), keyed by `${year}-${week}`. */
+  expensePhotos: Record<string, ExpensePhoto[]>
 
   // Localisation
   language: Language
@@ -77,6 +84,12 @@ interface AppState {
   toggleExpense: (date: string, expenseType: ExpenseType) => void
   setExpenseValue: (date: string, expenseType: ExpenseType, value: number) => void
 
+  // Expense photo operations (Spesen Belege)
+  loadExpensePhotos: (year: number, week: number) => Promise<void>
+  addExpensePhoto: (file: File, year: number, week: number) => Promise<ExpensePhoto | null>
+  updateExpensePhotoNote: (year: number, week: number, id: string, note: string) => Promise<void>
+  removeExpensePhoto: (year: number, week: number, id: string) => Promise<void>
+
   // Location operations
   searchLocations: (query: string) => Promise<Location[]>
   addRecentLocation: (location: Location) => Promise<void>
@@ -102,6 +115,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   syncStatus: { online: navigator.onLine, syncing: false, pendingSync: 0, lastSync: null },
   isLoading: false,
   dailyExpenses: {},
+  expensePhotos: {},
   language: (localStorage.getItem('otis_language') as Language) || 'de',
   theme: (localStorage.getItem('otis_theme') as 'system' | 'light' | 'dark') || 'system',
 
@@ -379,6 +393,132 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { user } = get()
     if (user) {
       queueAllExpensesSync(newState.dailyExpenses, user.id)
+    }
+  },
+
+  loadExpensePhotos: async (year, week) => {
+    // In-flight guard — Dashboard, Woche, Spesen and Export each call this on
+    // mount; without it the same week would be fetched 4× in parallel.
+    const key = `${year}-${week}`
+    if (photoLoadsInFlight.has(key)) return
+    photoLoadsInFlight.add(key)
+    try {
+      const { user } = get()
+      const list = await loadWeekExpensePhotos(user?.id, year, week)
+      set((state) => ({
+        expensePhotos: { ...state.expensePhotos, [key]: list },
+      }))
+    } finally {
+      photoLoadsInFlight.delete(key)
+    }
+  },
+
+  addExpensePhoto: async (file, year, week) => {
+    const { user } = get()
+    if (!user) return null
+
+    const dataUrl = await fileToPhotoDataUrl(file)
+    const photo: ExpensePhoto = {
+      id: generateId(),
+      user_id: user.id,
+      year,
+      week,
+      filename: `Beleg_KW${week}_${Date.now()}.jpg`,
+      dataUrl,
+      created_at: new Date().toISOString(),
+    }
+
+    // Offline-first: persist locally, then best-effort sync to cloud
+    await localDb.saveExpensePhoto(photo)
+    set((state) => ({
+      expensePhotos: {
+        ...state.expensePhotos,
+        [`${year}-${week}`]: [photo, ...(state.expensePhotos[`${year}-${week}`] || [])],
+      },
+    }))
+    if (navigator.onLine) {
+      try {
+        await upsertExpensePhoto({
+          id: photo.id,
+          user_id: photo.user_id,
+          year: photo.year,
+          week: photo.week,
+          filename: photo.filename,
+          data_url: photo.dataUrl,
+          created_at: photo.created_at,
+        })
+      } catch (err) {
+        console.warn('Failed to sync receipt photo to Supabase:', err)
+      }
+    }
+    return photo
+  },
+
+  updateExpensePhotoNote: async (year, week, id, note) => {
+    const key = `${year}-${week}`
+    let current = get().expensePhotos[key]?.find((p) => p.id === id)
+    // Defensive fallback: if the week isn't loaded into the store yet (e.g. the
+    // note button was tapped right after mount), look the photo up in the local
+    // DB so the edit is never silently dropped.
+    if (!current) {
+      const saved = await localDb.getExpensePhotos(year, week)
+      current = saved.find((p) => p.id === id)
+      if (!current) return
+    }
+
+    const updated: ExpensePhoto = { ...current, note: note.trim() || undefined }
+    await localDb.saveExpensePhoto(updated)
+    set((state) => ({
+      expensePhotos: {
+        ...state.expensePhotos,
+        [key]: (state.expensePhotos[key] || []).map((p) => (p.id === id ? updated : p)),
+      },
+    }))
+    if (navigator.onLine) {
+      try {
+        await upsertExpensePhoto({
+          id: updated.id,
+          user_id: updated.user_id,
+          year: updated.year,
+          week: updated.week,
+          filename: updated.filename,
+          data_url: updated.dataUrl,
+          // Send '' (not undefined) so a cleared note actually clears the
+          // cloud column — JSON.stringify drops undefined keys, which would
+          // leave the stale note behind and resurrect it on the next merge.
+          note: updated.note ?? '',
+          created_at: updated.created_at,
+        })
+      } catch (err) {
+        console.warn('Failed to sync receipt photo note to Supabase:', err)
+      }
+    }
+  },
+
+  removeExpensePhoto: async (year, week, id) => {
+    const { user } = get()
+    if (!user) return
+
+    // Offline-first: tombstone + local delete, then best-effort cloud delete.
+    // The tombstone prevents the photo from resurrecting on the next merge
+    // if the cloud delete fails (offline). It is purged once the cloud
+    // delete succeeds (see lib/expensePhotos.ts).
+    markPhotoDeleted(user.id, id)
+    await localDb.deleteExpensePhoto(id)
+    const key = `${year}-${week}`
+    set((state) => ({
+      expensePhotos: {
+        ...state.expensePhotos,
+        [key]: (state.expensePhotos[key] || []).filter((p) => p.id !== id),
+      },
+    }))
+    if (navigator.onLine) {
+      try {
+        await deleteExpensePhotoFromSupabase(id)
+        clearPhotoDeleted(user.id, id)
+      } catch (err) {
+        console.warn('Failed to delete receipt photo from Supabase:', err)
+      }
     }
   },
 

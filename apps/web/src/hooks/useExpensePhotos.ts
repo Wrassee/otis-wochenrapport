@@ -1,126 +1,51 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { ExpensePhoto } from '@/lib/types'
-import * as localDb from '@/db/indexeddb'
-import { upsertExpensePhoto, deleteExpensePhotoFromSupabase } from '@/db/supabase'
-import { fileToPhotoDataUrl } from '@/lib/photoUtils'
-import {
-  loadWeekExpensePhotos,
-  markPhotoDeleted,
-  clearPhotoDeleted,
-} from '@/lib/expensePhotos'
-import { generateId } from '@/lib/utils'
 import { useAppStore } from '@/stores/appStore'
 
 /**
- * Weekly receipt photos (Spesen Belege), synced across devices.
+ * Weekly receipt photos (Spesen Belege) — thin store wrapper.
  *
- * - load: merges local IndexedDB with the Supabase cloud copy (remote wins)
- * - add:  saves locally first (offline-first), then best-effort upserts to cloud
- * - remove: deletes locally first, then best-effort deletes from cloud
+ * Three-layer pattern (see ARCHITECTURE.md):
+ *   Layer 1: lib/expensePhotos.ts      — pure merge/sync logic
+ *   Layer 2: hooks/useExpensePhotos.ts — this hook, reads + mutates the store
+ *   Layer 3: stores/appStore.ts        — state + actions (load/add/update/remove)
+ *
+ * The store keeps photos keyed by `${year}-${week}`, so Dashboard and Woche
+ * can read the same data as the Spesen page without re-fetching.
  */
 export function useExpensePhotos(year: number, week: number) {
   const user = useAppStore((s) => s.user)
-  const [photos, setPhotos] = useState<ExpensePhoto[]>([])
+  const photos = useAppStore((s) => s.expensePhotos[`${year}-${week}`] || [])
+  const loadExpensePhotos = useAppStore((s) => s.loadExpensePhotos)
+  const addExpensePhoto = useAppStore((s) => s.addExpensePhoto)
+  const updateExpensePhotoNote = useAppStore((s) => s.updateExpensePhotoNote)
+  const removeExpensePhoto = useAppStore((s) => s.removeExpensePhoto)
+
   const [isLoading, setIsLoading] = useState(true)
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    const list = await loadWeekExpensePhotos(user?.id, year, week)
-    setPhotos(list)
+    await loadExpensePhotos(year, week)
     setIsLoading(false)
-  }, [user?.id, year, week])
+  }, [loadExpensePhotos, year, week])
 
   useEffect(() => {
     load()
   }, [load])
 
   const addPhoto = useCallback(
-    async (file: File): Promise<ExpensePhoto | null> => {
-      if (!user) return null
-      const dataUrl = await fileToPhotoDataUrl(file)
-      const photo: ExpensePhoto = {
-        id: generateId(),
-        user_id: user.id,
-        year,
-        week,
-        filename: `Beleg_KW${week}_${Date.now()}.jpg`,
-        dataUrl,
-        created_at: new Date().toISOString(),
-      }
-      // Offline-first: persist locally, then best-effort sync to cloud
-      await localDb.saveExpensePhoto(photo)
-      setPhotos((prev) => [photo, ...prev])
-      if (navigator.onLine) {
-        try {
-          await upsertExpensePhoto({
-            id: photo.id,
-            user_id: photo.user_id,
-            year: photo.year,
-            week: photo.week,
-            filename: photo.filename,
-            data_url: photo.dataUrl,
-            created_at: photo.created_at,
-          })
-        } catch (err) {
-          console.warn('Failed to sync receipt photo to Supabase:', err)
-        }
-      }
-      return photo
-    },
-    [user, year, week]
+    (file: File) => addExpensePhoto(file, year, week),
+    [addExpensePhoto, year, week]
   )
 
-  /** Set/edit the optional note on a receipt photo (offline-first, best-effort cloud sync). */
   const updatePhotoNote = useCallback(
-    async (id: string, note: string) => {
-      const current = photos.find((p) => p.id === id)
-      if (!current) return
-      const updated: ExpensePhoto = { ...current, note: note.trim() || undefined }
-      await localDb.saveExpensePhoto(updated)
-      setPhotos((prev) => prev.map((p) => (p.id === id ? updated : p)))
-      if (navigator.onLine) {
-        try {
-          await upsertExpensePhoto({
-            id: updated.id,
-            user_id: updated.user_id,
-            year: updated.year,
-            week: updated.week,
-            filename: updated.filename,
-            data_url: updated.dataUrl,
-            // Send '' (not undefined) so a cleared note actually clears the
-            // cloud column — JSON.stringify drops undefined keys, which would
-            // leave the stale note behind and resurrect it on the next merge.
-            note: updated.note ?? '',
-            created_at: updated.created_at,
-          })
-        } catch (err) {
-          console.warn('Failed to sync receipt photo note to Supabase:', err)
-        }
-      }
-    },
-    [photos]
+    (id: string, note: string) => updateExpensePhotoNote(year, week, id, note),
+    [updateExpensePhotoNote, year, week]
   )
 
   const removePhoto = useCallback(
-    async (id: string) => {
-      if (!user) return
-      // Offline-first: tombstone + local delete, then best-effort cloud delete.
-      // The tombstone prevents the photo from resurrecting on the next merge
-      // if the cloud delete fails (offline). It is purged once the cloud
-      // delete succeeds (see lib/expensePhotos.ts).
-      markPhotoDeleted(user.id, id)
-      await localDb.deleteExpensePhoto(id)
-      setPhotos((prev) => prev.filter((p) => p.id !== id))
-      if (navigator.onLine) {
-        try {
-          await deleteExpensePhotoFromSupabase(id)
-          clearPhotoDeleted(user.id, id)
-        } catch (err) {
-          console.warn('Failed to delete receipt photo from Supabase:', err)
-        }
-      }
-    },
-    [user]
+    (id: string) => removeExpensePhoto(year, week, id),
+    [removeExpensePhoto, year, week]
   )
 
   return { photos, isLoading, addPhoto, removePhoto, updatePhotoNote, reload: load }

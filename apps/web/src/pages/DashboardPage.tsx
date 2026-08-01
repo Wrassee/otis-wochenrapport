@@ -17,6 +17,8 @@ import { cn } from '@/lib/cn'
 import { TimelineView } from '@/components/ui/TimelineView'
 import { useExpensesSync } from '@/hooks/useExpensesSync'
 import { useTimeEntries } from '@/hooks/useTimeEntries'
+import { useExpensePhotos } from '@/hooks/useExpensePhotos'
+import { ReceiptPhotos } from '@/components/export/ReceiptPhotos'
 import { ExpenseEditor } from '@/components/weekly/ExpenseEditor'
 
 export function DashboardPage() {
@@ -29,6 +31,9 @@ export function DashboardPage() {
     activityCodes,
   } = useAppStore()
   const { timeEntries, addEntry, updateEntry, deleteEntry, quickAdd, loadWeek } = useTimeEntries()
+  const info = getWeekInfo(currentDate)
+  // Week's receipt photos (Spesen Belege) — shared store data, compact strip.
+  const { photos: weekPhotos } = useExpensePhotos(info.year, info.week)
   const handleSync = async () => {
     const { forceSync } = await import('@/db/sync')
     setSyncStatus({ syncing: true })
@@ -60,7 +65,6 @@ export function DashboardPage() {
   const lunchEntries = todayEntries.filter((e) => e.is_lunch)
   const totalHours = workEntries.reduce((sum, e) => sum + e.duration, 0)
   const lunchMinutes = lunchEntries.reduce((sum, e) => sum + e.duration * 60, 0)
-  const info = getWeekInfo(currentDate)
   const dayOfWeek = info.dayOfWeek
   const requiredHours = dayOfWeek === 5 ? 8.0 : 8.5
   const progress = Math.min(totalHours / requiredHours, 1)
@@ -305,6 +309,18 @@ export function DashboardPage() {
               conflictEntryIds={conflictEntryIds}
             />
           </div>
+        </div>
+      )}
+
+      {/* Week's receipt photos (Spesen Belege) — compact strip */}
+      {weekPhotos.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 text-xs font-semibold text-rose-400 dark:text-rose-300 uppercase tracking-wider mb-1">
+            <span className="w-1 h-3 rounded-full bg-gradient-to-b from-rose-400 to-rose-600" />
+            <span>{t('spesen.photos.title')}</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-rose-200/50 to-transparent dark:from-white/5" />
+          </div>
+          <ReceiptPhotos photos={weekPhotos} compact />
         </div>
       )}
 

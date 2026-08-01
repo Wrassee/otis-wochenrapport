@@ -12,6 +12,8 @@ import type { TimeEntry, ActivityCode } from '@/lib/types'
 import { decimalToTime, timeToDecimal, otisToStandard, formatOtisDuration, snapToQuarter } from '@/lib/utils'
 import { Save, Building2, ChevronDown } from 'lucide-react'
 import { useTimeEntries } from '@/hooks/useTimeEntries'
+import { useExpensePhotos } from '@/hooks/useExpensePhotos'
+import { ReceiptPhotos } from '@/components/export/ReceiptPhotos'
 
 export function WeeklyPage() {
   const { t } = useTranslation()
@@ -21,6 +23,8 @@ export function WeeklyPage() {
     activityCodes,
   } = useAppStore()
   const { timeEntries, weekSummary, isLoading, updateEntry, deleteEntry, loadWeek, recalculate } = useTimeEntries()
+  // Week's receipt photos (Spesen Belege) — shared store data, compact strip.
+  const { photos: weekPhotos } = useExpensePhotos(currentWeek.year, currentWeek.week)
 
   // Edit state
   const [editEntry, setEditEntry] = useState<TimeEntry | null>(null)
@@ -121,6 +125,18 @@ export function WeeklyPage() {
         onDeleteEntry={handleDeleteEntry}
         onEditEntry={handleEditEntry}
       />
+
+      {/* Week's receipt photos (Spesen Belege) — compact strip */}
+      {weekPhotos.length > 0 && (
+        <div className="space-y-1.5 mt-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-rose-400 dark:text-rose-300 uppercase tracking-wider mb-1">
+            <span className="w-1 h-3 rounded-full bg-gradient-to-b from-rose-400 to-rose-600" />
+            <span>{t('spesen.photos.title')}</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-rose-200/50 to-transparent dark:from-white/5" />
+          </div>
+          <ReceiptPhotos photos={weekPhotos} compact />
+        </div>
+      )}
 
       {/* Edit Entry Bottom Sheet */}
       <BottomSheet
