@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { isValidUuid, uuidFromString } from '@/lib/utils'
 
 // These will be replaced with actual values when Supabase is configured
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
@@ -143,21 +144,58 @@ const TIME_ENTRY_COLUMNS = [
  * Sync entries to Supabase (used by background sync). Only the table's own
  * columns are sent — denormalized display fields are stripped so the upsert
  * never fails with PGRST204.
+ *
+ * Rows are upserted one-by-one (not as a single batch) so one bad row
+ * (e.g. an FK that references a location not yet on the server) can never
+ * kill the whole week's sync — the remaining rows still reach the cloud and
+ * the failed row is simply retried on the next sync.
+ *
+ * @param userId Optional — when given, only rows belonging to this user are
+ *   sent. Local IndexedDB may hold rows from a previous account; sending
+ *   those would fail the RLS check and abort the entire upsert.
  */
-export async function syncEntries(entries: any[]) {
-  const rows = entries.map((e: Record<string, unknown>) => {
+export async function syncEntries(entries: any[], userId?: string) {
+  const scoped = userId ? entries.filter((e) => e.user_id === userId) : entries
+  const synced: any[] = []
+  for (const entry of scoped) {
     const row: Record<string, unknown> = {}
     for (const col of TIME_ENTRY_COLUMNS) {
-      if (e[col] !== undefined) row[col] = e[col]
+      if (entry[col] !== undefined) row[col] = entry[col]
     }
-    return row
-  })
-  const { data, error } = await supabase
-    .from('time_entries')
-    .upsert(rows, { onConflict: 'id' })
-    .select()
-  if (error) throw error
-  return data
+    // Guard: the cloud column is `UUID NOT NULL REFERENCES locations(id)` — a
+    // non-UUID id (manual_…, anlagenummer) would fail the whole upsert with
+    // 22P02. The caller remaps to a real cloud UUID when the referenced lift
+    // can be synced; otherwise fall back to null so the entry still reaches
+    // the cloud.
+    if (row.location_id !== null && !isValidUuid(row.location_id)) {
+      row.location_id = null
+    }
+    // Try once with the real location reference; only on a genuine foreign-key
+    // violation (23503 — the referenced lift is missing from the cloud
+    // locations table) retry once with location_id nulled so the entry still
+    // reaches the cloud. Transient errors are left to the next sync instead of
+    // silently downgrading the entry to a lift-less row.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { data, error } = await supabase
+          .from('time_entries')
+          .upsert(row, { onConflict: 'id' })
+          .select()
+        if (error) throw error
+        if (data?.length) synced.push(data[0])
+        break
+      } catch (e) {
+        const code = (e as any)?.code
+        if (attempt === 0 && row.location_id != null && code === '23503') {
+          row.location_id = null
+          continue
+        }
+        console.warn('Entry sync skipped (will retry later):', row.id, e)
+        break
+      }
+    }
+  }
+  return synced
 }
 
 /**
@@ -182,9 +220,14 @@ export async function upsertLocation(location: {
   zone: number
   manual_zone?: number
 }) {
+  // Manual/offline lifts have non-UUID ids (`manual_…`, anlagenummer) but the
+  // cloud `locations.id` column is UUID. Derive a stable UUID from the
+  // anlagenummer so the same lift always maps to the same cloud row across
+  // devices (the upsert key is anlagenummer, so repeated syncs are idempotent).
+  const id = isValidUuid(location.id) ? location.id : uuidFromString(location.anlagenummer)
   const { data, error } = await supabase
     .from('locations')
-    .upsert(location, { onConflict: 'anlagenummer' })
+    .upsert({ ...location, id }, { onConflict: 'anlagenummer' })
     .select()
     .single()
   if (error) throw error

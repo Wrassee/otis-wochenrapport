@@ -171,6 +171,47 @@ export function generateId(): string {
 }
 
 /**
+ * True if the value is a valid UUID (as stored in Supabase UUID columns).
+ */
+export function isValidUuid(value: unknown): boolean {
+  if (typeof value !== 'string' || value.length === 0) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+}
+
+/**
+ * Deterministic UUID-format hash of a string — the same input always yields
+ * the same UUID on every device. Used to give offline/manual lifts a stable
+ * cloud `locations.id` (the column is UUID, local manual ids are not), so time
+ * entries can reference the same lift across devices without FK failures.
+ */
+export function uuidFromString(input: string): string {
+  // FNV-1a double 32-bit mix — deterministic, synchronous, no crypto needed.
+  let h1 = 0x811c9dc5
+  let h2 = 0x01000193
+  for (let i = 0; i < input.length; i++) {
+    const c = input.charCodeAt(i)
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0
+    h2 = Math.imul(h2 ^ c, 0x85ebca6b) >>> 0
+  }
+  const a = h1.toString(16).padStart(8, '0')
+  const b = h2.toString(16).padStart(8, '0')
+  const c = (h1 >>> 7).toString(16).padStart(8, '0')
+  const d = (h2 >>> 7).toString(16).padStart(8, '0')
+  const hex = (a + b + c + d).slice(0, 32)
+  return (
+    hex.slice(0, 8) +
+    '-' +
+    hex.slice(8, 12) +
+    '-' +
+    hex.slice(12, 16) +
+    '-' +
+    hex.slice(16, 20) +
+    '-' +
+    hex.slice(20, 32)
+  )
+}
+
+/**
  * Check if running on a specific platform via Capacitor or userAgent
  */
 export function isPlatform(platform: 'android' | 'ios' | 'capacitor'): boolean {

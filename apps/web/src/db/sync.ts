@@ -1,4 +1,10 @@
-import { getUnsyncedEntries, markEntrySynced, getSyncQueue, clearSyncQueue } from './indexeddb'
+import {
+  getUnsyncedEntries,
+  markEntrySynced,
+  getSyncQueue,
+  clearSyncQueue,
+  getAllLocations as getLocalLocations,
+} from './indexeddb'
 import {
   syncEntries,
   deleteEntry as deleteRemoteEntry,
@@ -7,6 +13,8 @@ import {
   syncExpensesToSupabase,
   updateProfileLanguage,
 } from './supabase'
+import { isValidUuid, uuidFromString } from '@/lib/utils'
+import { useAppStore } from '@/stores/appStore'
 
 let syncInterval: ReturnType<typeof setInterval> | null = null
 let isSyncing = false
@@ -78,6 +86,70 @@ export function stopBackgroundSync() {
 }
 
 /**
+ * Remap every entry's `location_id` to a stable cloud UUID before pushing.
+ *
+ * Local lifts can carry non-UUID ids: manual entries use `manual_…` and
+ * favorites picked from "Letzte Anlagen" may use the anlagenummer as id. The
+ * cloud `locations.id` column is UUID and `time_entries.location_id` is a
+ * foreign key, so sending those ids fails with 22P02 and kills the whole
+ * batch. This helper upserts the referenced lift to the cloud under a
+ * deterministic UUID (uuidFromString(anlagenummer)) and rewrites the entry's
+ * reference to that UUID, so the FK resolves and the same lift links across
+ * devices. If the lift can't be found locally, the reference is nulled and the
+ * entry still syncs (syncEntries also guards defensively).
+ */
+async function prepareEntriesForPush(entries: any[]): Promise<any[]> {
+  const localLocations = await getLocalLocations()
+  // Cache of already-upserted lifts (by anlagenummer → cloud UUID) so a lift
+  // referenced by many entries is only upserted once per sync batch.
+  const upserted = new Map<string, string>()
+  const prepared: any[] = []
+  for (const entry of entries) {
+    const copy = { ...entry }
+    const lid = copy.location_id
+    if (lid && !isValidUuid(lid)) {
+      // Find the lift by its local id, or by the anlagenummer stored on the
+      // entry (manual entries don't always carry a resolvable location_id).
+      const loc =
+        localLocations.find((l) => l.id === lid) ||
+        localLocations.find(
+          (l) =>
+            copy.location_anlagenummer &&
+            l.anlagenummer.toUpperCase() === String(copy.location_anlagenummer).toUpperCase(),
+        )
+      if (loc) {
+        const key = loc.anlagenummer.toUpperCase()
+        let cloudId: string | null = upserted.get(key) ?? null
+        if (!cloudId) {
+          cloudId = uuidFromString(loc.anlagenummer)
+          try {
+            await upsertLocation({
+              id: cloudId,
+              anlagenummer: loc.anlagenummer,
+              project_id: loc.project_id,
+              full_address: loc.full_address,
+              latitude: loc.latitude,
+              longitude: loc.longitude,
+              zone: loc.zone,
+              manual_zone: loc.manual_zone,
+            })
+            upserted.set(key, cloudId)
+          } catch (e) {
+            console.warn('Lift upsert failed; entry will sync without lift link:', loc.anlagenummer, e)
+            cloudId = null
+          }
+        }
+        copy.location_id = cloudId
+      } else {
+        copy.location_id = null
+      }
+    }
+    prepared.push(copy)
+  }
+  return prepared
+}
+
+/**
  * Perform the actual sync operation
  */
 export async function performSync() {
@@ -112,11 +184,21 @@ export async function performSync() {
   }, 25000)
 
   try {
-    const unsyncedEntries = await getUnsyncedEntries()
+    // Only the signed-in user's rows are pushed — rows from a previous account
+    // in the same IndexedDB would fail the RLS check and abort the batch.
+    const userId = useAppStore.getState().user?.id
+    const unsyncedEntries = await getUnsyncedEntries(userId)
     const queue = await getSyncQueue()
-    if (unsyncedEntries.length > 0) {
-      // Sync entries to Supabase
-      const synced = await syncEntries(unsyncedEntries)
+    if (userId && unsyncedEntries.length > 0) {
+      // Manual/offline lifts have non-UUID local ids (manual_…, anlagenummer)
+      // but the cloud `locations.id` column is UUID and `time_entries.location_id`
+      // is a foreign key — pushing those ids fails with 22P02 and the whole
+      // batch dies silently. Remap each such reference to a stable cloud UUID
+      // (upserting the lift first) so entries actually reach the cloud.
+      const prepared = await prepareEntriesForPush(unsyncedEntries)
+
+      // Sync entries to Supabase (per-row, resilient)
+      const synced = await syncEntries(prepared, userId)
 
       // Mark as synced locally
       for (const entry of synced || []) {

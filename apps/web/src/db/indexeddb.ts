@@ -442,10 +442,12 @@ export async function addToSyncQueue(item: {
   await db.add('sync_queue', item)
 }
 
-export async function getUnsyncedEntries(): Promise<TimeEntry[]> {
+export async function getUnsyncedEntries(userId?: string): Promise<TimeEntry[]> {
   const db = await getDb()
   const all = await db.getAll('time_entries')
-  return all.filter((e) => !e.synced)
+  // Filter to the current user: IndexedDB may hold rows from a previous
+  // account, and pushing those would fail the RLS check server-side.
+  return all.filter((e) => !e.synced && (!userId || e.user_id === userId))
 }
 
 // ===================== DAILY EXPENSES =====================

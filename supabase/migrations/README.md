@@ -4,7 +4,7 @@ Az összes adatbázis-objektum (táblák, indexek, RLS-policy-k, realtime-beköt
 
 ## ⚡ Gyors útmutató (futtatási sorrend)
 
-Futtasd mind a 8 fájlt **növekvő sorrendben**:
+Futtasd mind a 9 fájlt **növekvő sorrendben**:
 
 ```text
 001_init.sql                    ← alapséma (profilok, helyek, időkódok, időbejegyzések)
@@ -15,6 +15,7 @@ Futtasd mind a 8 fájlt **növekvő sorrendben**:
 006_expense_photos_realtime.sql ← fotó-realtime (idempotens, általában no-op)
 007_daily_expenses_realtime.sql ← költség-realtime (idempotens, általában no-op)
 008_user_favorites_realtime.sql ← kedvenc-realtime (idempotens, általában no-op)
+009_locations_write_policies.sql ← locations INSERT/UPDATE RLS-policy (kézi lift-szinkron)
 ```
 
 > **💡 Egy fájl = egy futtatás.** Minden fájl teljes tartalmát másold be a SQL Editorba, és futtasd le. Ha egy fájl hibát dob, ne folytasd a következővel, amíg meg nem értetted az okot — a függőségek miatt a korábbi lépések nélkül a későbbiek elhasalhatnak.
@@ -31,6 +32,7 @@ Futtasd mind a 8 fájlt **növekvő sorrendben**:
 | 006 | `006_expense_photos_realtime.sql` | Fotó-realtime **biztosíték**: ha a 004 még nem kapcsolta be, itt bekapcsolja | ✅ | ✅ (tábla hiányában csendben kihagy) |
 | 007 | `007_daily_expenses_realtime.sql` | Költség-realtime **biztosíték**: ha a 003 még nem kapcsolta be, itt bekapcsolja | ✅ | ✅ (tábla hiányában csendben kihagy) |
 | 008 | `008_user_favorites_realtime.sql` | Kedvenc-realtime **biztosíték**: ha a 002 még nem kapcsolta be, itt bekapcsolja | ✅ | ✅ (tábla hiányában csendben kihagy) |
+| 009 | `009_locations_write_policies.sql` | `locations` INSERT + UPDATE RLS-policy — a kézi/offline liftek felhőbe szinkronjához (`upsertLocation`); a 001 csak SELECT-et adott, ami nélkül minden lift-push `new row violates row-level security policy` hibát dob | ⚠️ nem idempotens (egyszer kell futtatni, mint a 001-et) | ✅ |
 
 **Jelmagyarázat:**
 
