@@ -147,6 +147,13 @@ export const translations: TranslationDict = {
   'spesen.privat':        { de: 'Privatfahrzeug',     fr: 'V\u00e9hicule priv\u00e9',     it: 'Veicolo privato', hu: 'Saj\u00e1t g\u00e9pj\u00e1rm\u0171' },
   'spesen.active':        { de: 'Aktiv',              fr: 'Actif',              it: 'Attivo',         hu: 'Akt\u00edv' },
   'spesen.inactive':      { de: 'Aus',                fr: 'Inactif',            it: 'Inattivo',       hu: 'Inakt\u00edv' },
+  'spesen.photos.title':  { de: 'Belege',             fr: 'Justificatifs',      it: 'Ricevute',       hu: 'Bizonylatok' },
+  'spesen.photos.subtitle':{ de: 'Rechnungen fotografieren und dem Wochenrapport anh\u00e4ngen', fr: 'Photographier les factures et les joindre au rapport', it: 'Fotografa le fatture e allegale al rapporto', hu: 'Fot\u00f3zd le a sz\u00e1ml\u00e1kat, \u00e9s csatold a heti riporthoz' },
+  'spesen.photos.add':    { de: 'Beleg fotografieren', fr: 'Photographier la facture', it: 'Fotografa la ricevuta', hu: 'Bizonylat fot\u00f3z\u00e1sa' },
+  'spesen.photos.processing':{ de: 'Wird verarbeitet...', fr: 'Traitement...',   it: 'Elaborazione...', hu: 'Feldolgoz\u00e1s...' },
+  'spesen.photos.none':   { de: 'Noch keine Belege',  fr: 'Aucun justificatif',  it: 'Nessuna ricevuta', hu: 'M\u00e9g nincs bizonylat' },
+  'spesen.photos.delete': { de: 'Beleg l\u00f6schen',   fr: 'Supprimer',          it: 'Elimina',         hu: 'Bizonylat t\u00f6rl\u00e9se' },
+  'spesen.photos.error':  { de: 'Foto konnte nicht gespeichert werden', fr: 'Impossible d\'enregistrer la photo', it: 'Impossibile salvare la foto', hu: 'A fot\u00f3 ment\u00e9se nem siker\u00fclt' },
 
   // ─── Timeline / Entry list ───
   'timeline.edit':        { de: 'Bearbeiten',         fr: 'Modifier',           it: 'Modifica',       hu: 'Szerkeszt\u00e9s' },
@@ -176,6 +183,8 @@ export const translations: TranslationDict = {
   'export.download.manual':{ de: 'Download nicht automatisch gestartet? Hier klicken', fr: 'T\u00e9l\u00e9chargement pas automatique? Cliquez ici', it: 'Download non avviato? Clicca qui', hu: 'Nem indul a let\u00f6lt\u00e9s? Kattintson ide' },
   'export.offline.generated': { de: 'Offline generiert (kein Backend)', fr: 'G\u00e9n\u00e9r\u00e9 hors ligne (pas de backend)', it: 'Generato offline (nessun backend)', hu: 'Offline gener\u00e1lva (nincs backend)' },
   'export.email.success': { de: 'Wochenrapport erfolgreich per E-Mail gesendet!', fr: 'Rapport envoy\u00e9 par e-mail!', it: 'Rapporto inviato per email!', hu: 'Wochenrapport sikeresen elk\u00fcldve e-mailben!' },
+  'export.email.attachments': { de: '{n} Beleg(e) angeh\u00e4ngt', fr: '{n} justificatif(s) joint(s)', it: '{n} allegati', hu: '{n} bizonylat csatolva' },
+  'export.attachments':  { de: '{n} Belege werden mitgesendet', fr: '{n} justificatifs joints', it: '{n} allegati', hu: '{n} bizonylat ker\u00fcl csatol\u00e1sra' },
   'export.failed':        { de: 'Export fehlgeschlagen', fr: '\u00c9chec de l\'export', it: 'Esportazione fallita', hu: 'Export\u00e1l\u00e1s sikertelen' },
   'export.email.failed':  { de: 'E-Mail Versand fehlgeschlagen', fr: '\u00c9chec de l\'envoi', it: 'Invio email fallito', hu: 'E-mail k\u00fcld\u00e9s sikertelen' },
   'export.backend.error': { de: 'Backend-Server nicht erreichbar', fr: 'Serveur backend inaccessible', it: 'Server backend non raggiungibile', hu: 'Backend szerver nem el\u00e9rhet\u0151' },

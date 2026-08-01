@@ -1,10 +1,12 @@
+import { useRef, useState } from 'react'
 import { useTranslation } from '@/lib/useTranslation'
-import { Card } from '@/components/ui/Card'
+import { Card, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/cn'
 import { useDailyExpenses } from '@/hooks/useDailyExpenses'
+import { useExpensePhotos } from '@/hooks/useExpensePhotos'
 import { getWeekDates, getToday, getWeekInfo } from '@/lib/utils'
-import { Euro, Check, X } from 'lucide-react'
+import { Euro, Check, X, Camera, Trash2, ImagePlus } from 'lucide-react'
 
 const EXPENSE_ITEMS = [
   { type: 'entschaedigung_10h' as const, labelKey: 'spesen.10h', icon: '⏰' },
@@ -25,6 +27,27 @@ export function SpesenPage() {
   const dayNames = t('week.days').split(' | ')
 
   const { dailyExpenses, toggleExpense, setExpenseValue, syncExpenses } = useDailyExpenses(dates)
+
+  const { photos, addPhoto, removePhoto } = useExpensePhotos(weekInfo.year, weekInfo.week)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setPhotoBusy(true)
+    setPhotoError(null)
+    try {
+      await addPhoto(file)
+    } catch (err) {
+      console.warn('Failed to add receipt photo:', err)
+      setPhotoError(t('spesen.photos.error'))
+    } finally {
+      setPhotoBusy(false)
+    }
+  }
 
   const totalActive = Object.values(dailyExpenses).reduce((sum, exps) => sum + exps.length, 0)
 
@@ -50,6 +73,80 @@ export function SpesenPage() {
           {t('day.spesen.editor.hint')}
         </p>
       </div>
+
+      {/* Receipt photos — photographed invoices attached to the weekly report */}
+      <Card>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center shadow-lg shadow-rose-500/20">
+              <Camera className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <CardTitle>{t('spesen.photos.title')}</CardTitle>
+              <p className="text-[10px] text-gray-400">{t('spesen.photos.subtitle')}</p>
+            </div>
+          </div>
+          <Badge variant={photos.length > 0 ? 'info' : 'default'} size="sm">
+            {photos.length}
+          </Badge>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handlePhotoChange}
+        />
+
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={photoBusy}
+          className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl border-2 border-dashed border-rose-300/50 dark:border-rose-700/30 text-rose-600 dark:text-rose-300 font-semibold text-sm transition-all hover:border-rose-400/70 hover:bg-rose-50/50 dark:hover:bg-rose-900/10 active:scale-[0.98] disabled:opacity-50"
+        >
+          {photoBusy ? (
+            <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <ImagePlus className="w-5 h-5" />
+          )}
+          {photoBusy ? t('spesen.photos.processing') : t('spesen.photos.add')}
+        </button>
+
+        {photoError && (
+          <p className="text-[11px] text-red-500 mt-2 text-center">{photoError}</p>
+        )}
+
+        {photos.length > 0 ? (
+          <div className="grid grid-cols-3 gap-2 mt-3">
+            {photos.map((photo) => (
+              <div
+                key={photo.id}
+                className="relative rounded-xl overflow-hidden border border-otis-200/20 dark:border-white/10 aspect-square bg-otis-100/30 dark:bg-otis-900/30"
+              >
+                <img
+                  src={photo.dataUrl}
+                  alt={photo.filename}
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removePhoto(photo.id)}
+                  className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center shadow-md backdrop-blur-sm transition-colors active:scale-90 hover:bg-black/75"
+                  title={t('spesen.photos.delete')}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[11px] text-gray-400 text-center mt-3">
+            {t('spesen.photos.none')}
+          </p>
+        )}
+      </Card>
 
       {/* Per-day expense cards */}
       {dates.map((date, idx) => {

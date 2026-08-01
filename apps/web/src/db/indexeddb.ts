@@ -1,8 +1,8 @@
 import { openDB, type IDBPDatabase } from 'idb'
-import type { TimeEntry, Location, Profile, ActivityCode, FavoriteLocation } from '@/lib/types'
+import type { TimeEntry, Location, Profile, ActivityCode, FavoriteLocation, ExpensePhoto } from '@/lib/types'
 
 const DB_NAME = 'otis-rapport-db'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 let dbPromise: Promise<IDBPDatabase> | null = null
 
@@ -43,6 +43,12 @@ function getDb() {
         // Pending sync queue
         if (!db.objectStoreNames.contains('sync_queue')) {
           db.createObjectStore('sync_queue', { keyPath: 'id', autoIncrement: true })
+        }
+
+        // Expense receipt photos (v2)
+        if (!db.objectStoreNames.contains('expense_photos')) {
+          const store = db.createObjectStore('expense_photos', { keyPath: 'id' })
+          store.createIndex('week', ['year', 'week'], { unique: false })
         }
       },
     })
@@ -389,4 +395,24 @@ export async function getSyncStatus(): Promise<{ pendingSync: number; lastSync: 
     pendingSync: queue + (unsynced > 0 ? 1 : 0),
     lastSync: null,
   }
+}
+
+// ===================== EXPENSE PHOTOS =====================
+
+export async function saveExpensePhoto(photo: ExpensePhoto): Promise<void> {
+  const db = await getDb()
+  await db.put('expense_photos', photo)
+}
+
+export async function getExpensePhotos(year: number, week: number): Promise<ExpensePhoto[]> {
+  const db = await getDb()
+  const all = await db.getAll('expense_photos')
+  return all
+    .filter((p) => p.year === year && p.week === week)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+}
+
+export async function deleteExpensePhoto(id: string): Promise<void> {
+  const db = await getDb()
+  await db.delete('expense_photos', id)
 }

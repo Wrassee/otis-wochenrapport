@@ -132,3 +132,15 @@ export interface SyncStatus {
   pendingSync: number
   lastSync: string | null
 }
+
+/** A photographed receipt/invoice attached to the weekly report */
+export interface ExpensePhoto {
+  id: string
+  user_id: string
+  year: number
+  week: number
+  filename: string
+  /** Downscaled base64 JPEG data URL */
+  dataUrl: string
+  created_at: string
+}

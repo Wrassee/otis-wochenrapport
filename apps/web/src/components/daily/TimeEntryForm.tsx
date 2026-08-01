@@ -38,6 +38,8 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [searchResults, setSearchResults] = useState<Location[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [showAddressResults, setShowAddressResults] = useState(false)
+  const [addressResults, setAddressResults] = useState<Location[]>([])
   const [isLunch, setIsLunch] = useState(false)
   const [overlapWarning, setOverlapWarning] = useState<string | null>(null)
   const [conflictingEntryIds, setConflictingEntryIds] = useState<string[]>([])
@@ -97,6 +99,8 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
       setSelectedLocation(null)
     }
     setSearchQuery(query)
+    // Close the address dropdown so both results lists can't overlap
+    setShowAddressResults(false)
     if (query.length < 2) {
       setShowSearchResults(false)
       return
@@ -106,6 +110,23 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
     setShowSearchResults(true)
   }
 
+  /** Search by address — same location pool, matched on address/project/nr. */
+  const handleAddressSearch = async (query: string) => {
+    setSelectedAddress(query)
+    if (selectedLocation && query.toUpperCase() !== selectedLocation.full_address.toUpperCase()) {
+      setSelectedLocation(null)
+    }
+    // Close the lift-nr dropdown so both results lists can't overlap
+    setShowSearchResults(false)
+    if (query.length < 2) {
+      setShowAddressResults(false)
+      return
+    }
+    const results = await searchLocations(query)
+    setAddressResults(results)
+    setShowAddressResults(true)
+  }
+
   const handleSelectLocation = (loc: Location) => {
     setSelectedAnlagenummer(loc.anlagenummer)
     setSelectedProjectId(loc.project_id)
@@ -113,6 +134,7 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
     setSelectedLocation(loc)
     setSearchQuery(loc.anlagenummer)
     setShowSearchResults(false)
+    setShowAddressResults(false)
     addRecentLocation(loc)
   }
 
@@ -301,6 +323,9 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
     } else {
       setIsLunch(false)
     }
+    // Reset any open search dropdowns
+    setShowSearchResults(false)
+    setShowAddressResults(false)
   }
 
   /**
@@ -488,16 +513,31 @@ export function TimeEntryForm({ date, defaultStartTime, existingEntries, onSave,
                 <input
                   type="text"
                   value={selectedAddress}
-                  onChange={(e) => {
-                    setSelectedAddress(e.target.value)
-                    if (e.target.value !== selectedLocation?.full_address) {
-                      setSelectedLocation(null)
-                    }
-                  }}
+                  onChange={(e) => handleAddressSearch(e.target.value)}
                   placeholder={t('entry.address.placeholder')}
                   className="w-full h-14 pl-11 pr-4 rounded-2xl text-base glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none disabled:opacity-50 transition-all"
                   disabled={isLunch}
                 />
+
+                {/* Address search results dropdown */}
+                {showAddressResults && addressResults.length > 0 && (
+                  <div className="absolute z-20 mt-1.5 w-full glass-card dark:glass-card-dark rounded-2xl shadow-xl max-h-48 overflow-y-auto animate-slide-down border border-otis-200/30 dark:border-white/5">
+                    {addressResults.map((loc) => (
+                      <button
+                        key={loc.id}
+                        type="button"
+                        onClick={() => handleSelectLocation(loc)}
+                        className="w-full flex flex-col items-start p-3.5 hover:bg-otis-50 dark:hover:bg-white/5 border-b border-otis-200/20 dark:border-white/5 last:border-b-0 text-left transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-otis-600 dark:text-otis-400">{loc.anlagenummer}</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{loc.project_id}</span>
+                        </div>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{loc.full_address}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <p className="text-[10px] text-gray-400 mt-1 pl-1">
                 {t('entry.address.hint')}

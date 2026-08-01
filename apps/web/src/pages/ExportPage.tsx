@@ -6,12 +6,15 @@ import { useAppStore } from '@/stores/appStore'
 import { useTranslation } from '@/lib/useTranslation'
 import { getWeekDates, formatDateShort } from '@/lib/utils'
 import { cn } from '@/lib/cn'
-import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
+import { Calendar, FileSpreadsheet, Info, Paperclip } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
 import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
+import * as localDb from '@/db/indexeddb'
+import { dataUrlToBase64 } from '@/lib/photoUtils'
+import type { ExpensePhoto } from '@/lib/types'
 
 export function ExportPage() {
   const { t } = useTranslation()
@@ -21,6 +24,7 @@ export function ExportPage() {
   const [status, setStatus] = useState<string | null>(null)
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [downloadFilename, setDownloadFilename] = useState<string>('')
+  const [photos, setPhotos] = useState<ExpensePhoto[]>([])
   /** Debug logger — writes timestamped message to console */
   const dbg = (msg: string) => {
     console.log(`[${new Date().toLocaleTimeString()}] ${msg}`)
@@ -33,6 +37,20 @@ export function ExportPage() {
   useEffect(() => {
     calculateWeekSummary()
   }, [timeEntries, calculateWeekSummary])
+
+  // Load photographed receipts (Spesen Belege) for the current week
+  useEffect(() => {
+    let cancelled = false
+    localDb
+      .getExpensePhotos(currentWeek.year, currentWeek.week)
+      .then((list) => {
+        if (!cancelled) setPhotos(list)
+      })
+      .catch((e) => console.warn('Failed to load receipt photos:', e))
+    return () => {
+      cancelled = true
+    }
+  }, [currentWeek])
 
   const buildEntriesData = (): OfflineEntry[] => {
     return timeEntries.map((e) => {
@@ -71,6 +89,16 @@ export function ExportPage() {
       }
     }
     return all
+  }
+
+  /** Photographed receipts (Spesen Belege) for the current week. */
+  const collectWeekPhotos = async (): Promise<ExpensePhoto[]> => {
+    try {
+      return await localDb.getExpensePhotos(currentWeek.year, currentWeek.week)
+    } catch (e) {
+      console.warn('Failed to load receipt photos:', e)
+      return []
+    }
   }
 
   /**
@@ -123,12 +151,19 @@ export function ExportPage() {
   }
 
   /**
-   * Save a Blob to the device.
+   * Save a Blob (+ optional receipt photos) to the device.
    * Strategy — two approaches in order:
-   *   1. Capacitor Filesystem.writeFile + Share.share() (writes to internal storage + opens Share dialog)
+   *   1. Capacitor Filesystem.writeFile + Share.share() — main file first, then
+   *      each receipt photo; all URIs are passed to the Share dialog so the
+   *      email attachment includes the photographed invoices too.
    *   2. Manual download link (user taps it — always visible)
    */
-  const saveBlob = async (blob: Blob, filename: string, dialogTitle?: string) => {
+  const saveBlob = async (
+    blob: Blob,
+    filename: string,
+    dialogTitle?: string,
+    attachments: { filename: string; dataUrl: string }[] = []
+  ) => {
     const blobUrl = window.URL.createObjectURL(blob)
 
     // 1. Capacitor native file write (silent, best-effort)
@@ -156,15 +191,35 @@ export function ExportPage() {
         })
         dbg('✅ File written to device storage')
 
-        // 1b. Open native Share dialog so user can save/email the file
+        // Write each receipt photo to internal storage
+        const photoUris: string[] = []
+        for (let i = 0; i < attachments.length; i++) {
+          const att = attachments[i]
+          dbg(`📸 Writing attachment ${i + 1}/${attachments.length}: ${att.filename}`)
+          await Filesystem.writeFile({
+            path: att.filename,
+            data: dataUrlToBase64(att.dataUrl),
+            directory: Directory.Data,
+          })
+          const stat = await Filesystem.getUri({
+            path: att.filename,
+            directory: Directory.Data,
+          })
+          photoUris.push(stat.uri)
+        }
+
+        // 1b. Open native Share dialog so user can save/email the file(s)
         try {
           const fileStat = await Filesystem.getUri({
             path: filename,
             directory: Directory.Data,
           })
-          dbg(`📤 CapacitorShare.share()… URI: ${fileStat.uri}`)
+          const allUris = [fileStat.uri, ...photoUris]
+          dbg(`📤 CapacitorShare.share()… ${allUris.length} file(s)`)
           await Share.share({
-            url: fileStat.uri,
+            // urls is Android-only. Pass url: allUris[0] alongside urls so iOS
+            // still shares the Excel file (Android ignores url when urls is set).
+            ...(allUris.length > 1 ? { urls: allUris, url: allUris[0] } : { url: allUris[0] }),
             title: filename,
             dialogTitle: dialogTitle || t('export.excel.btn'),
           })
@@ -210,12 +265,24 @@ export function ExportPage() {
     try {
       const { blob, usedOffline } = await generateWeekBlob()
       const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
+
+      // Collect photographed receipts for this week and attach them to the
+      // Share sheet — the email app receives the Excel + all Belege together.
+      const photos = await collectWeekPhotos()
+      const attachments = photos.map((p, i) => ({
+        filename: p.filename || `Beleg_${currentWeek.week}_${i + 1}.jpg`,
+        dataUrl: p.dataUrl,
+      }))
+
       // Open the native Share sheet — the user picks their email app from there,
       // same pattern as the export button.
-      await saveBlob(blob, filename, t('export.email.btn'))
+      await saveBlob(blob, filename, t('export.email.btn'), attachments)
+      const photoNote = attachments.length > 0
+        ? ` (${t('export.email.attachments', { n: attachments.length })})`
+        : ''
       setStatus(usedOffline
-        ? `${t('export.email.success')} (${t('export.offline.generated')})`
-        : t('export.email.success'),
+        ? `${t('export.email.success')}${photoNote} (${t('export.offline.generated')})`
+        : `${t('export.email.success')}${photoNote}`,
       )
     } catch (err: any) {
       dbg(`🔥 Email CRASH: ${err?.message || 'unknown'}`)
@@ -267,6 +334,9 @@ export function ExportPage() {
         </Card>
       )}
 
+      {/* Receipt photos attached to this week's report */}
+      <ReceiptPhotoStrip photos={photos} />
+
       {/* Export summary */}
       <ExportSummary
         weekSummary={weekSummary}
@@ -315,5 +385,34 @@ export function ExportPage() {
         </div>
       </Card>
     </div>
+  )
+}
+
+/** Compact strip showing the receipt photos attached to this week's report. */
+function ReceiptPhotoStrip({ photos }: { photos: ExpensePhoto[] }) {
+  const { t } = useTranslation()
+  if (photos.length === 0) return null
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-2">
+          <Paperclip className="w-4 h-4 text-rose-500" />
+          <span className="text-sm font-semibold text-otis-800 dark:text-white">
+            {t('export.attachments', { n: photos.length })}
+          </span>
+        </div>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {photos.map((photo) => (
+          <img
+            key={photo.id}
+            src={photo.dataUrl}
+            alt={photo.filename}
+            className="w-full h-16 object-cover rounded-lg border border-otis-200/20 dark:border-white/10"
+          />
+        ))}
+      </div>
+    </Card>
   )
 }
