@@ -5,7 +5,7 @@ import { getToday, getWeekDates, getWeekInfo, haversineDistance, calculateZone, 
 import { REFERENCE_LAT, REFERENCE_LON, ACTIVITY_CODES } from '@/lib/constants'
 import type { Language } from '@/lib/translations'
 import { DAY_NAMES } from '@/lib/translations'
-import { supabase, upsertFavorite, getFavorites, syncExpensesToSupabase, getExpenses } from '@/db/supabase'
+import { supabase, getProfile, upsertFavorite, getFavorites, syncExpensesToSupabase, getExpenses } from '@/db/supabase'
 import { syncExpenses as queueExpensesSync } from '@/lib/syncExpenses'
 
 /**
@@ -434,25 +434,39 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
 
-    // Try to fetch profile from Supabase to get latest language setting
+    // Try to fetch the full profile from Supabase — the cloud is the source
+    // of truth, so a brand-new device immediately shows the saved profile
+    // (name, personnel number, supervisor email, language). Remote wins for
+    // each field, but we fall back to the locally cached value (not an empty
+    // string) so an incomplete remote row never wipes offline-first data.
     if (navigator.onLine) {
       try {
-        const { data: remoteProfile } = await supabase
-          .from('profiles')
-          .select('language')
-          .eq('id', userId)
-          .single()
-        if (remoteProfile?.language && remoteProfile.language !== get().language) {
-          const lang = remoteProfile.language as Language
-          localStorage.setItem('otis_language', lang)
-          set({ language: lang })
-          // Also update local profile cache
+        const remoteProfile = await getProfile(userId)
+        if (remoteProfile) {
           const currentProfile = get().profile
-          if (currentProfile) {
-            const updatedProfile = { ...currentProfile, language: lang }
-            set({ profile: updatedProfile })
-            localDb.saveLocalProfile(updatedProfile)
+          // Offline-first guard: if the local profile was edited more recently
+          // (e.g. saved while offline), don't let a stale remote row overwrite it.
+          const localUpdated = currentProfile?.updated_at
+            ? new Date(currentProfile.updated_at).getTime()
+            : 0
+          const remoteUpdated = remoteProfile.updated_at
+            ? new Date(remoteProfile.updated_at).getTime()
+            : 0
+          if (localUpdated > remoteUpdated) return
+
+          const mergedProfile: Profile = {
+            id: remoteProfile.id,
+            email: remoteProfile.email || currentProfile?.email || '',
+            full_name: remoteProfile.full_name || currentProfile?.full_name || '',
+            personnel_number: remoteProfile.personnel_number || currentProfile?.personnel_number || '',
+            supervisor_email: remoteProfile.supervisor_email || currentProfile?.supervisor_email || '',
+            language: remoteProfile.language || currentProfile?.language || get().language,
+            created_at: remoteProfile.created_at || currentProfile?.created_at || new Date().toISOString(),
+            updated_at: remoteProfile.updated_at || new Date().toISOString(),
           }
+          // Reuse the store action: sets state, persists to IndexedDB and
+          // applies the language preference if it differs.
+          get().setProfile(mergedProfile)
         }
       } catch (e) {
         console.warn('Failed to fetch profile from Supabase:', e)
