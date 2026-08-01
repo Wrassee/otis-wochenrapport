@@ -41,3 +41,27 @@ CREATE POLICY "Users can update own photos"
 CREATE POLICY "Users can delete own photos"
   ON expense_photos FOR DELETE
   USING (auth.uid() = user_id);
+
+-- ============================================================
+-- REALTIME (live cross-device photo sync)
+-- The table is realtime-enabled HERE at creation time, so the
+-- order of migrations 004 / 006 no longer matters: whichever runs
+-- first, the end state is correct. Idempotent (safe to re-run).
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'expense_photos'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE expense_photos;
+  END IF;
+END
+$$;
+
+-- REPLICA IDENTITY FULL: include all columns (esp. user_id, year,
+-- week) in DELETE payloads, so the filtered realtime channel can
+-- attribute deletes to the right user. Idempotent.
+ALTER TABLE expense_photos REPLICA IDENTITY FULL;

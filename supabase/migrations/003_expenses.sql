@@ -51,3 +51,27 @@ CREATE POLICY "Users can delete own expenses"
 CREATE TRIGGER set_daily_expenses_updated_at
   BEFORE UPDATE ON daily_expenses
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================
+-- REALTIME (live cross-device expense sync)
+-- The table is realtime-enabled HERE at creation time, so the
+-- order of migrations 003 / 007 no longer matters: whichever runs
+-- first, the end state is correct. Idempotent (safe to re-run).
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'daily_expenses'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE daily_expenses;
+  END IF;
+END
+$$;
+
+-- REPLICA IDENTITY FULL: include all columns (esp. user_id, date,
+-- expense_type) in DELETE payloads, so the filtered realtime channel
+-- can attribute deletes to the right user. Idempotent.
+ALTER TABLE daily_expenses REPLICA IDENTITY FULL;
