@@ -139,10 +139,79 @@ jobs:
             cat /tmp/render-response.txt 2>/dev/null || true
           fi
 
+  # ─── Android: build APK + upload as Draft Release ───
+  # Builds the debug APK on every push to main/master and uploads it as a
+  # GitHub Draft Release (visible under Releases → Drafts until published).
+  # Requires: node_modules (npm ci), the web build (cap sync copies dist),
+  # JDK 21 + Android SDK (ANDROID_HOME is preconfigured on ubuntu runners;
+  # local.properties stays gitignored and is NOT needed in CI).
+  build-apk:
+    name: Android APK — Build + Draft Release
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref_name == 'main' || github.ref_name == 'master')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci --no-audit --no-fund
+
+      # npm run build runs: tsc -b && vite build (includes type-check + PWA)
+      - name: Build web app (TypeScript + Vite + PWA)
+        working-directory: apps/web
+        run: npm run build
+
+      - name: Sync Capacitor assets
+        working-directory: apps/web
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: apps/web/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: apps/web/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: APK Build #${{ github.run_number }}
+          body: |
+            Automatikus APK build a ${{ github.ref_name }} ágra (${{ github.sha }}).
+
+            Commit: ${{ github.event.head_commit.message }}
+
+            📱 app-debug.apk — töltsd fel a telefonra és teszteld!
+          files: apps/web/android/app/build/outputs/apk/debug/app-debug.apk
+          draft: true
+          fail_on_unmatched_files: true
+
   notify:
     name: Notify — Deploy complete
     if: always() && (github.ref_name == 'main' || github.ref_name == 'master')
-    needs: [deploy-frontend, deploy-backend]
+    needs: [deploy-frontend, deploy-backend, build-apk]
     runs-on: ubuntu-latest
 
     steps:
@@ -158,4 +227,6 @@ jobs:
           echo "⚙️  Backend (Render): ${{ needs.deploy-backend.result }}"
           echo "   🔗 https://otis-wochenrapport.onrender.com/health"
           echo ""
-          echo "📱 APK: update via npx cap sync && cd android && ./gradlew assembleDebug"
+          echo "📱 APK (Draft Release): ${{ needs.build-apk.result }}"
+          echo "   🔗 GitHub → Releases → Drafts"
+          echo "   Manuális build: cd apps/web && npm run build && npx cap sync android && cd android && ./gradlew assembleDebug"
