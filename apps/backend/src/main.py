@@ -41,6 +41,33 @@ app.add_middleware(
 )
 
 
+# ===================== Helpers =====================
+
+
+def _iso_week_monday(year: int, week_number: int) -> datetime:
+    """
+    ISO-week Monday for the given year/week. January 4th is always in week 1,
+    so Monday = Jan 4 − weekday_offset + (week − 1) × 7 days.
+    """
+    jan4 = datetime(year, 1, 4)
+    day_offset = jan4.weekday()
+    return jan4 - timedelta(days=day_offset) + timedelta(weeks=week_number - 1)
+
+
+def _build_excel_filename(year: int, week_number: int) -> str:
+    """
+    Export filename incl. the week's date range,
+    e.g. Wochenrapport_KW31_2026_27_07-31_07.xlsx (Mon–Fri, DD_MM).
+    Matches the frontend's offline filename (ExportPage.buildFilename).
+    """
+    monday = _iso_week_monday(year, week_number)
+    friday = monday + timedelta(days=4)
+    return (
+        f"Wochenrapport_KW{week_number}_{year}_"
+        f"{monday.strftime('%d_%m')}-{friday.strftime('%d_%m')}.xlsx"
+    )
+
+
 # ===================== Data Models =====================
 
 class TimeEntryInput(BaseModel):
@@ -149,7 +176,7 @@ async def generate_excel_endpoint(request: GenerateRequest):
             photo_notes=request.photo_notes or None,
         )
 
-        filename = f"Wochenrapport_KW{request.week_number}_{request.year}.xlsx"
+        filename = _build_excel_filename(request.year, request.week_number)
 
         return Response(
             content=content,
@@ -230,9 +257,7 @@ async def _fetch_entries_from_supabase(user_id: str, year: int, week_number: int
         client = create_client(supabase_url, supabase_key)
 
         # Calculate week date range
-        jan4 = datetime(year, 1, 4)
-        day_offset = jan4.weekday()
-        monday = jan4 - timedelta(days=day_offset) + timedelta(weeks=week_number - 1)
+        monday = _iso_week_monday(year, week_number)
         friday = monday + timedelta(days=4)
 
         start_date = monday.strftime("%Y-%m-%d")

@@ -115,6 +115,19 @@ export function ExportPage() {
   }
 
   /**
+   * Export filename incl. the week's date range,
+   * e.g. Wochenrapport_KW31_2026_27_07-31_07.xlsx (Mon–Fri, DD_MM).
+   */
+  const buildFilename = (): string => {
+    const dates = getWeekDates(currentWeek.year, currentWeek.week)
+    const fmt = (d: string) => {
+      const [, mm, dd] = d.split('-') // YYYY-MM-DD → DD_MM
+      return `${dd}_${mm}`
+    }
+    return `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}_${fmt(dates[0])}-${fmt(dates[4])}.xlsx`
+  }
+
+  /**
    * Generate the week's Excel blob — backend first, offline fallback.
    * Shared by both the export and email buttons.
    */
@@ -248,7 +261,7 @@ export function ExportPage() {
     setStatus(null)
     try {
       const { blob, usedOffline } = await generateWeekBlob()
-      const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
+      const filename = buildFilename()
       await saveBlob(blob, filename, t('export.excel.btn'))
       setStatus(
         usedOffline
@@ -269,7 +282,7 @@ export function ExportPage() {
     setStatus(null)
     try {
       const { blob, usedOffline } = await generateWeekBlob()
-      const filename = `Wochenrapport_KW${currentWeek.week}_${currentWeek.year}.xlsx`
+      const filename = buildFilename()
 
       // Collect photographed receipts for this week and attach them to the
       // Share sheet — the email app receives the Excel + all Belege together.
