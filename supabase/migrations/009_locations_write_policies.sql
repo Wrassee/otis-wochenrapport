@@ -14,10 +14,16 @@
 -- matching the app's shared-lift-catalog model (same as the SELECT policy).
 -- ============================================================
 
+-- Idempotent: DROP POLICY IF EXISTS + CREATE POLICY, so re-running this
+-- migration (or running it after a previous partial state) never fails with
+-- 42710 "policy ... already exists". Safe to run any number of times.
+
+DROP POLICY IF EXISTS "Authenticated users can insert locations" ON locations;
 CREATE POLICY "Authenticated users can insert locations"
   ON locations FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can update locations" ON locations;
 CREATE POLICY "Authenticated users can update locations"
   ON locations FOR UPDATE
   USING (auth.role() = 'authenticated')

@@ -32,7 +32,7 @@ Futtasd mind a 9 fájlt **növekvő sorrendben**:
 | 006 | `006_expense_photos_realtime.sql` | Fotó-realtime **biztosíték**: ha a 004 még nem kapcsolta be, itt bekapcsolja | ✅ | ✅ (tábla hiányában csendben kihagy) |
 | 007 | `007_daily_expenses_realtime.sql` | Költség-realtime **biztosíték**: ha a 003 még nem kapcsolta be, itt bekapcsolja | ✅ | ✅ (tábla hiányában csendben kihagy) |
 | 008 | `008_user_favorites_realtime.sql` | Kedvenc-realtime **biztosíték**: ha a 002 még nem kapcsolta be, itt bekapcsolja | ✅ | ✅ (tábla hiányában csendben kihagy) |
-| 009 | `009_locations_write_policies.sql` | `locations` INSERT + UPDATE RLS-policy — a kézi/offline liftek felhőbe szinkronjához (`upsertLocation`); a 001 csak SELECT-et adott, ami nélkül minden lift-push `new row violates row-level security policy` hibát dob | ⚠️ nem idempotens (egyszer kell futtatni, mint a 001-et) | ✅ |
+| 009 | `009_locations_write_policies.sql` | `locations` INSERT + UPDATE RLS-policy — a kézi/offline liftek felhőbe szinkronjához (`upsertLocation`); a 001 csak SELECT-et adott, ami nélkül minden lift-push `new row violates row-level security policy` hibát dob | ✅ idempotens (`DROP POLICY IF EXISTS` + `CREATE POLICY`) | ✅ |
 
 **Jelmagyarázat:**
 

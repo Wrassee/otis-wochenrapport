@@ -107,42 +107,42 @@ async function prepareEntriesForPush(entries: any[]): Promise<any[]> {
   for (const entry of entries) {
     const copy = { ...entry }
     const lid = copy.location_id
-    if (lid && !isValidUuid(lid)) {
+    // Manual/typed lifts have location_id = null but carry the anlagenummer on
+    // the entry itself — without a cloud link the lift disappears after the
+    // round-trip (the pull joins locations by location_id). Link EVERY entry
+    // that references a lift, not just the non-UUID ones.
+    const nr = copy.location_anlagenummer
+      ? String(copy.location_anlagenummer).trim().toUpperCase()
+      : ''
+    const needsLink = (!lid || !isValidUuid(lid)) && nr
+    if (needsLink) {
       // Find the lift by its local id, or by the anlagenummer stored on the
       // entry (manual entries don't always carry a resolvable location_id).
       const loc =
-        localLocations.find((l) => l.id === lid) ||
-        localLocations.find(
-          (l) =>
-            copy.location_anlagenummer &&
-            l.anlagenummer.toUpperCase() === String(copy.location_anlagenummer).toUpperCase(),
-        )
-      if (loc) {
-        const key = loc.anlagenummer.toUpperCase()
-        let cloudId: string | null = upserted.get(key) ?? null
-        if (!cloudId) {
-          cloudId = uuidFromString(loc.anlagenummer)
-          try {
-            await upsertLocation({
-              id: cloudId,
-              anlagenummer: loc.anlagenummer,
-              project_id: loc.project_id,
-              full_address: loc.full_address,
-              latitude: loc.latitude,
-              longitude: loc.longitude,
-              zone: loc.zone,
-              manual_zone: loc.manual_zone,
-            })
-            upserted.set(key, cloudId)
-          } catch (e) {
-            console.warn('Lift upsert failed; entry will sync without lift link:', loc.anlagenummer, e)
-            cloudId = null
-          }
+        (lid ? localLocations.find((l) => l.id === lid) : undefined) ||
+        localLocations.find((l) => l.anlagenummer.toUpperCase() === nr)
+      const key = (loc?.anlagenummer || nr).toUpperCase()
+      let cloudId: string | null = upserted.get(key) ?? null
+      if (!cloudId) {
+        cloudId = uuidFromString(key)
+        try {
+          await upsertLocation({
+            id: cloudId,
+            anlagenummer: key,
+            project_id: loc?.project_id ?? copy.location_project_id ?? '',
+            full_address: loc?.full_address ?? copy.location_address ?? '',
+            latitude: loc?.latitude ?? 0,
+            longitude: loc?.longitude ?? 0,
+            zone: loc?.zone ?? copy.location_zone ?? 0,
+            manual_zone: loc?.manual_zone,
+          })
+          upserted.set(key, cloudId)
+        } catch (e) {
+          console.warn('Lift upsert failed; entry will sync without lift link:', key, e)
+          cloudId = null
         }
-        copy.location_id = cloudId
-      } else {
-        copy.location_id = null
       }
+      copy.location_id = cloudId
     }
     prepared.push(copy)
   }

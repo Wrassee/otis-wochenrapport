@@ -1,34 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import { TimeEntryForm } from '@/components/daily/TimeEntryForm'
+import { EditEntrySheet } from '@/components/daily/EditEntrySheet'
 import { QuickAdd } from '@/components/daily/QuickAdd'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { BottomSheet } from '@/components/ui/BottomSheet'
-import { OtisDurationSelect } from '@/components/ui/OtisDurationSelect'
-import { ActivityPicker } from '@/components/daily/ActivityPicker'
 import { useAppStore } from '@/stores/appStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
-import type { TimeEntry, ActivityCode } from '@/lib/types'
-import {
-  getWeekInfo,
-  decimalToTime,
-  timeToDecimal,
-  formatOtisDuration,
-  otisToStandard,
-  snapToQuarter,
-} from '@/lib/utils'
+import type { TimeEntry } from '@/lib/types'
+import { getWeekInfo } from '@/lib/utils'
 import {
   Clock,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   CheckCircle2,
   UtensilsCrossed,
   Building2,
-  Save,
   Euro,
   Wifi,
   WifiOff,
@@ -44,17 +32,15 @@ import { ExpenseEditor } from '@/components/weekly/ExpenseEditor'
 
 export function DashboardPage() {
   const { t } = useTranslation()
-  const { currentDate, setCurrentDate, currentWeek, syncStatus, setSyncStatus, activityCodes } =
-    useAppStore(
-      useShallow((s) => ({
-        currentDate: s.currentDate,
-        setCurrentDate: s.setCurrentDate,
-        currentWeek: s.currentWeek,
-        syncStatus: s.syncStatus,
-        setSyncStatus: s.setSyncStatus,
-        activityCodes: s.activityCodes,
-      })),
-    )
+  const { currentDate, setCurrentDate, currentWeek, syncStatus, setSyncStatus } = useAppStore(
+    useShallow((s) => ({
+      currentDate: s.currentDate,
+      setCurrentDate: s.setCurrentDate,
+      currentWeek: s.currentWeek,
+      syncStatus: s.syncStatus,
+      setSyncStatus: s.setSyncStatus,
+    })),
+  )
   const { timeEntries, addEntry, updateEntry, deleteEntry, quickAdd, loadWeek } = useTimeEntries()
   const info = getWeekInfo(currentDate)
   // Week's receipt photos (Spesen Belege) — shared store data, compact strip.
@@ -74,11 +60,6 @@ export function DashboardPage() {
     }
   }
   const [editEntry, setEditEntry] = useState<TimeEntry | null>(null)
-  const [editStart, setEditStart] = useState('')
-  const [editDuration, setEditDuration] = useState('')
-  const [editIsSaving, setEditIsSaving] = useState(false)
-  const [editActivityCode, setEditActivityCode] = useState<ActivityCode | null>(null)
-  const [showEditActivityPicker, setShowEditActivityPicker] = useState(false)
   const [conflictEntryIds, setConflictEntryIds] = useState<string[]>([])
   const [showExpenseEditor, setShowExpenseEditor] = useState(false)
   const syncExpensesOnClose = useExpensesSync()
@@ -138,36 +119,11 @@ export function DashboardPage() {
 
   const handleEditEntry = (entry: TimeEntry) => {
     setEditEntry(entry)
-    setEditStart(decimalToTime(entry.start_time))
-    setEditDuration(formatOtisDuration(entry.duration))
-    const foundCode = activityCodes.find((c) => c.code === entry.activity_code)
-    setEditActivityCode(foundCode || null)
   }
 
-  const handleSaveEdit = async () => {
-    if (!editEntry) return
-    setEditIsSaving(true)
-    try {
-      const start = timeToDecimal(editStart)
-      const otisVal = parseFloat(editDuration)
-      const standardDur = isNaN(otisVal)
-        ? editEntry.duration
-        : Math.max(Math.round(otisToStandard(otisVal) * 4) / 4, 0.25)
-      const updatedEntry: TimeEntry = {
-        ...editEntry,
-        start_time: start,
-        duration: standardDur,
-        activity_code: editActivityCode?.code || editEntry.activity_code,
-        activity_code_id: editActivityCode?.id || editEntry.activity_code_id,
-      }
-      await updateEntry(updatedEntry)
-      await loadWeek()
-      setEditEntry(null)
-    } catch (err) {
-      console.warn('Failed to update entry:', err)
-    } finally {
-      setEditIsSaving(false)
-    }
+  const handleSaveEdit = async (entry: TimeEntry) => {
+    await updateEntry(entry)
+    await loadWeek()
   }
 
   const dateObj = new Date(currentDate + 'T12:00:00')
@@ -382,127 +338,11 @@ export function DashboardPage() {
       <QuickAdd entries={todayEntries} onQuickAdd={handleQuickAdd} />
 
       {/* Edit Entry Bottom Sheet */}
-      <BottomSheet
+      <EditEntrySheet
         open={editEntry !== null}
+        entry={editEntry}
         onClose={() => setEditEntry(null)}
-        title={t('edit.title')}
-      >
-        {editEntry && (
-          <div className="space-y-4">
-            {/* Entry info */}
-            <div className="flex items-center gap-2.5 p-3.5 bg-otis-50/80 dark:bg-otis-900/30 backdrop-blur rounded-2xl border border-otis-200/30 dark:border-otis-700/30">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-otis-500 to-otis-700 flex items-center justify-center flex-shrink-0">
-                <Building2 className="w-4 h-4 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {editEntry.location_anlagenummer && (
-                    <span className="font-bold text-sm text-otis-700 dark:text-otis-300">
-                      {editEntry.location_anlagenummer}
-                    </span>
-                  )}
-                  {editEntry.location_project_id && (
-                    <span className="text-[11px] text-gray-400 dark:text-stone-300 font-mono">
-                      {editEntry.location_project_id}
-                    </span>
-                  )}
-                  {editEntry.activity_code && (
-                    <Badge variant="info" size="sm">
-                      {editEntry.activity_code}
-                    </Badge>
-                  )}
-                </div>
-                {editEntry.location_address && (
-                  <p className="text-[11px] text-gray-400 dark:text-stone-300 truncate mt-0.5">
-                    {editEntry.location_address}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Tätigkeit — Activity code picker */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200">
-                {t('entry.activity')}
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowEditActivityPicker(true)}
-                className="w-full flex items-center justify-between p-3.5 rounded-xl border transition-all duration-150 bg-white/50 dark:bg-white/5 border-otis-200/30 dark:border-white/10 hover:border-otis-300/50"
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-otis-100/50 dark:bg-otis-800/30 flex items-center justify-center">
-                    <Building2 className="w-3.5 h-3.5 text-otis-500 dark:text-otis-400" />
-                  </div>
-                  <span
-                    className={`text-sm font-medium ${editActivityCode ? 'text-otis-800 dark:text-white' : 'text-gray-400 dark:text-stone-400'}`}
-                  >
-                    {editActivityCode ? editActivityCode.code : t('entry.activity.select')}
-                  </span>
-                </div>
-                <ChevronDown className="w-4 h-4 text-gray-400 dark:text-stone-300" />
-              </button>
-            </div>
-
-            {/* Start time */}
-            <Input
-              id="dash-edit-start"
-              label={t('entry.beginn')}
-              type="time"
-              value={editStart}
-              onChange={(e) => {
-                const decimal = timeToDecimal(e.target.value)
-                const snapped = snapToQuarter(decimal)
-                setEditStart(decimalToTime(snapped))
-              }}
-              step="900"
-              required
-              hint={t('entry.beginn.hint')}
-            />
-
-            {/* Duration (OTIS) */}
-            <OtisDurationSelect
-              label={t('entry.dauer')}
-              value={editDuration}
-              onChange={(value) => setEditDuration(value)}
-              required
-            />
-
-            {/* Action buttons */}
-            <div className="flex gap-3 pt-2">
-              <Button
-                variant="secondary"
-                onClick={() => setEditEntry(null)}
-                className="flex-1"
-                size="lg"
-              >
-                {t('edit.cancel')}
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleSaveEdit}
-                className="flex-1"
-                size="lg"
-                disabled={editIsSaving}
-              >
-                <Save className="w-4 h-4" />
-                {editIsSaving ? t('edit.saving') : t('edit.save')}
-              </Button>
-            </div>
-          </div>
-        )}
-      </BottomSheet>
-
-      {/* Edit Activity Picker */}
-      <ActivityPicker
-        open={showEditActivityPicker}
-        onClose={() => setShowEditActivityPicker(false)}
-        onSelect={(code) => {
-          setEditActivityCode(code)
-          setShowEditActivityPicker(false)
-        }}
-        codes={activityCodes}
-        selectedCode={editActivityCode?.code}
+        onSave={handleSaveEdit}
       />
 
       {/* Spesen ExpenseEditor */}

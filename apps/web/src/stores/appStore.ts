@@ -22,6 +22,7 @@ import {
   haversineDistance,
   calculateZone,
   generateId,
+  isValidUuid,
 } from '@/lib/utils'
 import { REFERENCE_LAT, REFERENCE_LON, ACTIVITY_CODES } from '@/lib/constants'
 import type { Language } from '@/lib/translations'
@@ -447,7 +448,31 @@ export const useAppStore = create<AppState>((set, get) => ({
               // Local has unsynced edits → local wins, will be pushed soon.
               merged.push(local)
             } else {
-              merged.push(remoteRowToTimeEntry(row))
+              const remote = remoteRowToTimeEntry(row)
+              // Heal: rows pushed before the manual-lift linking fix reached
+              // the cloud with location_id = null, so the pull shows them
+              // WITHOUT their lift. If the local copy still carries the lift,
+              // preserve it and re-queue the row (synced=false) so the next
+              // push re-links the cloud location and the lift survives.
+              if (local && local.location_anlagenummer && !remote.location_anlagenummer) {
+                // A valid-UUID local lid that yields a lift-less remote row is
+                // by definition broken (the join found no cloud location) — if
+                // we kept it, the re-push would 23503-loop forever. Null it so
+                // prepareEntriesForPush re-derives the deterministic UUID and
+                // re-upserts the cloud location on the next push.
+                const healLid = isValidUuid(local.location_id) ? null : local.location_id
+                merged.push({
+                  ...remote,
+                  location_anlagenummer: local.location_anlagenummer,
+                  location_project_id: local.location_project_id,
+                  location_address: local.location_address,
+                  location_zone: local.location_zone,
+                  location_id: healLid ?? remote.location_id,
+                  synced: false,
+                })
+              } else {
+                merged.push(remote)
+              }
             }
           }
           // Local-only rows: keep unsynced (pending) ones; drop synced rows

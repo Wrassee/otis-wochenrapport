@@ -8,6 +8,7 @@ import { OtisDurationSelect } from '@/components/ui/OtisDurationSelect'
 import { FavoriteLifts } from './FavoriteLifts'
 import { ActivityPicker } from './ActivityPicker'
 import * as localDb from '@/db/indexeddb'
+import { upsertFavorite } from '@/db/supabase'
 import { useAppStore } from '@/stores/appStore'
 import { useShallow } from 'zustand/react/shallow'
 import {
@@ -93,6 +94,23 @@ export function TimeEntryForm({
    *  the chained (next) start time lands, surviving multiple intermediate
    *  renders caused by addEntry + loadWeek. */
   const justSubmittedRef = useRef<string | null>(null)
+  /** True once the user manually picked a start time — the auto-sync of the
+   *  chained default must not override a deliberate manual choice. */
+  const startTimeTouchedRef = useRef(false)
+
+  // Keep the start time in sync with the chained default once the day's entries
+  // load asynchronously — the form mounts BEFORE loadWeek() resolves, so it
+  // would otherwise keep the stale fallback default (07:30) and falsely report
+  // an overlap against the just-loaded entries (e.g. an existing 07:30-09:00).
+  // A manual user edit wins over the auto-sync; switching days resets the guard.
+  useEffect(() => {
+    startTimeTouchedRef.current = false
+  }, [date])
+
+  useEffect(() => {
+    if (startTimeTouchedRef.current) return
+    setStartTime(decimalToTime(defaultStartTime ?? 7.5))
+  }, [defaultStartTime])
 
   // Check for time overlaps — skip the render(s) triggered by the submit
   // itself: once the new entry lands in existingEntries, the form still holds
@@ -232,6 +250,29 @@ export function TimeEntryForm({
       })
       const refreshed = await localDb.getFavoriteLocations()
       setFavoriteLocations(refreshed.slice(0, 5))
+
+      // Also push the favorite to the cloud so the manually entered lift
+      // appears in "Letzte Anlagen" on other devices too (search-selected
+      // lifts do this via addRecentLocation → upsertFavorite).
+      const { user } = useAppStore.getState()
+      if (user && navigator.onLine) {
+        try {
+          const fav = refreshed.find((f) => f.anlagenummer.toUpperCase() === key)
+          await upsertFavorite({
+            user_id: user.id,
+            anlagenummer: key,
+            project_id: projectId,
+            full_address: address,
+            latitude: fav?.latitude ?? existingLoc?.latitude ?? 0,
+            longitude: fav?.longitude ?? existingLoc?.longitude ?? 0,
+            zone: fav?.manual_zone ?? fav?.zone ?? existingLoc?.manual_zone ?? existingLoc?.zone ?? 0,
+            manual_zone: fav?.manual_zone ?? existingLoc?.manual_zone,
+            use_count: fav?.use_count ?? 1,
+          })
+        } catch (e) {
+          console.warn('Failed to sync manual lift favorite to Supabase:', e)
+        }
+      }
     } catch (err) {
       console.warn('Failed to save manual lift:', err)
     }
@@ -343,6 +384,9 @@ export function TimeEntryForm({
   }
 
   const handleLunchToggle = () => {
+    // The lunch start is deliberately chosen (chained or 12:00) — the
+    // default-start sync must not override it with the next work default.
+    startTimeTouchedRef.current = true
     if (!isLunch) {
       const lastEntry = existingEntries[existingEntries.length - 1]
       if (lastEntry) {
@@ -631,6 +675,7 @@ export function TimeEntryForm({
               type="time"
               value={startTime}
               onChange={(e) => {
+                startTimeTouchedRef.current = true
                 const decimal = timeToDecimal(e.target.value)
                 const snapped = snapToQuarter(decimal)
                 setStartTime(decimalToTime(snapped))
