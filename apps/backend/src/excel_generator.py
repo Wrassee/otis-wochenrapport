@@ -24,7 +24,7 @@ SPESEN_DAY_COLUMNS = {
     5: "I", 6: "J",
 }
 
-ZONE_ROWS = {1: 10, 2: 12, 3: 15, 4: 18}
+ZONE_ROWS = {1: 10, 2: 12, 3: 15, 4: 18, 5: 21}
 
 EXPENSE_ROWS = {
     "entschaedigung_10h": 26,
@@ -114,21 +114,82 @@ def _set_cell_str(xml: str, ref: str, value: str) -> str:
     return _replace_cell(xml, ref, new)
 
 
-def _set_cell_marker(xml: str, ref: str) -> str:
-    """Set a cell to the activity marker 'ü' (inline string).
+def _set_cell_marker(xml: str, ref: str, style: str) -> str:
+    """Set a cell to the activity marker '✓' (U+2713, inline string).
 
-    The marker is written as a rich-text run with an explicit Wingdings font,
-    so 'ü' renders as a checkmark ✓ even in columns whose cell style uses a
-    regular font (the template's N/O/P/Q/R columns use an Arial style while
-    only J/K/L/M use the Wingdings style). The cell's own style is preserved
-    for borders/alignment; only the run's font is forced.
+    The CELL STYLE carries a plain black font (created by
+    _build_marker_styles), so '✓' renders visibly in every viewer — no
+    Wingdings needed (Wingdings maps '✓' to a wrong glyph, and the template's
+    marker fonts are white, i.e. invisible on white fill).
     """
-    style = _get_cell_style(xml, ref)
-    new = (
-        f'<c r="{ref}" s="{style}" t="inlineStr">'
-        f'<is><r><rPr><rFont val="Wingdings"/></rPr><t>ü</t></r></is></c>'
-    )
+    new = f'<c r="{ref}" s="{style}" t="inlineStr"><is><t>✓</t></is></c>'
     return _replace_cell(xml, ref, new)
+
+
+BLACK_MARKER_FONT_ID = 2  # Arial 14, default color (black) — matches the data rows' font size
+# Fonts that must be replaced when writing the literal '✓':
+#  - Wingdings (6, 7, 8, 22, 25) map '✓' to a wrong glyph
+#  - white fonts (20, 21, 22, 23, 25 — indexed=9) render invisible on white fill
+UNSAFE_MARKER_FONTS = {6, 7, 8, 20, 21, 22, 23, 25}
+# Dark solid fill (indexed=8 = black) that would hide a black '✓'
+DARK_FILL_IDS = {4}
+NONE_FILL_ID = 0
+
+
+def _build_marker_styles(styles_xml: str, marker_styles: set[int]) -> tuple[str, dict[int, int]]:
+    """Ensure marker cells render a visible black '✓'.
+
+    The template's marker columns use white (indexed=9) and Wingdings fonts,
+    which would render the literal '✓' invisible or as a wrong glyph. For each
+    marker cell style we append a variant that swaps the font to a plain black
+    Arial and clears dark fills. Styles that are already safe (black font on a
+    light fill) are left untouched (mapped to themselves).
+
+    Returns (updated styles.xml, {old_style: new_style}).
+    """
+    if not marker_styles:
+        return styles_xml, {}
+    # Only the <cellXfs> section carries the cell styles (cellStyleXfs is a
+    # separate, much smaller section that precedes it — including it would
+    # shift the indices and patch the wrong style).
+    cell_xfs_section = re.search(r"<cellXfs.*?</cellXfs>", styles_xml, re.S)
+    if not cell_xfs_section:
+        return styles_xml, {}
+    xfs = re.findall(r"<xf\b[^>]*?(?:/>|>.*?</xf>)", cell_xfs_section.group(0), re.S)
+    count_m = re.search(r'<cellXfs count="(\d+)"', styles_xml)
+    if not count_m:
+        return styles_xml, {}
+    base = int(count_m.group(1))
+    mapping: dict[int, int] = {}
+    extra: list[str] = []
+    for s in sorted(marker_styles):
+        if s >= len(xfs):
+            continue
+        xf = xfs[s]
+        fid_m = re.search(r'fontId="(\d+)"', xf)
+        fill_m = re.search(r'fillId="(\d+)"', xf)
+        fid = int(fid_m.group(1)) if fid_m else 0
+        fill = int(fill_m.group(1)) if fill_m else 0
+        need_font = fid in UNSAFE_MARKER_FONTS
+        need_fill = fill in DARK_FILL_IDS
+        if not need_font and not need_fill:
+            mapping[s] = s  # already safe — keep the original style
+            continue
+        new_xf = xf
+        if need_font:
+            new_xf = re.sub(r'fontId="\d+"', f'fontId="{BLACK_MARKER_FONT_ID}"', new_xf, count=1)
+        if need_fill:
+            new_xf = re.sub(r'fillId="\d+"', f'fillId="{NONE_FILL_ID}"', new_xf, count=1)
+        mapping[s] = base + len(extra)
+        extra.append(new_xf)
+    if not extra:
+        return styles_xml, mapping
+    styles_xml = styles_xml.replace(
+        f'<cellXfs count="{count_m.group(1)}">',
+        f'<cellXfs count="{base + len(extra)}">',
+    )
+    styles_xml = styles_xml.replace("</cellXfs>", "".join(extra) + "</cellXfs>", 1)
+    return styles_xml, mapping
 
 
 def _fill_stundenrapport(
@@ -138,9 +199,14 @@ def _fill_stundenrapport(
     personnel_number: str,
     full_name: str,
     entries: list[dict],
-) -> str:
-    """Fill Stundenrapport sheet XML with data."""
+) -> tuple[str, list[str]]:
+    """Fill Stundenrapport sheet XML with data.
+
+    Returns (filled_xml, marker_refs) — the activity markers are applied
+    afterwards (in generate_excel) once the Wingdings cell styles exist.
+    """
     xml = sheet_xml
+    marker_refs: list[str] = []
 
     # --- Header row 2 ---
     xml = _set_cell_str(xml, "C2", str(personnel_number))
@@ -167,14 +233,30 @@ def _fill_stundenrapport(
     xml = _set_cell_num(xml, "N28", year)
     xml = _set_cell_num(xml, "L29", week_number)
 
-    # --- Data entries (rows 8-22, max 15) ---
+    # --- Data entries. Two identical 15-row blocks in the template:
+    #   block 1 = rows 8-22, block 2 = rows 34-48 (offset +26).
+    # The template physically has a second page/block — entries beyond the
+    # first 15 MUST continue there, otherwise they silently vanish.
     work_entries = [e for e in entries if not e.get("is_lunch", False)]
     work_entries.sort(key=lambda e: (e.get("date", ""), e.get("start_time", 0)))
 
+    BLOCK_START = 8
+    BLOCK2_OFFSET = 26  # 34 - 8
+    MAX_ENTRIES = 30  # 15 rows per block × 2 blocks
+
+    if len(work_entries) > MAX_ENTRIES:
+        print(
+            f"[excel_generator] WARNING: {len(work_entries)} work entries exceed the "
+            f"template capacity of {MAX_ENTRIES} — {(len(work_entries) - MAX_ENTRIES)} "
+            "entries will NOT appear in the Excel."
+        )
+
     for i, entry in enumerate(work_entries):
-        if i >= 15:
+        if i >= MAX_ENTRIES:
             break
-        row = 8 + i
+        block_idx = i // 15
+        row_in_block = i % 15
+        row = BLOCK_START + row_in_block + (BLOCK2_OFFSET if block_idx == 1 else 0)
 
         # Day of month (A)
         date_str = entry.get("date", "")
@@ -209,13 +291,16 @@ def _fill_stundenrapport(
         if duration is not None:
             xml = _set_cell_num(xml, f"I{row}", _standard_to_otis(float(duration)))
 
-        # Activity code marker (J-R)
-        activity_code = entry.get("activity_code", "")
+        # Activity code marker (J-R) — applied later with a plain black font
+        # and the literal '✓' (see _set_cell_marker). Work entries without an
+        # explicit activity default to NK so every line of the protocol gets a
+        # checkmark (the template requires one per row).
+        activity_code = entry.get("activity_code", "") or "NK"
         if activity_code and activity_code in ACTIVITY_COLUMNS:
             col_letter = ACTIVITY_COLUMNS[activity_code]
-            xml = _set_cell_marker(xml, f"{col_letter}{row}")
+            marker_refs.append(f"{col_letter}{row}")
 
-    return xml
+    return xml, marker_refs
 
 
 def _fill_spesenrapport(
@@ -231,13 +316,12 @@ def _fill_spesenrapport(
     """Fill Spesenrapport sheet XML with data."""
     xml = sheet_xml
 
-    # --- Header row 7 ---
-    xml = _set_cell_str(xml, "B7", str(personnel_number))
-    xml = _set_cell_str(xml, "G7", full_name)
-
-    # --- Date range row 5 ---
+    # --- Header: values go into the empty value cells next to the template
+    # labels (D5/H5/A7/F7 are the labels; E5/I5/B7/G7 are the value cells).
     monday = _get_monday_of_week(year, week_number)
     friday = monday + timedelta(days=4)
+    xml = _set_cell_str(xml, "B7", str(personnel_number))
+    xml = _set_cell_str(xml, "G7", full_name)
     xml = _set_cell_str(xml, "E5", monday.strftime("%d.%m.%Y"))
     xml = _set_cell_str(xml, "I5", friday.strftime("%d.%m.%Y"))
 
@@ -327,11 +411,24 @@ def generate_excel(
     with zipfile.ZipFile(BytesIO(template_bytes), "r") as z_in:
         sheet1_xml = z_in.read("xl/worksheets/sheet1.xml").decode("utf-8")
         sheet2_xml = z_in.read("xl/worksheets/sheet2.xml").decode("utf-8")
+        styles_xml = z_in.read("xl/styles.xml").decode("utf-8")
 
         # Fill sheets with data
-        sheet1_filled = _fill_stundenrapport(
+        sheet1_filled, marker_refs = _fill_stundenrapport(
             sheet1_xml, year, week_number, personnel_number, full_name, entries
         )
+        # Wingdings/white-font cell styles for the activity markers are NOT
+        # needed anymore — the marker is the literal '✓' rendered with a plain
+        # black font (see _set_cell_marker). _build_marker_styles only fixes up
+        # styles whose original font is white/Wingdings or whose fill is dark.
+        marker_styles = {int(_get_cell_style(sheet1_filled, ref)) for ref in marker_refs}
+        styles_xml, style_map = _build_marker_styles(styles_xml, marker_styles)
+        for ref in marker_refs:
+            style = _get_cell_style(sheet1_filled, ref)
+            sheet1_filled = _set_cell_marker(
+                sheet1_filled, ref, style_map.get(int(style), style)
+            )
+
         sheet2_filled = _fill_spesenrapport(
             sheet2_xml, year, week_number, personnel_number, full_name,
             entries, expenses, photo_notes
@@ -346,6 +443,8 @@ def generate_excel(
                     data = sheet1_filled.encode("utf-8")
                 elif item.filename == "xl/worksheets/sheet2.xml":
                     data = sheet2_filled.encode("utf-8")
+                elif item.filename == "xl/styles.xml":
+                    data = styles_xml.encode("utf-8")
 
                 # Preserve the ZipInfo but force DEFLATED compression
                 info = copy.copy(item)

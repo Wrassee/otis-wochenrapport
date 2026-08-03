@@ -22,7 +22,7 @@ const SPESEN_DAY_COLUMNS: Record<number, string> = {
   6: 'J', // Sunday (DI)
 }
 
-const ZONE_ROWS: Record<number, number> = { 1: 10, 2: 12, 3: 15, 4: 18 }
+const ZONE_ROWS: Record<number, number> = { 1: 10, 2: 12, 3: 15, 4: 18, 5: 21 }
 
 const ACTIVITY_COLUMNS: Record<string, string> = {
   NK: 'J',
@@ -149,18 +149,88 @@ function setCellStr(xml: string, ref: string, value: string): string {
 }
 
 /**
- * Set a cell to the activity marker 'ü' (inline string).
+ * Set a cell to the activity marker '✓' (U+2713, inline string).
  *
- * The marker is written as a rich-text run with an explicit Wingdings font,
- * so 'ü' renders as a checkmark ✓ even in columns whose cell style uses a
- * regular font (the template's N/O/P/Q/R columns use an Arial style — style
- * 161 — while only J/K/L/M use the Wingdings style). The cell's own style is
- * preserved for borders/alignment; only the run's font is forced.
+ * The CELL STYLE carries a plain black font (created by buildMarkerStyles), so
+ * '✓' renders visibly in every viewer — no Wingdings needed (Wingdings maps
+ * '✓' to a wrong glyph, and the template's marker fonts are white, i.e.
+ * invisible on white fill).
  */
-function setCellMarker(xml: string, ref: string): string {
-  const style = getCellStyle(xml, ref)
-  const newXml = `<c r="${ref}" s="${style}" t="inlineStr"><is><r><rPr><rFont val="Wingdings"/></rPr><t>ü</t></r></is></c>`
+function setCellMarker(xml: string, ref: string, style: string): string {
+  const newXml = `<c r="${ref}" s="${style}" t="inlineStr"><is><t>✓</t></is></c>`
   return replaceCell(xml, ref, newXml)
+}
+
+/** Arial 14, default color (black) — matches the data rows' font size */
+const BLACK_MARKER_FONT_ID = 2
+/** Fonts that must be replaced when writing the literal '✓':
+ *  - Wingdings (6, 7, 8, 22, 25) map '✓' to a wrong glyph
+ *  - white fonts (20, 21, 22, 23, 25 — indexed=9) render invisible on white fill
+ */
+const UNSAFE_MARKER_FONTS = new Set([6, 7, 8, 20, 21, 22, 23, 25])
+/** Dark solid fill (indexed=8 = black) that would hide a black '✓' */
+const DARK_FILL_IDS = new Set([4])
+const NONE_FILL_ID = 0
+
+/**
+ * Ensure marker cells render a visible black '✓'.
+ *
+ * The template's marker columns use white (indexed=9) and Wingdings fonts,
+ * which would render the literal '✓' invisible or as a wrong glyph. For each
+ * marker cell style we append a variant that swaps the font to a plain black
+ * Arial and clears dark fills. Styles that are already safe (black font on a
+ * light fill) are left untouched (mapped to themselves).
+ *
+ * Returns (updated styles.xml, {old_style: new_style}).
+ */
+function buildMarkerStyles(
+  stylesXml: string,
+  markerStyles: Set<number>,
+): { xml: string; styleMap: Record<number, number> } {
+  const styleMap: Record<number, number> = {}
+  if (markerStyles.size === 0) return { xml: stylesXml, styleMap }
+  // Only the <cellXfs> section carries the cell styles (cellStyleXfs is a
+  // separate, much smaller section that precedes it — including it would
+  // shift the indices and patch the wrong style).
+  const cellXfsMatch = stylesXml.match(/<cellXfs[^>]*>.*?<\/cellXfs>/s)
+  if (!cellXfsMatch) return { xml: stylesXml, styleMap }
+  const cellXfsSection = cellXfsMatch[0]
+  const xfs = [...cellXfsSection.matchAll(/<xf\b[^>]*?(?:\/>|>.*?<\/xf>)/gs)].map((m) => m[0])
+  const countM = stylesXml.match(/<cellXfs count="(\d+)"/)
+  if (!countM) return { xml: stylesXml, styleMap }
+  const base = parseInt(countM[1], 10)
+  const extra: string[] = []
+  const sorted = [...markerStyles].sort((a, b) => a - b)
+  for (const s of sorted) {
+    if (s >= xfs.length) continue
+    const xf = xfs[s]
+    const fidM = xf.match(/fontId="(\d+)"/)
+    const fillM = xf.match(/fillId="(\d+)"/)
+    const fid = fidM ? parseInt(fidM[1], 10) : 0
+    const fill = fillM ? parseInt(fillM[1], 10) : 0
+    const needFont = UNSAFE_MARKER_FONTS.has(fid)
+    const needFill = DARK_FILL_IDS.has(fill)
+    if (!needFont && !needFill) {
+      styleMap[s] = s // already safe — keep the original style
+      continue
+    }
+    let newXf = xf
+    if (needFont) {
+      newXf = newXf.replace(/fontId="\d+"/, `fontId="${BLACK_MARKER_FONT_ID}"`)
+    }
+    if (needFill) {
+      newXf = newXf.replace(/fillId="\d+"/, `fillId="${NONE_FILL_ID}"`)
+    }
+    styleMap[s] = base + extra.length
+    extra.push(newXf)
+  }
+  if (extra.length === 0) return { xml: stylesXml, styleMap }
+  let out = stylesXml.replace(
+    `<cellXfs count="${countM[1]}">`,
+    `<cellXfs count="${base + extra.length}">`,
+  )
+  out = out.replace('</cellXfs>', extra.join('') + '</cellXfs>')
+  return { xml: out, styleMap }
 }
 
 // ====== ENTRY DATA TYPES ======
@@ -204,8 +274,9 @@ function fillStundenrapport(
   personnelNumber: string,
   fullName: string,
   entries: OfflineEntry[],
-): string {
+): { xml: string; markerRefs: string[] } {
   let xml = sheetXml
+  const markerRefs: string[] = []
 
   // --- Header row 2 ---
   xml = setCellStr(xml, 'C2', String(personnelNumber))
@@ -234,7 +305,10 @@ function fillStundenrapport(
   xml = setCellNum(xml, 'N28', year)
   xml = setCellNum(xml, 'L29', weekNumber)
 
-  // --- Data entries (rows 8-22, max 15) ---
+  // --- Data entries. Two identical 15-row blocks in the template:
+  //   block 1 = rows 8-22, block 2 = rows 34-48 (offset +26).
+  // The template physically has a second page/block — entries beyond the
+  // first 15 MUST continue there, otherwise they silently vanish.
   const workEntries = entries
     .filter((e) => !e.is_lunch)
     .sort((a, b) => {
@@ -242,9 +316,23 @@ function fillStundenrapport(
       return a.start_time - b.start_time
     })
 
-  for (let i = 0; i < Math.min(workEntries.length, 15); i++) {
+  const BLOCK_START = 8
+  const BLOCK2_OFFSET = 26 // 34 - 8
+  const MAX_ENTRIES = 30 // 15 rows per block × 2 blocks
+
+  if (workEntries.length > MAX_ENTRIES) {
+    console.warn(
+      `[offlineGenerator] ${workEntries.length} work entries exceed the template ` +
+        `capacity of ${MAX_ENTRIES} — ${workEntries.length - MAX_ENTRIES} entries ` +
+        'will NOT appear in the Excel.',
+    )
+  }
+
+  for (let i = 0; i < Math.min(workEntries.length, MAX_ENTRIES); i++) {
     const entry = workEntries[i]
-    const row = 8 + i
+    const blockIdx = Math.floor(i / 15)
+    const rowInBlock = i % 15
+    const row = BLOCK_START + rowInBlock + (blockIdx === 1 ? BLOCK2_OFFSET : 0)
 
     // Day of month (A)
     if (entry.date) {
@@ -279,14 +367,18 @@ function fillStundenrapport(
       xml = setCellNum(xml, `I${row}`, standardToOtis(entry.duration))
     }
 
-    // Activity code marker (J-R)
-    if (entry.activity_code && ACTIVITY_COLUMNS[entry.activity_code]) {
-      const colLetter = ACTIVITY_COLUMNS[entry.activity_code]
-      xml = setCellMarker(xml, `${colLetter}${row}`)
+    // Activity code marker (J-R) — applied later with a plain black font
+    // and the literal '✓' (see setCellMarker). Work entries without an
+    // explicit activity default to NK so every line of the protocol gets a
+    // checkmark (the template requires one per row).
+    const activityCode = entry.activity_code || 'NK'
+    if (activityCode && ACTIVITY_COLUMNS[activityCode]) {
+      const colLetter = ACTIVITY_COLUMNS[activityCode]
+      markerRefs.push(`${colLetter}${row}`)
     }
   }
 
-  return xml
+  return { xml, markerRefs }
 }
 
 function fillSpesenrapport(
@@ -301,14 +393,13 @@ function fillSpesenrapport(
 ): string {
   let xml = sheetXml
 
-  // --- Header row 7 ---
-  xml = setCellStr(xml, 'B7', String(personnelNumber))
-  xml = setCellStr(xml, 'G7', fullName)
-
-  // --- Date range row 5 ---
+  // --- Header: values go into the empty value cells next to the template
+  // labels (D5/H5/A7/F7 are the labels; E5/I5/B7/G7 are the value cells).
   const monday = getMondayOfWeek(year, weekNumber)
   const friday = new Date(monday)
   friday.setDate(monday.getDate() + 4)
+  xml = setCellStr(xml, 'B7', String(personnelNumber))
+  xml = setCellStr(xml, 'G7', fullName)
   xml = setCellStr(xml, 'E5', formatDateDMY(monday))
   xml = setCellStr(xml, 'I5', formatDateDMY(friday))
 
@@ -399,19 +490,29 @@ export async function generateExcelOffline(options: OfflineGenerateOptions): Pro
   // 2. Open as ZIP
   const zip = await JSZip.loadAsync(templateData)
 
-  // 3. Extract sheet XMLs
+  // 3. Extract sheet XMLs + styles
   const sheet1Raw = await zip.file('xl/worksheets/sheet1.xml')!.async('string')
   const sheet2Raw = await zip.file('xl/worksheets/sheet2.xml')!.async('string')
+  const stylesRaw = await zip.file('xl/styles.xml')!.async('string')
 
   // 4. Fill with data
-  const sheet1Filled = fillStundenrapport(
-    sheet1Raw,
-    year,
-    week_number,
-    personnel_number,
-    full_name,
-    entries,
-  )
+  const s1 = fillStundenrapport(sheet1Raw, year, week_number, personnel_number, full_name, entries)
+
+  // Wingdings/white-font cell styles for the activity markers are NOT
+  // needed anymore — the marker is the literal '✓' rendered with a plain
+  // black font (see setCellMarker). buildMarkerStyles only fixes up styles
+  // whose original font is white/Wingdings or whose fill is dark.
+  const markerStyles = new Set<number>()
+  for (const ref of s1.markerRefs) {
+    markerStyles.add(parseInt(getCellStyle(s1.xml, ref), 10) || 0)
+  }
+  const wd = buildMarkerStyles(stylesRaw, markerStyles)
+  let sheet1Filled = s1.xml
+  for (const ref of s1.markerRefs) {
+    const style = parseInt(getCellStyle(sheet1Filled, ref), 10) || 0
+    sheet1Filled = setCellMarker(sheet1Filled, ref, String(wd.styleMap[style] ?? style))
+  }
+
   const sheet2Filled = fillSpesenrapport(
     sheet2Raw,
     year,
@@ -426,6 +527,7 @@ export async function generateExcelOffline(options: OfflineGenerateOptions): Pro
   // 5. Update the ZIP
   zip.file('xl/worksheets/sheet1.xml', sheet1Filled)
   zip.file('xl/worksheets/sheet2.xml', sheet2Filled)
+  zip.file('xl/styles.xml', wd.xml)
 
   // 6. Generate blob
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' })
