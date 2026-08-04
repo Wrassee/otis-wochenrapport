@@ -188,19 +188,19 @@ export function TimelineView({
                       className="flex items-center gap-1.5 relative z-10"
                       style={{ marginLeft: bar.left }}
                     >
-                      {/* Icon */}
+                      {/* Icon — prominent circle badge at the bar start */}
                       <div
                         className={cn(
-                          'w-6 h-6 rounded-xl flex items-center justify-center flex-shrink-0',
+                          'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0',
                           isLunch
-                            ? 'bg-amber-100/80 dark:bg-amber-900/30'
-                            : 'bg-otis-100/80 dark:bg-otis-800/30',
+                            ? 'bg-amber-100 dark:bg-amber-900/40'
+                            : 'bg-otis-100 dark:bg-otis-800/40',
                         )}
                       >
                         {isLunch ? (
-                          <UtensilsCrossed className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                          <UtensilsCrossed className="w-4 h-4 text-amber-600 dark:text-amber-300" />
                         ) : (
-                          <Building2 className="w-3 h-3 text-otis-600 dark:text-otis-400" />
+                          <Building2 className="w-4 h-4 text-otis-600 dark:text-otis-300" />
                         )}
                       </div>
 

@@ -74,7 +74,7 @@ export function OtisDurationSelect({
           disabled={disabled}
           required={required}
           className={cn(
-            'appearance-none w-full h-14 pl-4 pr-12 rounded-2xl text-base',
+            'appearance-none w-full h-14 pl-4 pr-24 rounded-2xl text-base',
             'glass-input dark:glass-input-dark',
             'text-otis-900 dark:text-white',
             'focus:outline-none focus:ring-2 focus:ring-otis-400/50',
@@ -89,9 +89,10 @@ export function OtisDurationSelect({
           ))}
         </select>
 
-        {/* Custom chevron + current value overlay (pointer-events: none so taps pass through to <select>) */}
-        <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1">
-          <span className="text-sm font-bold text-otis-600 dark:text-otis-300 tabular-nums">
+        {/* Custom chevron + current value overlay (pointer-events: none so taps pass through to <select>).
+            pr-24 on the select keeps the two texts from flowing together. */}
+        <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-lg bg-white/60 dark:bg-white/10 border border-otis-200/30 dark:border-white/10 px-1.5 py-1">
+          <span className="text-xs font-bold text-otis-600 dark:text-otis-300 tabular-nums">
             {value}
           </span>
           <ChevronDown className="w-4 h-4 text-gray-400 dark:text-stone-300" />

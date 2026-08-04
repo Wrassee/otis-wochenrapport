@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from '@/lib/useTranslation'
 import { Card } from '@/components/ui/Card'
-import { Paperclip, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Paperclip, X, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { ExpensePhoto } from '@/lib/types'
 
@@ -11,15 +11,24 @@ interface ReceiptPhotosProps {
   compact?: boolean
   /** grid columns for the thumbnail strip (default 4) */
   cols?: 2 | 3 | 4
+  /** Optional — when provided, each photo gets a delete button (thumbnail + lightbox) */
+  onDelete?: (photoId: string) => void
 }
 
 /**
  * Receipt-photo strip with a fullscreen lightbox preview.
  *
  * Used by the Export page (card layout) and by Dashboard/Woche (compact
- * inline strip) — all read the same store-backed photos list.
+ * inline strip) — all read the same store-backed photos list. When `onDelete`
+ * is provided the photos can be deleted right from this view (offline-first:
+ * the store tombstones the id and removes the local + cloud copy).
  */
-export function ReceiptPhotos({ photos, compact = false, cols = 4 }: ReceiptPhotosProps) {
+export function ReceiptPhotos({
+  photos,
+  compact = false,
+  cols = 4,
+  onDelete,
+}: ReceiptPhotosProps) {
   const { t } = useTranslation()
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   if (photos.length === 0) return null
@@ -35,6 +44,12 @@ export function ReceiptPhotos({ photos, compact = false, cols = 4 }: ReceiptPhot
     setPreviewIndex((previewIndex + 1) % photos.length)
   }
 
+  const handleDelete = (id: string) => {
+    onDelete?.(id)
+    // If the deleted photo is the one being previewed, close the lightbox.
+    if (current?.id === id) setPreviewIndex(null)
+  }
+
   const strip = (
     <div
       className={cn(
@@ -43,20 +58,37 @@ export function ReceiptPhotos({ photos, compact = false, cols = 4 }: ReceiptPhot
       )}
     >
       {photos.map((photo, idx) => (
-        <button
+        <div
           key={photo.id}
-          type="button"
-          onClick={() => setPreviewIndex(idx)}
-          className="relative w-full aspect-square min-h-0 rounded-lg overflow-hidden border border-otis-200/20 dark:border-white/10 bg-otis-100/30 dark:bg-otis-900/30 p-0 transition-transform active:scale-95"
-          title={photo.note || photo.filename}
+          className="relative w-full aspect-square min-h-0 rounded-lg overflow-hidden border border-otis-200/20 dark:border-white/10 bg-otis-100/30 dark:bg-otis-900/30 p-0"
         >
-          <img src={photo.dataUrl} alt={photo.filename} className="w-full h-full object-cover" />
-          {photo.note && (
-            <span className="absolute bottom-0 inset-x-0 px-1 py-0.5 bg-black/55 text-white text-[7px] leading-tight truncate">
-              {photo.note}
-            </span>
+          <button
+            type="button"
+            onClick={() => setPreviewIndex(idx)}
+            className="w-full h-full p-0 transition-transform active:scale-95"
+            title={photo.note || photo.filename}
+          >
+            <img src={photo.dataUrl} alt={photo.filename} className="w-full h-full object-cover" />
+            {photo.note && (
+              <span className="absolute bottom-0 inset-x-0 px-1 py-0.5 bg-black/55 text-white text-[7px] leading-tight truncate">
+                {photo.note}
+              </span>
+            )}
+          </button>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDelete(photo.id)
+              }}
+              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/55 text-white flex items-center justify-center shadow-md backdrop-blur-sm transition-colors active:scale-90 hover:bg-black/75"
+              title={t('spesen.photos.delete')}
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
           )}
-        </button>
+        </div>
       ))}
     </div>
   )
@@ -90,17 +122,32 @@ export function ReceiptPhotos({ photos, compact = false, cols = 4 }: ReceiptPhot
             <span className="text-xs font-medium text-white/60">
               {previewIndex + 1} / {photos.length}
             </span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                setPreviewIndex(null)
-              }}
-              className="w-10 h-10 min-h-0 rounded-full bg-white/10 text-white flex items-center justify-center transition-colors hover:bg-white/20 active:scale-95"
-              title={t('export.photo.close')}
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDelete(current.id)
+                  }}
+                  className="w-10 h-10 min-h-0 rounded-full bg-red-500/80 text-white flex items-center justify-center transition-colors hover:bg-red-500 active:scale-95"
+                  title={t('spesen.photos.delete')}
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPreviewIndex(null)
+                }}
+                className="w-10 h-10 min-h-0 rounded-full bg-white/10 text-white flex items-center justify-center transition-colors hover:bg-white/20 active:scale-95"
+                title={t('export.photo.close')}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Image */}

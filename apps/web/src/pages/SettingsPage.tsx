@@ -8,6 +8,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
 import { upsertProfile } from '@/db/supabase'
 import * as localDb from '@/db/indexeddb'
+import { geocodeAndApplyZone, locationsMissingZone } from '@/lib/locationZones'
 import {
   LogOut,
   Wifi,
@@ -30,6 +31,7 @@ import {
   AlertTriangle,
   Plus,
   Languages,
+  MapPinned,
   Sun,
   Moon,
   Monitor,
@@ -429,6 +431,13 @@ function LiftZoneManager() {
   const [editZone, setEditZone] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  // Batch zone recalculation (geocodes every Z0 lift)
+  const [geoRunning, setGeoRunning] = useState(false)
+  const [geoProgress, setGeoProgress] = useState<{
+    done: number
+    total: number
+    updated: number
+  } | null>(null)
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null)
   const [feedbackType, setFeedbackType] = useState<'success' | 'error'>('success')
   const [isAdding, setIsAdding] = useState(false)
@@ -453,7 +462,8 @@ function LiftZoneManager() {
           anlagenummer: loc.anlagenummer,
           projectId: loc.project_id,
           address: loc.full_address,
-          effectiveZone: loc.manual_zone ?? loc.zone,
+          // Z0 lifts behave as Zone 1
+          effectiveZone: loc.manual_zone ?? (loc.zone || 1),
           isManual: loc.manual_zone !== undefined,
         })
       }
@@ -465,7 +475,8 @@ function LiftZoneManager() {
           anlagenummer: fav.anlagenummer,
           projectId: fav.project_id,
           address: fav.full_address,
-          effectiveZone: fav.manual_zone ?? fav.zone,
+          // Z0 lifts behave as Zone 1
+          effectiveZone: fav.manual_zone ?? (fav.zone || 1),
           isManual: fav.manual_zone !== undefined,
         })
       }
@@ -530,9 +541,9 @@ function LiftZoneManager() {
         full_address: editAddress,
       })
 
-      // Update zone
+      // Update zone — Z0 ("Auto") behaves as Zone 1
       const manualZone = editZone > 0 ? editZone : undefined
-      const effectiveZone = manualZone ?? editZone
+      const effectiveZone = manualZone ?? (editZone || 1)
       await localDb.updateLocationZone(anlagenummer, effectiveZone, manualZone)
 
       // Refresh store locations and favorites
@@ -544,6 +555,16 @@ function LiftZoneManager() {
       showFeedback(t('lifts.saved', { nr: anlagenummer }), 'success')
       setEditingLift(null)
       loadLifts()
+
+      // Background-geocode the (possibly edited) address so the lift gets
+      // coordinates + an auto-computed zone unless a manual zone was chosen.
+      if (editAddress.trim().length >= 5) {
+        geocodeAndApplyZone(anlagenummer, editAddress.trim(), {
+          manual_zone: manualZone,
+        })
+          .then(() => loadLifts())
+          .catch(() => {})
+      }
     } catch (err) {
       showFeedback(t('lifts.save.error'), 'error')
       setEditingLift(null)
@@ -590,7 +611,7 @@ function LiftZoneManager() {
           full_address: address,
           latitude: 0,
           longitude: 0,
-          zone: manualZone ?? 0,
+          zone: manualZone ?? 1,
           manual_zone: manualZone,
           created_at: new Date().toISOString(),
         },
@@ -603,7 +624,7 @@ function LiftZoneManager() {
         full_address: address,
         latitude: 0,
         longitude: 0,
-        zone: manualZone ?? 0,
+        zone: manualZone ?? 1,
         manual_zone: manualZone,
       })
 
@@ -620,8 +641,68 @@ function LiftZoneManager() {
       setAddAddress('')
       setAddZone(0)
       loadLifts()
+
+      // Background-geocode the address so the new lift gets real coordinates
+      // and an auto-computed zone (unless a manual zone was chosen).
+      if (address.trim().length >= 5) {
+        geocodeAndApplyZone(key, address.trim(), { manual_zone: manualZone })
+          .then(() => loadLifts())
+          .catch(() => {})
+      }
     } catch (err) {
       showFeedback(t('lifts.add.error'), 'error')
+    }
+  }
+
+  /**
+   * Batch-recalculate zones: geocode every lift that still has no zone
+   * (Z0, no manual override) and persist coords + zone locally + to the cloud
+   * via the sync queue, so the Spesenrapport fills for every day. Nominatim is
+   * rate-limited to ~1 request/second, so this can take a while for large
+   * lists — progress is shown while it runs.
+   */
+  const recalculateZones = async () => {
+    if (geoRunning) return
+    setGeoRunning(true)
+    setGeoProgress(null)
+    try {
+      const allLocs = await localDb.getAllLocations()
+      const candidates = locationsMissingZone(allLocs)
+      if (candidates.length === 0) {
+        showFeedback(t('lifts.zones.none'), 'success')
+        return
+      }
+      setGeoProgress({ done: 0, total: candidates.length, updated: 0 })
+      let updated = 0
+      for (const loc of candidates) {
+        const addr = loc.full_address || ''
+        if (addr.trim().length >= 5) {
+          const result = await geocodeAndApplyZone(loc.anlagenummer, addr.trim(), loc)
+          if (result) {
+            updated++
+            setGeoProgress((p) => (p ? { ...p, done: p.done + 1, updated } : p))
+            continue
+          }
+        }
+        // Cannot geocode (no address / no result) → default to Zone 1 so the
+        // lift is never left Z0.
+        await localDb.updateLocationZone(loc.anlagenummer, 1)
+        updated++
+        setGeoProgress((p) => (p ? { ...p, done: p.done + 1, updated } : p))
+      }
+      // Refresh store + list so the new zones show immediately
+      const updatedLocs = await localDb.getAllLocations()
+      setLocations(updatedLocs)
+      const updatedFavs = await localDb.getFavoriteLocations()
+      setFavoriteLocations(updatedFavs.slice(0, 5))
+      loadLifts()
+      showFeedback(t('lifts.zones.recalculated', { n: updated }), 'success')
+    } catch (err) {
+      console.warn('Zone recalculation failed:', err)
+      showFeedback(t('lifts.zones.error'), 'error')
+    } finally {
+      setGeoRunning(false)
+      setGeoProgress(null)
     }
   }
 
@@ -631,6 +712,7 @@ function LiftZoneManager() {
     { value: 2, label: t('lifts.zone.2') },
     { value: 3, label: t('lifts.zone.3') },
     { value: 4, label: t('lifts.zone.4') },
+    { value: 5, label: t('lifts.zone.5') },
   ]
 
   if (liftList.length === 0 && !isLoading) return null
@@ -670,6 +752,15 @@ function LiftZoneManager() {
             <span className="hidden sm:inline">{t('lifts.add')}</span>
           </button>
           <button
+            onClick={recalculateZones}
+            disabled={geoRunning}
+            className="h-8 px-3 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center gap-1.5 text-white text-xs font-semibold shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-indigo-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={t('lifts.zones.recalculate')}
+          >
+            <MapPinned className={cn('w-3.5 h-3.5', geoRunning && 'animate-pulse')} />
+            <span className="hidden sm:inline">{t('lifts.zones.recalculate')}</span>
+          </button>
+          <button
             onClick={loadLifts}
             className="w-8 h-8 rounded-xl glass dark:glass-dark flex items-center justify-center hover:bg-white/20 transition-all"
             title={t('lifts.refresh')}
@@ -683,6 +774,41 @@ function LiftZoneManager() {
           </button>
         </div>
       </div>
+
+      {/* Zone recalculation progress */}
+      {geoProgress && (
+        <div className="flex items-center gap-2 mb-3 p-2.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-900/20 border border-indigo-200/60 dark:border-indigo-700/40 animate-slide-down">
+          <RefreshCw className="w-3.5 h-3.5 text-indigo-500 animate-spin flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-300">
+                {t('lifts.zones.running', {
+                  done: geoProgress.done,
+                  total: geoProgress.total,
+                })}
+              </span>
+              <span className="text-[10px] text-indigo-500/80 dark:text-indigo-300/80 tabular-nums">
+                {geoProgress.total > 0
+                  ? Math.round((geoProgress.done / geoProgress.total) * 100)
+                  : 0}
+                %
+              </span>
+            </div>
+            <div className="mt-1 h-1.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-indigo-400 to-indigo-600 transition-all duration-300"
+                style={{
+                  width: `${
+                    geoProgress.total > 0
+                      ? (geoProgress.done / geoProgress.total) * 100
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search filter */}
       <div className="relative mb-3">
@@ -765,7 +891,8 @@ function LiftZoneManager() {
               <input
                 type="text"
                 value={addProject}
-                onChange={(e) => setAddProject(e.target.value)}
+                onChange={(e) => setAddProject(e.target.value.toUpperCase())}
+                autoCapitalize="characters"
                 placeholder={t('lifts.add.project.placeholder')}
                 className="w-full h-9 px-3 rounded-xl text-xs bg-white dark:bg-otis-800 border border-emerald-300/40 dark:border-emerald-700/30 text-otis-800 dark:text-white focus:outline-none focus:border-emerald-400/60"
               />
@@ -904,7 +1031,8 @@ function LiftZoneManager() {
                       <input
                         type="text"
                         value={editProject}
-                        onChange={(e) => setEditProject(e.target.value)}
+                        onChange={(e) => setEditProject(e.target.value.toUpperCase())}
+                        autoCapitalize="characters"
                         placeholder={t('lifts.add.project.placeholder')}
                         className="w-full h-9 px-3 rounded-xl text-xs bg-white dark:bg-otis-800 border border-otis-300/30 dark:border-otis-700/30 text-otis-800 dark:text-white focus:outline-none focus:border-otis-400/50"
                       />
@@ -992,10 +1120,10 @@ function LiftZoneManager() {
                     )}
                   </div>
 
-                  {/* Zone badge + edit button */}
+                  {/* Zone badge + edit button — Z0 (auto/unknown) is shown as 'Auto' */}
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <Badge variant={lift.isManual ? 'warning' : 'zone'} size="sm">
-                      Z{lift.effectiveZone}
+                      {lift.effectiveZone > 0 ? `Z${lift.effectiveZone}` : t('lifts.zone.auto.short')}
                       {lift.isManual && (
                         <span className="ml-0.5 text-[9px] text-amber-600 dark:text-amber-300">
                           &bull;

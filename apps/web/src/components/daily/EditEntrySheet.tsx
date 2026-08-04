@@ -229,13 +229,17 @@ export function EditEntrySheet({ open, entry, onClose, onSave }: EditEntrySheetP
                       type="text"
                       value={selectedProjectId}
                       onChange={(e) => {
-                        setSelectedProjectId(e.target.value)
-                        if (e.target.value !== selectedLocation?.project_id) {
+                        setSelectedProjectId(e.target.value.toUpperCase())
+                        if (
+                          e.target.value.toUpperCase() !==
+                          (selectedLocation?.project_id || '').toUpperCase()
+                        ) {
                           setSelectedLocation(null)
                         }
                       }}
+                      autoCapitalize="characters"
                       placeholder={t('entry.projekt.placeholder')}
-                      className="w-full h-14 pl-11 pr-4 rounded-2xl text-base glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none transition-all"
+                      className="w-full h-14 pl-11 pr-4 rounded-2xl text-base uppercase glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none transition-all"
                     />
                   </div>
                 </div>
@@ -339,8 +343,13 @@ export function EditEntrySheet({ open, entry, onClose, onSave }: EditEntrySheetP
               />
             </div>
 
-            {/* Action buttons */}
-            <div className="flex gap-3 pt-2">
+            {/* Action buttons — sticky footer so Save/Cancel are always
+                visible at the bottom of the sheet (never hidden behind the
+                app's bottom nav or the system gesture bar) */}
+            <div
+              className="sticky bottom-0 -mx-6 px-6 pt-3 flex gap-3 bg-white/95 dark:bg-stone-900/95 backdrop-blur-sm border-t border-otis-200/20 dark:border-white/5"
+              style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
+            >
               <Button
                 variant="secondary"
                 onClick={onClose}

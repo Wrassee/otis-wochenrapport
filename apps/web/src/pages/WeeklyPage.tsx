@@ -20,7 +20,10 @@ export function WeeklyPage() {
   const { timeEntries, weekSummary, updateEntry, deleteEntry, loadWeek, recalculate } =
     useTimeEntries()
   // Week's receipt photos (Spesen Belege) — shared store data, compact strip.
-  const { photos: weekPhotos } = useExpensePhotos(currentWeek.year, currentWeek.week)
+  const { photos: weekPhotos, removePhoto: removeWeekPhoto } = useExpensePhotos(
+    currentWeek.year,
+    currentWeek.week,
+  )
 
   // Page-local loading state — independent from the app-wide initialize()
   // flag, so the spinner reflects only THIS page's week load (not the whole
@@ -118,7 +121,7 @@ export function WeeklyPage() {
             <span>{t('spesen.photos.title')}</span>
             <div className="flex-1 h-px bg-gradient-to-r from-rose-200/50 to-transparent dark:from-white/5" />
           </div>
-          <ReceiptPhotos photos={weekPhotos} compact />
+          <ReceiptPhotos photos={weekPhotos} compact onDelete={removeWeekPhoto} />
         </div>
       )}
 

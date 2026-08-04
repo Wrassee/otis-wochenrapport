@@ -97,7 +97,7 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Bottom navigation - Glassmorphism */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 glass-nav dark:glass-nav-dark safe-area-bottom">
-        <div className="max-w-lg mx-auto flex justify-around h-16 pt-1.5">
+        <div className="max-w-lg mx-auto flex h-16 pt-1.5">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path
             const Icon = item.icon
@@ -106,7 +106,7 @@ export function AppShell({ children }: AppShellProps) {
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-0.5 px-4 min-h-[56px] relative',
+                  'flex-1 min-w-0 px-1 flex flex-col items-center justify-center gap-0.5 min-h-[56px] relative',
                   'transition-all duration-200',
                 )}
               >
@@ -124,7 +124,7 @@ export function AppShell({ children }: AppShellProps) {
                 />
                 <span
                   className={cn(
-                    'text-[10px] font-semibold transition-colors duration-200',
+                    'text-[10px] font-semibold transition-colors duration-200 truncate max-w-full px-0.5',
                     isActive
                       ? 'text-otis-600 dark:text-otis-400'
                       : 'text-gray-400 dark:text-stone-400',

@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/Badge'
 import { useAppStore } from '@/stores/appStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
-import { getWeekDates, formatDateShort } from '@/lib/utils'
+import { getWeekDates, formatDateShort, calculateZone, haversineDistance } from '@/lib/utils'
+import { REFERENCE_LAT, REFERENCE_LON } from '@/lib/constants'
 import { cn } from '@/lib/cn'
 import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
@@ -51,7 +52,7 @@ export function ExportPage() {
   const [downloadFilename, setDownloadFilename] = useState<string>('')
   // Receipt photos come from the store-backed hook — Dashboard/Woche share the
   // same data, and the Export page just renders the merged week's photos.
-  const { photos } = useExpensePhotos(currentWeek.year, currentWeek.week)
+  const { photos, removePhoto } = useExpensePhotos(currentWeek.year, currentWeek.week)
   useEffect(() => {
     loadWeekEntries()
   }, [currentWeek, loadWeekEntries])
@@ -63,16 +64,34 @@ export function ExportPage() {
   const buildEntriesData = (): OfflineEntry[] => {
     return timeEntries.map((e) => {
       let zone = e.location_zone || 0
-      if (!zone && e.location_anlagenummer) {
+      let lat = 0
+      let lon = 0
+      if (e.location_anlagenummer) {
         const key = e.location_anlagenummer.toUpperCase()
         const loc = locations.find((l) => l.anlagenummer.toUpperCase() === key)
         if (loc) {
-          zone = loc.manual_zone ?? loc.zone ?? 0
+          if (!zone) zone = loc.manual_zone ?? loc.zone ?? 0
+          lat = loc.latitude || 0
+          lon = loc.longitude || 0
         } else {
           const fav = favoriteLocations.find((f) => f.anlagenummer.toUpperCase() === key)
-          zone = fav?.manual_zone ?? fav?.zone ?? 0
+          if (fav) {
+            if (!zone) zone = fav.manual_zone ?? fav.zone ?? 0
+            lat = fav.latitude || 0
+            lon = fav.longitude || 0
+          }
         }
       }
+      // Auto-zone: lifts stored with zone 0 (never geocoded) get their zone
+      // computed from the coordinates so the Spesenrapport can be filled for
+      // every day — otherwise only days whose lift already had a zone would
+      // receive a mark.
+      if (!zone && lat && lon) {
+        zone = calculateZone(haversineDistance(REFERENCE_LAT, REFERENCE_LON, lat, lon))
+      }
+      // Z0 lifts (no coordinates, no stored zone) default to Zone 1 so the
+      // Spesenrapport always gets a zone mark for every work day.
+      if (!e.is_lunch && !zone) zone = 1
       return {
         date: e.date,
         start_time: e.start_time,
@@ -80,7 +99,9 @@ export function ExportPage() {
         anlagenummer: e.location_anlagenummer || '',
         project_id: e.location_project_id || '',
         address: e.location_address || '',
-        activity_code: e.activity_code || '',
+        // Work entries without an explicit activity get the default NK marker
+        // (Normalkosten) so the protocol always shows a checkmark per line.
+        activity_code: e.activity_code || (e.is_lunch ? '' : 'NK'),
         is_lunch: e.is_lunch,
         zone,
       }
@@ -251,7 +272,21 @@ export function ExportPage() {
       }
     }
 
-    // 2. Manual download link (always available as backup)
+    // 2. Web: start the download automatically (PC browsers save it right
+    // away). The manual link below stays visible as a fallback for browsers
+    // that block programmatic downloads.
+    if (!isNative) {
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename
+      a.rel = 'noopener'
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(() => document.body.removeChild(a), 100)
+    }
+
+    // 3. Manual download link (always available as backup)
     setDownloadUrl(blobUrl)
     setDownloadFilename(filename)
   }
@@ -359,7 +394,7 @@ export function ExportPage() {
       )}
 
       {/* Receipt photos attached to this week's report */}
-      <ReceiptPhotos photos={photos} />
+      <ReceiptPhotos photos={photos} onDelete={removePhoto} />
 
       {/* Export summary */}
       <ExportSummary

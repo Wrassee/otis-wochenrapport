@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/lib/cn'
 import { X } from 'lucide-react'
 import { useTranslation } from '@/lib/useTranslation'
@@ -33,7 +34,12 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
 
   if (!open) return null
 
-  return (
+  // Render into document.body via a portal: the sheet must sit ABOVE the app's
+  // fixed bottom navigation. The AppShell main wrapper creates its own
+  // stacking context (relative z-10), which would otherwise cap this z-50
+  // overlay BELOW the z-30 nav and let the nav cover the sheet's bottom
+  // buttons.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       {/* Backdrop */}
       <div
@@ -82,6 +88,7 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

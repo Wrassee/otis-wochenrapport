@@ -44,9 +44,14 @@ ACTIVITY_COLUMNS = {
     "VM": "O", "VP": "P",
     "NM": "Q", "NTC": "Q", "NF": "Q", "VC": "Q",
     "QI SCOTT": "R",
-}
+}    # Activity code -> column letter mapping (used in _fill_stundenrapport))
 
-# Activity code -> column letter mapping (used in _fill_stundenrapport))
+# Codes that are written as TEXT into the Phase/Improductif column (N) instead
+# of a checkmark — e.g. 'I04' = Administration, absence codes A01-A07.
+TEXT_ACTIVITY_CODES = {
+    "I04", "I5S", "I5Q", "I5T", "I5A",
+    "A01", "A02", "A03", "A04", "A05", "A07",
+}
 
 
 def _get_monday_of_week(year: int, week_number: int) -> datetime:
@@ -122,32 +127,49 @@ def _set_cell_marker(xml: str, ref: str, style: str) -> str:
     Wingdings needed (Wingdings maps '✓' to a wrong glyph, and the template's
     marker fonts are white, i.e. invisible on white fill).
     """
-    new = f'<c r="{ref}" s="{style}" t="inlineStr"><is><t>✓</t></is></c>'
+    new = f'<c r="{ref}" s="{style}" t="inlineStr"><is><t>ü</t></is></c>'
     return _replace_cell(xml, ref, new)
 
 
-BLACK_MARKER_FONT_ID = 2  # Arial 14, default color (black) — matches the data rows' font size
-# Fonts that must be replaced when writing the literal '✓':
-#  - Wingdings (6, 7, 8, 22, 25) map '✓' to a wrong glyph
-#  - white fonts (20, 21, 22, 23, 25 — indexed=9) render invisible on white fill
-UNSAFE_MARKER_FONTS = {6, 7, 8, 20, 21, 22, 23, 25}
-# Dark solid fill (indexed=8 = black) that would hide a black '✓'
+def _set_cell_text_marker(xml: str, ref: str, style: str, code: str) -> str:
+    """Write an activity CODE as text (e.g. 'I04' = Administration) into the
+    Improduktif/Phase column - the template expects the literal code here, not
+    a checkmark. The style is fixed up to a plain black Arial font by
+    _build_marker_styles (Wingdings would garble the code)."""
+    new = f'<c r="{ref}" s="{style}" t="inlineStr"><is><t>{xml_escape(code)}</t></is></c>'
+    return _replace_cell(xml, ref, new)
+
+
+WINGDINGS_MARKER_FONT_ID = 6  # Wingdings 26 bold BLACK - the template's own checkmark font
+TEXT_MARKER_FONT_ID = 2  # Arial 14 black - for activity codes written as text (I04, A01, ...)
+# Fonts that render the marker/code invisible (white - indexed=9) and must be
+# swapped to a black Wingdings font for markers, or to black Arial for codes:
+WHITE_FONTS = {20, 21, 22, 23, 25}
+# Black Wingdings fonts are PERFECT for the 'ü' marker (6, 7, 8) but must be
+# swapped to Arial when writing a text code ('I04' in Wingdings = garbage).
+WINGDINGS_FONTS = {6, 7, 8}
+# Dark solid fill (indexed=8 = black) that would hide a black marker/text.
 DARK_FILL_IDS = {4}
 NONE_FILL_ID = 0
 
 
-def _build_marker_styles(styles_xml: str, marker_styles: set[int]) -> tuple[str, dict[int, int]]:
-    """Ensure marker cells render a visible black '✓'.
+def _build_marker_styles(
+    styles_xml: str,
+    marker_styles: set[int],
+    text_styles: set[int],
+) -> tuple[str, dict[int, int]]:
+    """Ensure marker cells render a visible black 'ü' (Wingdings) and
+    text-code cells a visible black Arial code.
 
-    The template's marker columns use white (indexed=9) and Wingdings fonts,
-    which would render the literal '✓' invisible or as a wrong glyph. For each
-    marker cell style we append a variant that swaps the font to a plain black
-    Arial and clears dark fills. Styles that are already safe (black font on a
-    light fill) are left untouched (mapped to themselves).
+    The template's marker columns use white (indexed=9) and Wingdings fonts.
+    For each style we append a variant that swaps the font to a black Wingdings
+    (for the 'ü' marker) or to plain black Arial (for codes written as text),
+    and clears dark fills. Styles that are already safe (black font on a light
+    fill) are mapped to themselves.
 
     Returns (updated styles.xml, {old_style: new_style}).
     """
-    if not marker_styles:
+    if not marker_styles and not text_styles:
         return styles_xml, {}
     # Only the <cellXfs> section carries the cell styles (cellStyleXfs is a
     # separate, much smaller section that precedes it — including it would
@@ -162,7 +184,7 @@ def _build_marker_styles(styles_xml: str, marker_styles: set[int]) -> tuple[str,
     base = int(count_m.group(1))
     mapping: dict[int, int] = {}
     extra: list[str] = []
-    for s in sorted(marker_styles):
+    for s in sorted(marker_styles | text_styles):
         if s >= len(xfs):
             continue
         xf = xfs[s]
@@ -170,14 +192,23 @@ def _build_marker_styles(styles_xml: str, marker_styles: set[int]) -> tuple[str,
         fill_m = re.search(r'fillId="(\d+)"', xf)
         fid = int(fid_m.group(1)) if fid_m else 0
         fill = int(fill_m.group(1)) if fill_m else 0
-        need_font = fid in UNSAFE_MARKER_FONTS
+        is_text = s in text_styles
+        if is_text:
+            # Text codes need a normal font: white fonts are invisible, and
+            # black Wingdings fonts would garble the code characters.
+            need_font = fid in WHITE_FONTS or fid in WINGDINGS_FONTS
+        else:
+            # Markers must ALWAYS use a black Wingdings font (6/7/8) so 'ü'
+            # renders as a checkmark — a normal font would show a 'ü' letter.
+            need_font = fid not in WINGDINGS_FONTS
         need_fill = fill in DARK_FILL_IDS
         if not need_font and not need_fill:
             mapping[s] = s  # already safe — keep the original style
             continue
+        target = TEXT_MARKER_FONT_ID if is_text else WINGDINGS_MARKER_FONT_ID
         new_xf = xf
         if need_font:
-            new_xf = re.sub(r'fontId="\d+"', f'fontId="{BLACK_MARKER_FONT_ID}"', new_xf, count=1)
+            new_xf = re.sub(r'fontId="\d+"', f'fontId="{target}"', new_xf, count=1)
         if need_fill:
             new_xf = re.sub(r'fillId="\d+"', f'fillId="{NONE_FILL_ID}"', new_xf, count=1)
         mapping[s] = base + len(extra)
@@ -202,11 +233,12 @@ def _fill_stundenrapport(
 ) -> tuple[str, list[str]]:
     """Fill Stundenrapport sheet XML with data.
 
-    Returns (filled_xml, marker_refs) — the activity markers are applied
-    afterwards (in generate_excel) once the Wingdings cell styles exist.
+    Returns (filled_xml, marker_refs, text_refs) — the activity markers are
+    applied afterwards (in generate_excel) once the styles exist.
     """
     xml = sheet_xml
     marker_refs: list[str] = []
+    text_refs: list[tuple[str, int, str]] = []
 
     # --- Header row 2 ---
     xml = _set_cell_str(xml, "C2", str(personnel_number))
@@ -291,16 +323,20 @@ def _fill_stundenrapport(
         if duration is not None:
             xml = _set_cell_num(xml, f"I{row}", _standard_to_otis(float(duration)))
 
-        # Activity code marker (J-R) — applied later with a plain black font
-        # and the literal '✓' (see _set_cell_marker). Work entries without an
-        # explicit activity default to NK so every line of the protocol gets a
-        # checkmark (the template requires one per row).
+        # Activity marker / text code (J-R) — applied later once the styles
+        # exist. Work entries without an explicit activity default to NK so
+        # every line of the protocol gets a checkmark (the template requires
+        # one per row). Codes like I04/A01 are written as TEXT ('I04') into
+        # the Phase/Improductif column, not as a checkmark.
         activity_code = entry.get("activity_code", "") or "NK"
         if activity_code and activity_code in ACTIVITY_COLUMNS:
             col_letter = ACTIVITY_COLUMNS[activity_code]
-            marker_refs.append(f"{col_letter}{row}")
+            if activity_code in TEXT_ACTIVITY_CODES:
+                text_refs.append((col_letter, row, activity_code))
+            else:
+                marker_refs.append(f"{col_letter}{row}")
 
-    return xml, marker_refs
+    return xml, marker_refs, text_refs
 
 
 def _fill_spesenrapport(
@@ -414,19 +450,29 @@ def generate_excel(
         styles_xml = z_in.read("xl/styles.xml").decode("utf-8")
 
         # Fill sheets with data
-        sheet1_filled, marker_refs = _fill_stundenrapport(
+        sheet1_filled, marker_refs, text_refs = _fill_stundenrapport(
             sheet1_xml, year, week_number, personnel_number, full_name, entries
         )
-        # Wingdings/white-font cell styles for the activity markers are NOT
-        # needed anymore — the marker is the literal '✓' rendered with a plain
-        # black font (see _set_cell_marker). _build_marker_styles only fixes up
-        # styles whose original font is white/Wingdings or whose fill is dark.
+        # The marker is the template's own 'ü' rendered with a black Wingdings
+        # font (see _set_cell_marker); text codes (I04, A01, ...) are written
+        # with a plain black Arial font. _build_marker_styles fixes up any
+        # style whose original font is white/Wingdings or whose fill is dark.
         marker_styles = {int(_get_cell_style(sheet1_filled, ref)) for ref in marker_refs}
-        styles_xml, style_map = _build_marker_styles(styles_xml, marker_styles)
+        text_styles = {
+            int(_get_cell_style(sheet1_filled, f"{col}{row}"))
+            for col, row, _ in text_refs
+        }
+        styles_xml, style_map = _build_marker_styles(styles_xml, marker_styles, text_styles)
         for ref in marker_refs:
             style = _get_cell_style(sheet1_filled, ref)
             sheet1_filled = _set_cell_marker(
                 sheet1_filled, ref, style_map.get(int(style), style)
+            )
+        for col, row, code in text_refs:
+            ref = f"{col}{row}"
+            style = _get_cell_style(sheet1_filled, ref)
+            sheet1_filled = _set_cell_text_marker(
+                sheet1_filled, ref, style_map.get(int(style), style), code
             )
 
         sheet2_filled = _fill_spesenrapport(

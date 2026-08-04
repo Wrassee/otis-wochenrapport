@@ -4,6 +4,7 @@ import { Card, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/cn'
 import { useAppStore } from '@/stores/appStore'
+import { DAY_NAMES } from '@/lib/translations'
 import { useDailyExpenses } from '@/hooks/useDailyExpenses'
 import { useExpensePhotos } from '@/hooks/useExpensePhotos'
 import { EXPENSE_ITEM_STYLES } from '@/lib/expenseItems'
@@ -33,8 +34,10 @@ export function SpesenPage() {
   // Single week source of truth — same currentWeek the Woche/Export pages use,
   // so the Spesen tab always shows the same week's expenses and Belege photos.
   const currentWeek = useAppStore((s) => s.currentWeek)
+  const language = useAppStore((s) => s.language)
   const dates = getWeekDates(currentWeek.year, currentWeek.week)
-  const dayNames = t('week.days').split(' | ')
+  const dayNames = t('week.days').split(' | ') // short badge names (Mo, Di, …)
+  const fullDayNames = DAY_NAMES[language] // full names (Montag, Kedd, …)
 
   const { dailyExpenses, toggleExpense, setExpenseValue, syncExpenses } = useDailyExpenses(dates)
 
@@ -233,6 +236,7 @@ export function SpesenPage() {
       {dates.map((date, idx) => {
         const dayExp = dailyExpenses[date] || []
         const dayName = dayNames[idx]
+        const fullDayName = fullDayNames[idx]
 
         return (
           <Card key={date}>
@@ -251,7 +255,7 @@ export function SpesenPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-otis-800 dark:text-white">
-                      {dayName}
+                      {fullDayName}
                     </span>
                     <span className="text-[10px] text-gray-500 dark:text-stone-300 font-mono">
                       {date.slice(5)}

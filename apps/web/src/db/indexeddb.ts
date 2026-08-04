@@ -265,6 +265,59 @@ export async function updateLocationZone(
   }
 }
 
+/**
+ * Update coordinates (+ optionally zone) for a single location + its favorite
+ * counterpart, and ALWAYS queue a location_upsert sync (unlike cacheLocations,
+ * which only syncs ids with the 'manual_' prefix — geocoded coordinates for
+ * Supabase-synced lifts would otherwise never reach the cloud).
+ */
+export async function updateLocationGeo(
+  anlagenummer: string,
+  geo: { latitude: number; longitude: number; zone: number; manual_zone?: number },
+): Promise<void> {
+  const db = await getDb()
+  const key = anlagenummer.toUpperCase()
+
+  // Update in locations store
+  const allLocs = await db.getAll('locations')
+  const loc = allLocs.find((l: Location) => l.anlagenummer.toUpperCase() === key)
+  if (loc) {
+    const updated: Location = {
+      ...loc,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
+      zone: geo.zone,
+      // Preserve an existing manual override unless the caller explicitly
+      // passes a new one — never silently wipe the user's choice.
+      manual_zone: geo.manual_zone !== undefined ? geo.manual_zone : loc.manual_zone,
+    }
+    await db.put('locations', updated)
+
+    // Queue sync — unconditional, so geocoded coords reach Supabase even for
+    // server-issued (non-'manual_') location ids.
+    await db.add('sync_queue', {
+      type: 'location_upsert',
+      entryId: updated.id,
+      locationData: updated,
+      timestamp: Date.now(),
+    })
+  }
+
+  // Update in favorites store
+  const existing = await db.get('favorites', key)
+  if (existing) {
+    const updated = {
+      ...existing,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
+      zone: geo.zone,
+      manual_zone: geo.manual_zone !== undefined ? geo.manual_zone : existing.manual_zone,
+      last_used: new Date().toISOString(),
+    }
+    await db.put('favorites', updated)
+  }
+}
+
 // ===================== FAVORITES =====================
 
 export async function getFavoriteLocations(): Promise<FavoriteLocation[]> {

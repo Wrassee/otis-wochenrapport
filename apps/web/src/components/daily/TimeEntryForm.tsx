@@ -213,13 +213,19 @@ export function TimeEntryForm({
       const existingLoc = locations.find((l) => l.anlagenummer.toUpperCase() === key)
 
       if (existingLoc) {
-        // Update existing location with new project/address
+        // Update existing location with new project/address. updateLocationDetails
+        // queues a location_upsert sync UNCONDITIONALLY (cacheLocations only
+        // syncs 'manual_' ids, so edits to Supabase-synced lifts would otherwise
+        // never reach the cloud).
         const updatedLoc = {
           ...existingLoc,
           project_id: projectId,
           full_address: address,
         }
-        await localDb.cacheLocations([updatedLoc])
+        await localDb.updateLocationDetails(key, {
+          project_id: projectId,
+          full_address: address,
+        })
         setLocations(locations.map((l) => (l.id === updatedLoc.id ? updatedLoc : l)))
       } else {
         // Create new location entry
@@ -265,7 +271,8 @@ export function TimeEntryForm({
             full_address: address,
             latitude: fav?.latitude ?? existingLoc?.latitude ?? 0,
             longitude: fav?.longitude ?? existingLoc?.longitude ?? 0,
-            zone: fav?.manual_zone ?? fav?.zone ?? existingLoc?.manual_zone ?? existingLoc?.zone ?? 0,
+            zone:
+              fav?.manual_zone ?? fav?.zone ?? existingLoc?.manual_zone ?? existingLoc?.zone ?? 0,
             manual_zone: fav?.manual_zone ?? existingLoc?.manual_zone,
             use_count: fav?.use_count ?? 1,
           })
@@ -329,7 +336,15 @@ export function TimeEntryForm({
           longitude: result.lon,
           zone: effectiveZone,
         }
-        await localDb.cacheLocations([updatedLoc])
+        // updateLocationGeo queues a location_upsert sync UNCONDITIONALLY
+        // (cacheLocations only syncs 'manual_' ids, so coordinates for
+        // Supabase-synced lifts would otherwise never reach the cloud).
+        await localDb.updateLocationGeo(anlagenummer, {
+          latitude: result.lat,
+          longitude: result.lon,
+          zone: effectiveZone,
+          manual_zone: locToUpdate.manual_zone,
+        })
         setLocations(locations.map((l) => (l.id === updatedLoc.id ? updatedLoc : l)))
       }
 
@@ -533,92 +548,30 @@ export function TimeEntryForm({
             {isLunch ? t('entry.lunch.active') : t('entry.lunch.btn')}
           </button>
 
-          {/* Anlagenummer search */}
-          <div className="relative">
-            <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
-              {t('entry.anlagenummer')} <span className="text-red-400">*</span>
-            </label>
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-stone-300" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                placeholder={t('entry.search.placeholder')}
-                className="w-full h-14 pl-12 pr-4 rounded-2xl text-base glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none disabled:opacity-50 transition-all"
-                disabled={isLunch}
-              />
-            </div>
-
-            {/* Search results dropdown */}
-            {showSearchResults && searchResults.length > 0 && (
-              <div className="absolute z-20 mt-1.5 w-full glass-card dark:glass-card-dark rounded-2xl shadow-xl max-h-48 overflow-y-auto animate-slide-down border border-otis-200/30 dark:border-white/5">
-                {searchResults.map((loc) => (
-                  <button
-                    key={loc.id}
-                    type="button"
-                    onClick={() => handleSelectLocation(loc)}
-                    className="w-full flex flex-col items-start p-3.5 hover:bg-otis-50 dark:hover:bg-white/5 border-b border-otis-200/20 dark:border-white/5 last:border-b-0 text-left transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-otis-600 dark:text-otis-400">
-                        {loc.anlagenummer}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-stone-300 font-medium">
-                        {loc.project_id}
-                      </span>
-                    </div>
-                    <span className="text-xs text-gray-400 dark:text-stone-400">
-                      {loc.full_address}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Project number & Address fields (always visible, editable) */}
-          <div className="grid grid-cols-1 gap-3">
-            <div>
-              <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
-                {t('entry.projekt')} <span className="text-red-400">*</span>
-              </label>
+          {/* Lift fields (Anlagen-Nr / Projekt-Nr / Adresse) — hidden for
+              Mittagspause, they are irrelevant and distract the technician */}
+          {!isLunch && (
+            <>
+              {/* Anlagenummer search */}
               <div className="relative">
-                <PenLine className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-stone-300" />
-                <input
-                  type="text"
-                  value={selectedProjectId}
-                  onChange={(e) => {
-                    setSelectedProjectId(e.target.value)
-                    if (e.target.value !== selectedLocation?.project_id) {
-                      setSelectedLocation(null)
-                    }
-                  }}
-                  placeholder={t('entry.projekt.placeholder')}
-                  className="w-full h-14 pl-11 pr-4 rounded-2xl text-base glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none disabled:opacity-50 transition-all"
-                  disabled={isLunch}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
-                {t('entry.address')} <span className="text-red-400">*</span>
-              </label>
-              <div className="relative">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-stone-300" />
-                <input
-                  type="text"
-                  value={selectedAddress}
-                  onChange={(e) => handleAddressSearch(e.target.value)}
-                  placeholder={t('entry.address.placeholder')}
-                  className="w-full h-14 pl-11 pr-4 rounded-2xl text-base glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none disabled:opacity-50 transition-all"
-                  disabled={isLunch}
-                />
+                <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
+                  {t('entry.anlagenummer')} <span className="text-red-400">*</span>
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-stone-300" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    placeholder={t('entry.search.placeholder')}
+                    className="w-full h-14 pl-12 pr-4 rounded-2xl text-base glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none disabled:opacity-50 transition-all"
+                  />
+                </div>
 
-                {/* Address search results dropdown */}
-                {showAddressResults && addressResults.length > 0 && (
+                {/* Search results dropdown */}
+                {showSearchResults && searchResults.length > 0 && (
                   <div className="absolute z-20 mt-1.5 w-full glass-card dark:glass-card-dark rounded-2xl shadow-xl max-h-48 overflow-y-auto animate-slide-down border border-otis-200/30 dark:border-white/5">
-                    {addressResults.map((loc) => (
+                    {searchResults.map((loc) => (
                       <button
                         key={loc.id}
                         type="button"
@@ -641,30 +594,102 @@ export function TimeEntryForm({
                   </div>
                 )}
               </div>
-              <p className="text-[10px] text-gray-400 dark:text-stone-300 mt-1 pl-1">
-                {t('entry.address.hint')}
-              </p>
-            </div>
-          </div>
 
-          {/* Selected location info badge */}
-          {selectedLocation && (
-            <div className="flex items-center gap-2.5 p-3 bg-emerald-50/80 dark:bg-emerald-900/20 backdrop-blur rounded-2xl border border-emerald-200/40 dark:border-emerald-700/30">
-              <div className="w-7 h-7 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              {/* Project number & Address fields (always visible, editable) */}
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
+                    {t('entry.projekt')} <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <PenLine className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-stone-300" />
+                    <input
+                      type="text"
+                      value={selectedProjectId}
+                      onChange={(e) => {
+                        setSelectedProjectId(e.target.value.toUpperCase())
+                        if (
+                          e.target.value.toUpperCase() !==
+                          (selectedLocation?.project_id || '').toUpperCase()
+                        ) {
+                          setSelectedLocation(null)
+                        }
+                      }}
+                      autoCapitalize="characters"
+                      placeholder={t('entry.projekt.placeholder')}
+                      className="w-full h-14 pl-11 pr-4 rounded-2xl text-base uppercase glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none disabled:opacity-50 transition-all"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
+                    {t('entry.address')} <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-stone-300" />
+                    <input
+                      type="text"
+                      value={selectedAddress}
+                      onChange={(e) => handleAddressSearch(e.target.value)}
+                      placeholder={t('entry.address.placeholder')}
+                      className="w-full h-14 pl-11 pr-4 rounded-2xl text-base glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none disabled:opacity-50 transition-all"
+                    />
+
+                    {/* Address search results dropdown */}
+                    {showAddressResults && addressResults.length > 0 && (
+                      <div className="absolute z-20 mt-1.5 w-full glass-card dark:glass-card-dark rounded-2xl shadow-xl max-h-48 overflow-y-auto animate-slide-down border border-otis-200/30 dark:border-white/5">
+                        {addressResults.map((loc) => (
+                          <button
+                            key={loc.id}
+                            type="button"
+                            onClick={() => handleSelectLocation(loc)}
+                            className="w-full flex flex-col items-start p-3.5 hover:bg-otis-50 dark:hover:bg-white/5 border-b border-otis-200/20 dark:border-white/5 last:border-b-0 text-left transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-otis-600 dark:text-otis-400">
+                                {loc.anlagenummer}
+                              </span>
+                              <span className="text-xs text-gray-500 dark:text-stone-300 font-medium">
+                                {loc.project_id}
+                              </span>
+                            </div>
+                            <span className="text-xs text-gray-400 dark:text-stone-400">
+                              {loc.full_address}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-400 dark:text-stone-300 mt-1 pl-1">
+                    {t('entry.address.hint')}
+                  </p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                  {t('entry.from.database')} {selectedLocation.anlagenummer}
-                </span>
-              </div>
-              <Badge variant="zone" size="sm">
-                Z{selectedLocation.manual_zone ?? selectedLocation.zone}
-                {selectedLocation.manual_zone !== undefined && (
-                  <span className="ml-0.5 text-[9px]">✦</span>
-                )}
-              </Badge>
-            </div>
+
+              {/* Selected location info badge */}
+              {selectedLocation && (
+                <div className="flex items-center gap-2.5 p-3 bg-emerald-50/80 dark:bg-emerald-900/20 backdrop-blur rounded-2xl border border-emerald-200/40 dark:border-emerald-700/30">
+                  <div className="w-7 h-7 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                      {t('entry.from.database')} {selectedLocation.anlagenummer}
+                    </span>
+                  </div>
+                  <Badge variant="zone" size="sm">
+                    {/* Z0 lifts behave as Zone 1 */}
+                    {(selectedLocation.manual_zone ?? selectedLocation.zone) > 0
+                      ? `Z${selectedLocation.manual_zone ?? selectedLocation.zone}`
+                      : 'Z1'}
+                    {selectedLocation.manual_zone !== undefined && (
+                      <span className="ml-0.5 text-[9px]">✦</span>
+                    )}
+                  </Badge>
+                </div>
+              )}
+            </>
           )}
 
           {/* Time inputs — 15-minute increments per OTIS standard */}

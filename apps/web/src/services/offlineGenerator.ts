@@ -51,6 +51,22 @@ const ACTIVITY_COLUMNS: Record<string, string> = {
   'QI SCOTT': 'R',
 }
 
+/** Codes written as TEXT into the Phase/Improductif column (N) instead of a
+ * checkmark — e.g. 'I04' = Administration, absence codes A01-A07. */
+const TEXT_ACTIVITY_CODES = new Set([
+  'I04',
+  'I5S',
+  'I5Q',
+  'I5T',
+  'I5A',
+  'A01',
+  'A02',
+  'A03',
+  'A04',
+  'A05',
+  'A07',
+])
+
 const EXPENSE_ROWS: Record<string, number> = {
   entschaedigung_10h: 26,
   hotel: 27,
@@ -157,18 +173,28 @@ function setCellStr(xml: string, ref: string, value: string): string {
  * invisible on white fill).
  */
 function setCellMarker(xml: string, ref: string, style: string): string {
-  const newXml = `<c r="${ref}" s="${style}" t="inlineStr"><is><t>✓</t></is></c>`
+  const newXml = `<c r="${ref}" s="${style}" t="inlineStr"><is><t>ü</t></is></c>`
   return replaceCell(xml, ref, newXml)
 }
 
-/** Arial 14, default color (black) — matches the data rows' font size */
-const BLACK_MARKER_FONT_ID = 2
-/** Fonts that must be replaced when writing the literal '✓':
- *  - Wingdings (6, 7, 8, 22, 25) map '✓' to a wrong glyph
- *  - white fonts (20, 21, 22, 23, 25 — indexed=9) render invisible on white fill
- */
-const UNSAFE_MARKER_FONTS = new Set([6, 7, 8, 20, 21, 22, 23, 25])
-/** Dark solid fill (indexed=8 = black) that would hide a black '✓' */
+/** Write an activity CODE as text (e.g. 'I04' = Administration) into the
+ * Phase/Improductif column — the template expects the literal code, not a
+ * checkmark. The style is fixed up to a plain black Arial font by
+ * buildMarkerStyles (Wingdings would garble the code). */
+function setCellTextMarker(xml: string, ref: string, style: string, code: string): string {
+  const newXml = `<c r="${ref}" s="${style}" t="inlineStr"><is><t>${xmlEscape(code)}</t></is></c>`
+  return replaceCell(xml, ref, newXml)
+}
+
+/** Wingdings 26 bold BLACK — the template's own checkmark font for 'ü'. */
+const WINGDINGS_MARKER_FONT_ID = 6
+/** Arial 14 black — for activity codes written as text (I04, A01, ...). */
+const TEXT_MARKER_FONT_ID = 2
+/** Fonts that render the marker/code invisible (white — indexed=9). */
+const WHITE_FONTS = new Set([20, 21, 22, 23, 25])
+/** Black Wingdings fonts — perfect for the 'ü' marker, but garble text codes. */
+const WINGDINGS_FONTS = new Set([6, 7, 8])
+/** Dark solid fill (indexed=8 = black) that would hide a black marker/text. */
 const DARK_FILL_IDS = new Set([4])
 const NONE_FILL_ID = 0
 
@@ -186,9 +212,10 @@ const NONE_FILL_ID = 0
 function buildMarkerStyles(
   stylesXml: string,
   markerStyles: Set<number>,
+  textStyles: Set<number>,
 ): { xml: string; styleMap: Record<number, number> } {
   const styleMap: Record<number, number> = {}
-  if (markerStyles.size === 0) return { xml: stylesXml, styleMap }
+  if (markerStyles.size === 0 && textStyles.size === 0) return { xml: stylesXml, styleMap }
   // Only the <cellXfs> section carries the cell styles (cellStyleXfs is a
   // separate, much smaller section that precedes it — including it would
   // shift the indices and patch the wrong style).
@@ -200,7 +227,7 @@ function buildMarkerStyles(
   if (!countM) return { xml: stylesXml, styleMap }
   const base = parseInt(countM[1], 10)
   const extra: string[] = []
-  const sorted = [...markerStyles].sort((a, b) => a - b)
+  const sorted = [...new Set([...markerStyles, ...textStyles])].sort((a, b) => a - b)
   for (const s of sorted) {
     if (s >= xfs.length) continue
     const xf = xfs[s]
@@ -208,15 +235,26 @@ function buildMarkerStyles(
     const fillM = xf.match(/fillId="(\d+)"/)
     const fid = fidM ? parseInt(fidM[1], 10) : 0
     const fill = fillM ? parseInt(fillM[1], 10) : 0
-    const needFont = UNSAFE_MARKER_FONTS.has(fid)
+    const isText = textStyles.has(s)
+    let needFont: boolean
+    if (isText) {
+      // Text codes need a normal font: white fonts are invisible, black
+      // Wingdings fonts would garble the code characters.
+      needFont = WHITE_FONTS.has(fid) || WINGDINGS_FONTS.has(fid)
+    } else {
+      // Markers must ALWAYS use a black Wingdings font (6/7/8) so 'ü'
+      // renders as a checkmark — a normal font would show a 'ü' letter.
+      needFont = !WINGDINGS_FONTS.has(fid)
+    }
     const needFill = DARK_FILL_IDS.has(fill)
     if (!needFont && !needFill) {
       styleMap[s] = s // already safe — keep the original style
       continue
     }
+    const target = isText ? TEXT_MARKER_FONT_ID : WINGDINGS_MARKER_FONT_ID
     let newXf = xf
     if (needFont) {
-      newXf = newXf.replace(/fontId="\d+"/, `fontId="${BLACK_MARKER_FONT_ID}"`)
+      newXf = newXf.replace(/fontId="\d+"/, `fontId="${target}"`)
     }
     if (needFill) {
       newXf = newXf.replace(/fillId="\d+"/, `fillId="${NONE_FILL_ID}"`)
@@ -274,9 +312,10 @@ function fillStundenrapport(
   personnelNumber: string,
   fullName: string,
   entries: OfflineEntry[],
-): { xml: string; markerRefs: string[] } {
+): { xml: string; markerRefs: string[]; textRefs: Array<[string, number, string]> } {
   let xml = sheetXml
   const markerRefs: string[] = []
+  const textRefs: Array<[string, number, string]> = []
 
   // --- Header row 2 ---
   xml = setCellStr(xml, 'C2', String(personnelNumber))
@@ -367,18 +406,23 @@ function fillStundenrapport(
       xml = setCellNum(xml, `I${row}`, standardToOtis(entry.duration))
     }
 
-    // Activity code marker (J-R) — applied later with a plain black font
-    // and the literal '✓' (see setCellMarker). Work entries without an
-    // explicit activity default to NK so every line of the protocol gets a
-    // checkmark (the template requires one per row).
+    // Activity marker / text code (J-R) — applied later once the styles exist.
+    // Work entries without an explicit activity default to NK so every line
+    // of the protocol gets a checkmark (the template requires one per row).
+    // Codes like I04/A01 are written as TEXT ('I04') into the Phase/Improductif
+    // column, not as a checkmark.
     const activityCode = entry.activity_code || 'NK'
     if (activityCode && ACTIVITY_COLUMNS[activityCode]) {
       const colLetter = ACTIVITY_COLUMNS[activityCode]
-      markerRefs.push(`${colLetter}${row}`)
+      if (TEXT_ACTIVITY_CODES.has(activityCode)) {
+        textRefs.push([colLetter, row, activityCode])
+      } else {
+        markerRefs.push(`${colLetter}${row}`)
+      }
     }
   }
 
-  return { xml, markerRefs }
+  return { xml, markerRefs, textRefs }
 }
 
 function fillSpesenrapport(
@@ -506,11 +550,20 @@ export async function generateExcelOffline(options: OfflineGenerateOptions): Pro
   for (const ref of s1.markerRefs) {
     markerStyles.add(parseInt(getCellStyle(s1.xml, ref), 10) || 0)
   }
-  const wd = buildMarkerStyles(stylesRaw, markerStyles)
+  const textStyles = new Set<number>()
+  for (const [col, row] of s1.textRefs) {
+    textStyles.add(parseInt(getCellStyle(s1.xml, `${col}${row}`), 10) || 0)
+  }
+  const wd = buildMarkerStyles(stylesRaw, markerStyles, textStyles)
   let sheet1Filled = s1.xml
   for (const ref of s1.markerRefs) {
     const style = parseInt(getCellStyle(sheet1Filled, ref), 10) || 0
     sheet1Filled = setCellMarker(sheet1Filled, ref, String(wd.styleMap[style] ?? style))
+  }
+  for (const [col, row, code] of s1.textRefs) {
+    const ref = `${col}${row}`
+    const style = parseInt(getCellStyle(sheet1Filled, ref), 10) || 0
+    sheet1Filled = setCellTextMarker(sheet1Filled, ref, String(wd.styleMap[style] ?? style), code)
   }
 
   const sheet2Filled = fillSpesenrapport(

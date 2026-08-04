@@ -2,6 +2,8 @@ import type { FavoriteLocation } from '@/lib/types'
 import { MapPin, History, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useTranslation } from '@/lib/useTranslation'
+import { calculateZone, haversineDistance } from '@/lib/utils'
+import { REFERENCE_LAT, REFERENCE_LON } from '@/lib/constants'
 
 interface FavoriteLiftsProps {
   favorites: FavoriteLocation[]
@@ -80,7 +82,24 @@ export function FavoriteLifts({ favorites, onSelect }: FavoriteLiftsProps) {
               <div className="flex items-center gap-1 mt-0.5 relative z-10">
                 <TrendingUp className="w-2.5 h-2.5 text-otis-400/50" />
                 <span className="text-[9px] text-otis-400/50 font-medium">
-                  Zone {fav.manual_zone ?? fav.zone}
+                  {(() => {
+                    const stored = fav.manual_zone ?? fav.zone
+                    const zone =
+                      stored > 0
+                        ? stored
+                        : fav.latitude && fav.longitude
+                          ? calculateZone(
+                              haversineDistance(
+                                REFERENCE_LAT,
+                                REFERENCE_LON,
+                                fav.latitude,
+                                fav.longitude,
+                              ),
+                            )
+                          // Z0 lifts (no coordinates) default to Zone 1
+                          : 1
+                    return zone > 0 ? `Zone ${zone}` : t('lifts.zone.auto.short')
+                  })()}
                   {fav.manual_zone !== undefined && (
                     <span className="text-[8px] ml-0.5 text-amber-500 font-bold">✦</span>
                   )}

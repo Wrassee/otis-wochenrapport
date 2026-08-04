@@ -82,11 +82,11 @@ export function WeekOverview({
 
       {/* Overall status */}
       <Card variant={allValid ? 'success' : 'warning'}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <div
               className={cn(
-                'w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg',
+                'w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0',
                 allValid
                   ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/20'
                   : 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-amber-500/20',
@@ -98,19 +98,23 @@ export function WeekOverview({
                 <BarChart3 className="w-6 h-6 text-white" />
               )}
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-baseline gap-1">
                 <span className="font-bold text-2xl text-otis-800 dark:text-white">
                   {weekSummary.totalHours.toFixed(1)}h
                 </span>
                 <span className="text-sm text-gray-400 dark:text-stone-300">{t('week.total')}</span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-stone-300">
+              <p className="text-xs text-gray-500 dark:text-stone-300 truncate">
                 {t('week.days.complete', { valid: validDays, total: totalDays })}
               </p>
             </div>
           </div>
-          <Badge variant={allValid ? 'success' : 'warning'} size="lg">
+          <Badge
+            variant={allValid ? 'success' : 'warning'}
+            size="lg"
+            className="flex-shrink-0 whitespace-nowrap"
+          >
             {allValid ? t('week.complete') : t('week.incomplete')}
           </Badge>
         </div>

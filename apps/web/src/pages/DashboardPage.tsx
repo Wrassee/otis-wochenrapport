@@ -4,7 +4,6 @@ import { EditEntrySheet } from '@/components/daily/EditEntrySheet'
 import { QuickAdd } from '@/components/daily/QuickAdd'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
 import { useAppStore } from '@/stores/appStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
@@ -18,9 +17,6 @@ import {
   UtensilsCrossed,
   Building2,
   Euro,
-  Wifi,
-  WifiOff,
-  RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { TimelineView } from '@/components/ui/TimelineView'
@@ -32,13 +28,12 @@ import { ExpenseEditor } from '@/components/weekly/ExpenseEditor'
 
 export function DashboardPage() {
   const { t } = useTranslation()
-  const { currentDate, setCurrentDate, currentWeek, syncStatus, setSyncStatus } = useAppStore(
+  const { currentDate, setCurrentDate, currentWeek, language } = useAppStore(
     useShallow((s) => ({
       currentDate: s.currentDate,
       setCurrentDate: s.setCurrentDate,
       currentWeek: s.currentWeek,
-      syncStatus: s.syncStatus,
-      setSyncStatus: s.setSyncStatus,
+      language: s.language,
     })),
   )
   const { timeEntries, addEntry, updateEntry, deleteEntry, quickAdd, loadWeek } = useTimeEntries()
@@ -46,19 +41,10 @@ export function DashboardPage() {
   // Week's receipt photos (Spesen Belege) — shared store data, compact strip.
   // Single week source of truth: the store's currentWeek (kept in sync with
   // the day via setCurrentDate), so all pages address the same week.
-  const { photos: weekPhotos } = useExpensePhotos(currentWeek.year, currentWeek.week)
-  const handleSync = async () => {
-    const { forceSync } = await import('@/db/sync')
-    setSyncStatus({ syncing: true })
-    try {
-      await forceSync()
-      // After pushing local changes, pull the cloud week so entries recorded
-      // on another device (e.g. the phone) appear immediately.
-      await loadWeek()
-    } finally {
-      setSyncStatus({ syncing: false })
-    }
-  }
+  const { photos: weekPhotos, removePhoto: removeWeekPhoto } = useExpensePhotos(
+    currentWeek.year,
+    currentWeek.week,
+  )
   const [editEntry, setEditEntry] = useState<TimeEntry | null>(null)
   const [conflictEntryIds, setConflictEntryIds] = useState<string[]>([])
   const [showExpenseEditor, setShowExpenseEditor] = useState(false)
@@ -127,8 +113,8 @@ export function DashboardPage() {
   }
 
   const dateObj = new Date(currentDate + 'T12:00:00')
-  const dayName = dateObj.toLocaleDateString('de-DE', { weekday: 'long' })
-  const dateFormatted = dateObj.toLocaleDateString('de-DE', {
+  const dayName = dateObj.toLocaleDateString(language, { weekday: 'long' })
+  const dateFormatted = dateObj.toLocaleDateString(language, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -136,59 +122,6 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      {/* Sync status card */}
-      <Card>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div
-              className={cn(
-                'w-9 h-9 rounded-xl flex items-center justify-center shadow-lg',
-                syncStatus.online
-                  ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/20'
-                  : 'bg-gradient-to-br from-red-400 to-red-600 shadow-red-500/20',
-              )}
-            >
-              {syncStatus.online ? (
-                <Wifi className="w-4 h-4 text-white" />
-              ) : (
-                <WifiOff className="w-4 h-4 text-white" />
-              )}
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span
-                  className={cn(
-                    'text-xs font-bold',
-                    syncStatus.online
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-red-500 dark:text-red-400',
-                  )}
-                >
-                  {syncStatus.online ? t('settings.online') : t('settings.offline')}
-                </span>
-                {syncStatus.lastSync && (
-                  <span className="text-[10px] text-gray-400 dark:text-stone-300">
-                    {new Date(syncStatus.lastSync).toLocaleTimeString('de-DE', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px] text-gray-400 dark:text-stone-300">
-                {syncStatus.pendingSync > 0
-                  ? t('settings.pending.count', { n: syncStatus.pendingSync })
-                  : t('settings.pending.none')}
-              </span>
-            </div>
-          </div>
-          <Button onClick={handleSync} variant="primary" size="sm" disabled={syncStatus.syncing}>
-            <RefreshCw className={cn('w-3.5 h-3.5', syncStatus.syncing && 'animate-spin')} />
-            {syncStatus.syncing ? t('settings.syncing') : t('settings.sync.now')}
-          </Button>
-        </div>
-      </Card>
-
       {/* Day navigation */}
       <Card>
         <div className="flex items-center justify-between">
@@ -330,7 +263,7 @@ export function DashboardPage() {
             <span>{t('spesen.photos.title')}</span>
             <div className="flex-1 h-px bg-gradient-to-r from-rose-200/50 to-transparent dark:from-white/5" />
           </div>
-          <ReceiptPhotos photos={weekPhotos} compact />
+          <ReceiptPhotos photos={weekPhotos} compact onDelete={removeWeekPhoto} />
         </div>
       )}
 
