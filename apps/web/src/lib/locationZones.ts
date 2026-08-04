@@ -58,14 +58,25 @@ export async function geocodeAndApplyZone(
 }
 
 /**
- * Collect every lift that still needs a zone: no manual override and no
- * positive computed zone yet. These are the Z0 lifts the export's
- * Spesenrapport currently cannot fill.
+ * Collect every lift whose zone is not trustworthy: no manual override and
+ * (no geocoded coordinates OR the stored zone does not match the zone
+ * recomputed from those coordinates). Lifts without coordinates can carry a
+ * misleading defaulted zone (e.g. Z1) that was never actually computed from a
+ * distance — and lifts WITH coordinates can carry a stale zone from the old
+ * Z0→Z1 default. Both must be recalculated, otherwise a lift like H2957
+ * (Hausen am Albis ≈ 20 km → Z2) would stay stuck on the wrong Z1 forever.
  */
 export function locationsMissingZone(
   locations: (Location | FavoriteLocation)[],
 ): (Location | FavoriteLocation)[] {
-  return locations.filter(
-    (l) => l.manual_zone === undefined && !(Number(l.zone) > 0),
-  )
+  const ref = getZoneReference()
+  return locations.filter((l) => {
+    if (l.manual_zone !== undefined) return false
+    if (!Number(l.latitude) || !Number(l.longitude)) return true
+    // Has coordinates → recompute and compare, never trust the stored zone.
+    const computed = calculateZone(
+      haversineDistance(ref.lat, ref.lon, Number(l.latitude), Number(l.longitude)),
+    )
+    return Number(l.zone) !== computed
+  })
 }

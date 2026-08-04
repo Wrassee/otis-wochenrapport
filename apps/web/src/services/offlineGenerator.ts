@@ -302,6 +302,11 @@ export interface OfflineGenerateOptions {
   expenses?: OfflineExpense[]
   /** Optional receipt-photo notes written into the Spesenrapport (row 34). */
   photo_notes?: string[]
+  /**
+   * Z4/Z5 km allowance (CHF) per weekday (Mon=0..Fri=4), written into the
+   * Spesenrapport's "Zone 4 + 5 (variable) · CHF -.10 / km" row (row 24).
+   */
+  km_allowances?: Record<number, number>
 }
 
 // ====== SHEET FILLERS ======
@@ -435,6 +440,7 @@ function fillSpesenrapport(
   entries: OfflineEntry[],
   expenses?: OfflineExpense[],
   photoNotes?: string[],
+  kmAllowances?: Record<number, number>,
 ): string {
   let xml = sheetXml
 
@@ -468,6 +474,17 @@ function fillSpesenrapport(
       const colLetter = SPESEN_DAY_COLUMNS[weekday]
       if (colLetter) {
         xml = setCellNum(xml, `${colLetter}${row}`, 1)
+      }
+    }
+  }
+
+  // --- Z4/Z5 km allowance (row 24: "Zone 4 + 5 variable · CHF -.10 / km") ---
+  if (kmAllowances) {
+    for (const [weekdayStr, value] of Object.entries(kmAllowances)) {
+      const weekday = Number(weekdayStr)
+      const colLetter = SPESEN_DAY_COLUMNS[weekday]
+      if (colLetter && value > 0) {
+        xml = setCellNum(xml, `${colLetter}24`, value)
       }
     }
   }
@@ -522,7 +539,16 @@ function fillSpesenrapport(
  * @returns A Promise resolving to the XLSX Blob
  */
 export async function generateExcelOffline(options: OfflineGenerateOptions): Promise<Blob> {
-  const { year, week_number, personnel_number, full_name, entries, expenses, photo_notes } = options
+  const {
+    year,
+    week_number,
+    personnel_number,
+    full_name,
+    entries,
+    expenses,
+    photo_notes,
+    km_allowances,
+  } = options
 
   // 1. Decode the embedded template from base64
   const templateBinary = atob(TEMPLATE_BASE64)
@@ -576,6 +602,7 @@ export async function generateExcelOffline(options: OfflineGenerateOptions): Pro
     entries,
     expenses,
     photo_notes,
+    km_allowances,
   )
 
   // 5. Update the ZIP

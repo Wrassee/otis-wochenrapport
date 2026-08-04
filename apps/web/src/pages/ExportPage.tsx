@@ -8,10 +8,12 @@ import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
 import { getWeekDates, formatDateShort, calculateZone, haversineDistance } from '@/lib/utils'
 import { getZoneReference } from '@/lib/zoneReference'
+import { getDrivingDistance } from '@/lib/routing'
 import { cn } from '@/lib/cn'
 import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
 import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
+import type { TimeEntry } from '@/lib/types'
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
@@ -61,41 +63,57 @@ export function ExportPage() {
     calculateWeekSummary()
   }, [timeEntries, calculateWeekSummary])
 
-  const buildEntriesData = (): OfflineEntry[] => {
-    // The zone origin (profile override or Dietlikon default) is constant for
-    // the whole export — resolve once instead of per entry.
+  /**
+   * Resolve the TRUSTWORTHY zone for an entry — mirrors the Settings lift list
+   * (liftEffectiveZone): a manual override always wins, otherwise the zone is
+   * recomputed from the geocoded coordinates and the current reference point.
+   * A stale stored zone (e.g. a leftover of the old Z0→Z1 default) is never
+   * trusted — the report and the km allowance use the same zone the user sees.
+   * Returns the coordinates too, for the Z4/Z5 km calculation.
+   */
+  const resolveEntryZone = (e: TimeEntry): { zone: number; lat: number; lon: number } => {
     const zoneRef = getZoneReference()
-    return timeEntries.map((e) => {
-      let zone = e.location_zone || 0
-      let lat = 0
-      let lon = 0
-      if (e.location_anlagenummer) {
-        const key = e.location_anlagenummer.toUpperCase()
-        const loc = locations.find((l) => l.anlagenummer.toUpperCase() === key)
-        if (loc) {
-          if (!zone) zone = loc.manual_zone ?? loc.zone ?? 0
-          lat = loc.latitude || 0
-          lon = loc.longitude || 0
-        } else {
-          const fav = favoriteLocations.find((f) => f.anlagenummer.toUpperCase() === key)
-          if (fav) {
-            if (!zone) zone = fav.manual_zone ?? fav.zone ?? 0
-            lat = fav.latitude || 0
-            lon = fav.longitude || 0
-          }
+    let manualZone: number | undefined
+    let lat = 0
+    let lon = 0
+    if (e.location_anlagenummer) {
+      const key = e.location_anlagenummer.toUpperCase()
+      const loc = locations.find((l) => l.anlagenummer.toUpperCase() === key)
+      if (loc) {
+        manualZone = loc.manual_zone
+        lat = loc.latitude || 0
+        lon = loc.longitude || 0
+      } else {
+        const fav = favoriteLocations.find((f) => f.anlagenummer.toUpperCase() === key)
+        if (fav) {
+          manualZone = fav.manual_zone
+          lat = fav.latitude || 0
+          lon = fav.longitude || 0
         }
       }
-      // Auto-zone: lifts stored with zone 0 (never geocoded) get their zone
-      // computed from the coordinates so the Spesenrapport can be filled for
-      // every day — otherwise only days whose lift already had a zone would
-      // receive a mark.
-      if (!zone && lat && lon) {
-        zone = calculateZone(haversineDistance(zoneRef.lat, zoneRef.lon, lat, lon))
+    }
+    if (manualZone !== undefined) return { zone: manualZone, lat, lon }
+    if (lat && lon) {
+      return {
+        zone: calculateZone(haversineDistance(zoneRef.lat, zoneRef.lon, lat, lon)),
+        lat,
+        lon,
       }
-      // Z0 lifts (no coordinates, no stored zone) default to Zone 1 so the
-      // Spesenrapport always gets a zone mark for every work day. Absence
-      // entries (A01/A03/…) get no zone mark — sick/vacation days have no Spesen.
-      if (!e.is_lunch && !zone && !(e.activity_code || '').startsWith('A')) zone = 1
+    }
+    // No geocoded lift → fall back to whatever the entry carried (usually 0).
+    return { zone: e.location_zone || 0, lat: 0, lon: 0 }
+  }
+
+  const buildEntriesData = (): OfflineEntry[] => {
+    return timeEntries.map((e) => {
+      const { zone } = resolveEntryZone(e)
+      // Last resort for the Spesenrapport: a work day whose lift is truly
+      // unknown (no coordinates, no stored zone) is marked Z1 so the report
+      // always gets a zone — the Settings lift list shows such lifts honestly
+      // as 'Auto' and the batch recalc geocodes them into their real zone.
+      // Absence entries (A01/A03/…) never get a zone mark (no Spesen).
+      const effectiveZone =
+        !e.is_lunch && !zone && !(e.activity_code || '').startsWith('A') ? 1 : zone
       return {
         date: e.date,
         start_time: e.start_time,
@@ -107,9 +125,83 @@ export function ExportPage() {
         // (Normalkosten) so the protocol always shows a checkmark per line.
         activity_code: e.activity_code || (e.is_lunch ? '' : 'NK'),
         is_lunch: e.is_lunch,
-        zone,
+        zone: effectiveZone,
       }
     })
+  }
+
+  /**
+   * Z4/Z5 km allowance per weekday (Mon=0..Fri=4) for the Spesenrapport's
+   * "Zone 4 + 5 (variable) · CHF -.10 / km" row (row 24).
+   *
+   * Rule: on days whose highest zone is Z4 or Z5 (60+ km straight-line → the
+   * rule kicks in automatically by zone), the technician is entitled to
+   * 0.10 CHF per km DRIVEN. The driven distance comes from OSRM road routing
+   * (real route, e.g. 68 km straight-line ≈ 114 km driven one way → 228 km
+   * round trip → 22.80 CHF); when offline the straight-line distance ×2 is
+   * used as a fallback estimate. Written per day column.
+   */
+  const collectKmAllowances = async (): Promise<Record<number, number>> => {
+    const zoneRef = getZoneReference()
+    const weekDates = getWeekDates(currentWeek.year, currentWeek.week)
+    const result: Record<number, number> = {}
+
+    // Per-day candidates: { weekday, home→lift } for the max-zone lift.
+    const candidates: { weekday: number; from: { lat: number; lon: number }; to: { lat: number; lon: number } }[] = []
+
+    weekDates.forEach((date, weekday) => {
+      const dayEntries = timeEntries.filter((e) => e.date === date && !e.is_lunch)
+      if (dayEntries.length === 0) return
+
+      // Highest zone per day + the coordinates of the lift that set it (for
+      // the km calc we keep the FARTHEST lift when several share the max zone).
+      // Zones come from resolveEntryZone — the same trustworthy, coordinate-
+      // based zones used for the report marks and the Settings lift list.
+      let maxZone = 0
+      let best: { lat: number; lon: number } | null = null
+      for (const e of dayEntries) {
+        const { zone, lat, lon } = resolveEntryZone(e)
+        if (zone > maxZone) {
+          maxZone = zone
+          best = lat && lon ? { lat, lon } : null
+        } else if (zone === maxZone && zone > 0 && lat && lon) {
+          const d1 = haversineDistance(zoneRef.lat, zoneRef.lon, lat, lon)
+          const d0 = best
+            ? haversineDistance(zoneRef.lat, zoneRef.lon, best.lat, best.lon)
+            : 0
+          if (d1 > d0) best = { lat, lon }
+        }
+      }
+
+      // Only Z4/Z5 days get the km allowance (60+ km straight-line).
+      if (maxZone >= 4 && best) {
+        candidates.push({ weekday, from: zoneRef, to: best })
+      }
+    })
+
+    if (candidates.length === 0) return result
+
+    // Real driven distance via OSRM (parallel, but never block the export on
+    // slow routing — each request times out after 5 s and getDrivingDistance
+    // itself returns null instead of throwing, so this can't stall the export).
+    const routes = await Promise.all(
+      candidates.map((c) =>
+        getDrivingDistance(c.from.lat, c.from.lon, c.to.lat, c.to.lon).then((r) => ({ c, r })),
+      ),
+    )
+
+    for (const { c, r } of routes) {
+      // Driven route when available, else straight-line as fallback.
+      const oneWayKm =
+        r !== null && r > 0
+          ? r
+          : haversineDistance(c.from.lat, c.from.lon, c.to.lat, c.to.lon)
+      const roundTripKm = 2 * oneWayKm
+      const chf = Math.round(roundTripKm * 0.1 * 100) / 100
+      if (chf > 0) result[c.weekday] = chf
+    }
+
+    return result
   }
 
   const collectWeekExpenses = (): OfflineExpense[] => {
@@ -161,6 +253,7 @@ export function ExportPage() {
     const entriesData = buildEntriesData()
     const allExpenses = collectWeekExpenses()
     const photoNotes = collectPhotoNotes()
+    const kmAllowances = await collectKmAllowances()
 
     try {
       const renderUrl = import.meta.env.VITE_RENDER_URL || 'http://localhost:8000'
@@ -176,6 +269,7 @@ export function ExportPage() {
           entries: entriesData,
           expenses: allExpenses,
           photo_notes: photoNotes,
+          km_allowances: kmAllowances,
         }),
         signal: AbortSignal.timeout(30000),
       })
@@ -196,6 +290,7 @@ export function ExportPage() {
         entries: entriesData,
         expenses: allExpenses,
         photo_notes: photoNotes,
+        km_allowances: kmAllowances,
       })
       return { blob, usedOffline: true }
     }

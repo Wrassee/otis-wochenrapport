@@ -85,11 +85,15 @@ export function FavoriteLifts({ favorites, onSelect }: FavoriteLiftsProps) {
                 <TrendingUp className="w-2.5 h-2.5 text-otis-400/50" />
                 <span className="text-[9px] text-otis-400/50 font-medium">
                   {(() => {
-                    const stored = fav.manual_zone ?? fav.zone
+                    // A stored zone is only trustworthy with a manual override
+                    // — the auto zone is ALWAYS recomputed from the coordinates
+                    // and the current reference point (a stale stored zone,
+                    // e.g. a Z0→Z1 default leftover, is never shown).
+                    const hasCoords = fav.latitude && fav.longitude
                     const zone =
-                      stored > 0
-                        ? stored
-                        : fav.latitude && fav.longitude
+                      fav.manual_zone !== undefined
+                        ? fav.manual_zone
+                        : hasCoords
                           ? calculateZone(
                               haversineDistance(
                                 zoneRef.lat,
@@ -98,8 +102,9 @@ export function FavoriteLifts({ favorites, onSelect }: FavoriteLiftsProps) {
                                 fav.longitude,
                               ),
                             )
-                          // Z0 lifts (no coordinates) default to Zone 1
-                          : 1
+                          // No coordinates → zone unknown; show 'Auto' rather
+                          // than fabricating a misleading Z1.
+                          : 0
                     return zone > 0 ? `Zone ${zone}` : t('lifts.zone.auto.short')
                   })()}
                   {fav.manual_zone !== undefined && (

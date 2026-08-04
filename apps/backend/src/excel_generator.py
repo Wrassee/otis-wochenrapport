@@ -348,6 +348,7 @@ def _fill_spesenrapport(
     entries: list[dict],
     expenses: Optional[list[dict]] = None,
     photo_notes: Optional[list[str]] = None,
+    km_allowances: Optional[dict] = None,
 ) -> str:
     """Fill Spesenrapport sheet XML with data."""
     xml = sheet_xml
@@ -382,6 +383,18 @@ def _fill_spesenrapport(
             col_letter = SPESEN_DAY_COLUMNS.get(weekday)
             if col_letter:
                 xml = _set_cell_num(xml, f"{col_letter}{row}", 1)
+
+    # --- Z4/Z5 km allowance (row 24: "Zone 4 + 5 (variable) · CHF -.10 / km") ---
+    if km_allowances:
+        for weekday_str, value in km_allowances.items():
+            try:
+                weekday = int(weekday_str)
+                value_f = float(value)
+            except (ValueError, TypeError):
+                continue
+            col_letter = SPESEN_DAY_COLUMNS.get(weekday)
+            if col_letter and value_f > 0:
+                xml = _set_cell_num(xml, f"{col_letter}24", value_f)
 
     # --- Fill expenses ---
     if expenses:
@@ -428,6 +441,7 @@ def generate_excel(
     entries: list[dict],
     expenses: Optional[list[dict]] = None,
     photo_notes: Optional[list[str]] = None,
+    km_allowances: Optional[dict] = None,
     output_path: Optional[str] = None,
 ) -> bytes:
     """
@@ -477,7 +491,7 @@ def generate_excel(
 
         sheet2_filled = _fill_spesenrapport(
             sheet2_xml, year, week_number, personnel_number, full_name,
-            entries, expenses, photo_notes
+            entries, expenses, photo_notes, km_allowances
         )
 
         # Rebuild the zip with modified sheets

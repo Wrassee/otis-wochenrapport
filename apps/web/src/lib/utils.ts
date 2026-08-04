@@ -122,13 +122,18 @@ export function meetsDailyRequirement(
 }
 
 /**
- * Calculate zone based on distance from reference point (Dietlikon)
+ * Calculate zone based on distance from the reference point.
+ *
+ *   Z1: 0–10 km        Z2: 10–30 km
+ *   Z3: 30–60 km       Z4: 60+ km
+ *   Z5: 60+ km with an overnight stay (only ever chosen manually / explicitly,
+ *       auto-computed zones never assume an overnight stay)
  */
-export function calculateZone(distanceKm: number): number {
+export function calculateZone(distanceKm: number, overnightStay = false): number {
   if (distanceKm < 10) return 1
   if (distanceKm < 30) return 2
   if (distanceKm < 60) return 3
-  return 4
+  return overnightStay ? 5 : 4
 }
 
 /**

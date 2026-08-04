@@ -11,6 +11,8 @@ import * as localDb from '@/db/indexeddb'
 import { geocodeAndApplyZone, locationsMissingZone } from '@/lib/locationZones'
 import { geocodeAddress } from '@/lib/geocode'
 import { REFERENCE_LAT, REFERENCE_LON } from '@/lib/constants'
+import { calculateZone, haversineDistance } from '@/lib/utils'
+import { getZoneReference } from '@/lib/zoneReference'
 import type { Profile } from '@/lib/types'
 import {
   LogOut,
@@ -423,6 +425,28 @@ interface LiftItem {
   isManual: boolean
 }
 
+/**
+ * Resolve the zone a lift should display: a manual override always wins;
+ * otherwise the zone is recomputed from the geocoded coordinates and the
+ * current zone reference point. A stale stored zone (leftover of the old
+ * Z0→Z1 default) is never trusted — unknown lifts honestly show 'Auto'.
+ */
+function liftEffectiveZone(loc: {
+  manual_zone?: number
+  zone?: number
+  latitude?: number
+  longitude?: number
+}): number {
+  if (loc.manual_zone !== undefined) return loc.manual_zone
+  if (Number(loc.latitude) && Number(loc.longitude)) {
+    const ref = getZoneReference()
+    return calculateZone(
+      haversineDistance(ref.lat, ref.lon, Number(loc.latitude), Number(loc.longitude)),
+    )
+  }
+  return 0
+}
+
 function LiftZoneManager() {
   const { t } = useTranslation()
   const { locations, setLocations, setFavoriteLocations } = useAppStore(
@@ -472,8 +496,11 @@ function LiftZoneManager() {
           anlagenummer: loc.anlagenummer,
           projectId: loc.project_id,
           address: loc.full_address,
-          // Z0 lifts behave as Zone 1
-          effectiveZone: loc.manual_zone ?? (loc.zone || 1),
+          // Auto zone is ALWAYS recomputed from the geocoded coordinates and
+          // the current zone reference point — a stale stored zone (e.g. a
+          // leftover of the old Z0→Z1 default) is never trusted. Only a manual
+          // override wins. Unknown (no coords, no override) → shown as 'Auto'.
+          effectiveZone: liftEffectiveZone(loc),
           isManual: loc.manual_zone !== undefined,
         })
       }
@@ -485,8 +512,9 @@ function LiftZoneManager() {
           anlagenummer: fav.anlagenummer,
           projectId: fav.project_id,
           address: fav.full_address,
-          // Z0 lifts behave as Zone 1
-          effectiveZone: fav.manual_zone ?? (fav.zone || 1),
+          // Same trust rule as locations: auto zone always comes from the
+          // coordinates, never from a possibly-stale stored zone.
+          effectiveZone: liftEffectiveZone(fav),
           isManual: fav.manual_zone !== undefined,
         })
       }
@@ -551,9 +579,24 @@ function LiftZoneManager() {
         full_address: editAddress,
       })
 
-      // Update zone — Z0 ("Auto") behaves as Zone 1
+      // Update zone — a manual pick wins; "Auto" (0) recomputes from the
+      // lift's existing coordinates when available (so a known lift never
+      // loses its zone), otherwise it stays unknown until the background
+      // geocode below fills it in from the address.
       const manualZone = editZone > 0 ? editZone : undefined
-      const effectiveZone = manualZone ?? (editZone || 1)
+      let effectiveZone = manualZone ?? 0
+      if (!manualZone) {
+        const allLocs = await localDb.getAllLocations()
+        const loc = allLocs.find(
+          (l) => l.anlagenummer.toUpperCase() === anlagenummer.toUpperCase(),
+        )
+        if (loc && Number(loc.latitude) && Number(loc.longitude)) {
+          const ref = getZoneReference()
+          effectiveZone = calculateZone(
+            haversineDistance(ref.lat, ref.lon, loc.latitude, loc.longitude),
+          )
+        }
+      }
       await localDb.updateLocationZone(anlagenummer, effectiveZone, manualZone)
 
       // Refresh store locations and favorites
@@ -621,7 +664,7 @@ function LiftZoneManager() {
           full_address: address,
           latitude: 0,
           longitude: 0,
-          zone: manualZone ?? 1,
+          zone: manualZone ?? 0,
           manual_zone: manualZone,
           created_at: new Date().toISOString(),
         },
@@ -634,7 +677,7 @@ function LiftZoneManager() {
         full_address: address,
         latitude: 0,
         longitude: 0,
-        zone: manualZone ?? 1,
+        zone: manualZone ?? 0,
         manual_zone: manualZone,
       })
 
@@ -685,19 +728,25 @@ function LiftZoneManager() {
       setGeoProgress({ done: 0, total: candidates.length, updated: 0 })
       let updated = 0
       for (const loc of candidates) {
-        const addr = loc.full_address || ''
-        if (addr.trim().length >= 5) {
-          const result = await geocodeAndApplyZone(loc.anlagenummer, addr.trim(), loc)
-          if (result) {
-            updated++
-            setGeoProgress((p) => (p ? { ...p, done: p.done + 1, updated } : p))
-            continue
+        if (Number(loc.latitude) && Number(loc.longitude)) {
+          // Already geocoded → just recompute the zone from the coordinates
+          // and the current reference point (no rate-limited geocode needed).
+          const ref = getZoneReference()
+          const zone = calculateZone(
+            haversineDistance(ref.lat, ref.lon, Number(loc.latitude), Number(loc.longitude)),
+          )
+          await localDb.updateLocationZone(loc.anlagenummer, zone, undefined)
+          updated++
+        } else {
+          const addr = loc.full_address || ''
+          if (addr.trim().length >= 5) {
+            const result = await geocodeAndApplyZone(loc.anlagenummer, addr.trim(), loc)
+            if (result) updated++
           }
+          // Cannot geocode (no address / no result) → the lift stays unknown
+          // (Z0/'Auto') instead of being silently mislabelled Zone 1 — an
+          // honest empty zone beats a fabricated one.
         }
-        // Cannot geocode (no address / no result) → default to Zone 1 so the
-        // lift is never left Z0.
-        await localDb.updateLocationZone(loc.anlagenummer, 1)
-        updated++
         setGeoProgress((p) => (p ? { ...p, done: p.done + 1, updated } : p))
       }
       // Refresh store + list so the new zones show immediately

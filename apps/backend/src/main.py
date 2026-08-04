@@ -98,6 +98,9 @@ class GenerateRequest(BaseModel):
     expenses: list[ExpenseInput] = []
     supervisor_email: Optional[str] = None
     photo_notes: list[str] = []
+    # Z4/Z5 km allowance (CHF) per weekday (0=Mon..4=Fri), written into the
+    # Spesenrapport "Zone 4 + 5 (variable) · CHF -.10 / km" row (row 24).
+    km_allowances: dict[int, float] = {}
 
 
 class SendEmailRequest(GenerateRequest):
@@ -174,6 +177,7 @@ async def generate_excel_endpoint(request: GenerateRequest):
             entries=entries_dict,
             expenses=expenses_dict if expenses_dict else None,
             photo_notes=request.photo_notes or None,
+            km_allowances=request.km_allowances or None,
         )
 
         filename = _build_excel_filename(request.year, request.week_number)
