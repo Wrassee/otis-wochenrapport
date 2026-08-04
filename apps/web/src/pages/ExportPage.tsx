@@ -90,8 +90,9 @@ export function ExportPage() {
         zone = calculateZone(haversineDistance(REFERENCE_LAT, REFERENCE_LON, lat, lon))
       }
       // Z0 lifts (no coordinates, no stored zone) default to Zone 1 so the
-      // Spesenrapport always gets a zone mark for every work day.
-      if (!e.is_lunch && !zone) zone = 1
+      // Spesenrapport always gets a zone mark for every work day. Absence
+      // entries (A01/A03/…) get no zone mark — sick/vacation days have no Spesen.
+      if (!e.is_lunch && !zone && !(e.activity_code || '').startsWith('A')) zone = 1
       return {
         date: e.date,
         start_time: e.start_time,

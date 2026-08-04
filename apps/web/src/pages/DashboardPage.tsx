@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { TimeEntryForm } from '@/components/daily/TimeEntryForm'
 import { EditEntrySheet } from '@/components/daily/EditEntrySheet'
 import { QuickAdd } from '@/components/daily/QuickAdd'
@@ -17,6 +18,7 @@ import {
   UtensilsCrossed,
   Building2,
   Euro,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { TimelineView } from '@/components/ui/TimelineView'
@@ -27,6 +29,7 @@ import { ReceiptPhotos } from '@/components/export/ReceiptPhotos'
 import { ExpenseEditor } from '@/components/weekly/ExpenseEditor'
 
 export function DashboardPage() {
+  const navigate = useNavigate()
   const { t } = useTranslation()
   const { currentDate, setCurrentDate, currentWeek, language } = useAppStore(
     useShallow((s) => ({
@@ -122,6 +125,32 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4">
+      {/* Wizard entry — guided week entry */}
+      <button
+        onClick={() => navigate('/wizard')}
+        className="w-full text-left group"
+      >
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-otis-600 via-otis-500 to-emerald-500 p-5 shadow-lg shadow-otis-500/25 transition-all duration-300 hover:shadow-otis-500/40 hover:brightness-110 active:scale-[0.99]">
+          <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shadow-inner">
+              <Sparkles className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-white text-base leading-snug">
+                {t('wizard.dashboard.title')}
+              </p>
+              <p className="text-white/75 text-xs mt-0.5 leading-snug">
+                {t('wizard.dashboard.hint')}
+              </p>
+            </div>
+            <div className="w-9 h-9 rounded-full bg-white/20 backdrop-blur flex items-center justify-center transition-transform duration-300 group-hover:translate-x-0.5">
+              <ChevronRight className="w-5 h-5 text-white" />
+            </div>
+          </div>
+        </div>
+      </button>
+
       {/* Day navigation */}
       <Card>
         <div className="flex items-center justify-between">

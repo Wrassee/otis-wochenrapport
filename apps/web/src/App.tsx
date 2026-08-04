@@ -7,6 +7,7 @@ import { SpesenPage } from '@/pages/SpesenPage'
 import { WeeklyPage } from '@/pages/WeeklyPage'
 import { ExportPage } from '@/pages/ExportPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { WizardPage } from '@/pages/WizardPage'
 import { useAppStore } from '@/stores/appStore'
 import { useShallow } from 'zustand/react/shallow'
 import { getCurrentSession } from '@/db/supabase'
@@ -252,6 +253,16 @@ export default function App() {
                 <AppShell>
                   <SettingsPage />
                 </AppShell>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Guided week-entry wizard — standalone, distraction-free */}
+          <Route
+            path="/wizard"
+            element={
+              <ProtectedRoute>
+                <WizardPage />
               </ProtectedRoute>
             }
           />
