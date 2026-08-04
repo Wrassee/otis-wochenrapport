@@ -478,6 +478,22 @@ export async function clearSyncQueue(): Promise<void> {
 }
 
 /**
+ * Remove only the given sync-queue items (by auto-increment id). Used by the
+ * background sync to drop items that were processed successfully while keeping
+ * failed ones queued for retry — a blanket clear would silently lose a failed
+ * delete/expense/language sync and let the data resurrect or drift.
+ */
+export async function removeSyncQueueItems(ids: number[]): Promise<void> {
+  if (ids.length === 0) return
+  const db = await getDb()
+  const tx = db.transaction('sync_queue', 'readwrite')
+  for (const id of ids) {
+    await tx.store.delete(id)
+  }
+  await tx.done
+}
+
+/**
  * Add an arbitrary item to the sync queue.
  * Used by the standalone syncExpenses lib to queue expense-sync operations.
  */

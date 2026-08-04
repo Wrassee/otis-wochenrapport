@@ -24,7 +24,7 @@ import {
   generateId,
   isValidUuid,
 } from '@/lib/utils'
-import { REFERENCE_LAT, REFERENCE_LON, ACTIVITY_CODES } from '@/lib/constants'
+import { ACTIVITY_CODES } from '@/lib/constants'
 import type { Language } from '@/lib/translations'
 import { DAY_NAMES } from '@/lib/translations'
 import {
@@ -439,11 +439,23 @@ export const useAppStore = create<AppState>((set, get) => ({
           const byId = new Map<string, TimeEntry>(localEntries.map((e) => [e.id, e]))
           const merged: TimeEntry[] = []
           const seenRemote = new Set<string>()
-          const pendingDelete: string[] = []
+          const locallyDropped: string[] = []
+
+          // Pending local deletes (queued but not yet pushed to the cloud)
+          // must win over remote rows — otherwise the merge resurrects a row
+          // the user just deleted and the UI flickers until the background
+          // sync processes the queue (a queued delete is skipped here and
+          // stays skipped until the cloud delete succeeds and the queue clears).
+          const queue = await localDb.getSyncQueue()
+          const pendingDeleteIds = new Set(
+            queue.filter((q) => q.type === 'delete' && q.entryId).map((q) => String(q.entryId)),
+          )
 
           for (const row of remoteRows) {
-            seenRemote.add(String(row.id))
-            const local = byId.get(String(row.id))
+            const remoteId = String(row.id)
+            if (pendingDeleteIds.has(remoteId)) continue
+            seenRemote.add(remoteId)
+            const local = byId.get(remoteId)
             if (local && !local.synced) {
               // Local has unsynced edits → local wins, will be pushed soon.
               merged.push(local)
@@ -482,13 +494,13 @@ export const useAppStore = create<AppState>((set, get) => ({
               if (!local.synced) {
                 merged.push(local)
               } else {
-                pendingDelete.push(local.id)
+                locallyDropped.push(local.id)
               }
             }
           }
 
-          if (pendingDelete.length > 0) {
-            await localDb.removeEntriesLocally(pendingDelete)
+          if (locallyDropped.length > 0) {
+            await localDb.removeEntriesLocally(locallyDropped)
           }
           // Persist the merge without re-queueing (pulled rows keep synced=true).
           await localDb.saveEntriesPreservingSync(merged)
@@ -855,6 +867,10 @@ export const useAppStore = create<AppState>((set, get) => ({
                 supervisor_email:
                   remoteProfile.supervisor_email || currentProfile?.supervisor_email || '',
                 language: remoteProfile.language || currentProfile?.language || get().language,
+                home_latitude:
+                  remoteProfile.home_latitude ?? currentProfile?.home_latitude ?? undefined,
+                home_longitude:
+                  remoteProfile.home_longitude ?? currentProfile?.home_longitude ?? undefined,
                 created_at:
                   remoteProfile.created_at ||
                   currentProfile?.created_at ||

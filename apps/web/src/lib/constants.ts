@@ -249,6 +249,16 @@ export const ACTIVITY_CODES: ActivityCode[] = [
     sort_order: 34,
   },
   {
+    id: 'A06',
+    code: 'A06',
+    category: 'absence',
+    description_de: 'A06 - Feiertag',
+    description_fr: 'A06 - Jours fériés',
+    description_it: 'A06 - Giorni festivi',
+    excel_column: 'N',
+    sort_order: 35,
+  },
+  {
     id: 'A07',
     code: 'A07',
     category: 'absence',
@@ -256,6 +266,6 @@ export const ACTIVITY_CODES: ActivityCode[] = [
     description_fr: 'A07 - Compensation',
     description_it: 'A07 - Compensazione',
     excel_column: 'N',
-    sort_order: 35,
+    sort_order: 36,
   },
 ]

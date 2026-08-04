@@ -39,6 +39,7 @@ const CODE_GROUPS: Record<string, Array<{ label: string; codeIds: string[] }>> =
     { label: 'A03', codeIds: ['A03'] },
     { label: 'A04', codeIds: ['A04'] },
     { label: 'A05', codeIds: ['A05'] },
+    { label: 'A06', codeIds: ['A06'] },
     { label: 'A07', codeIds: ['A07'] },
   ],
 }

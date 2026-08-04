@@ -21,7 +21,7 @@ import {
   haversineDistance,
   calculateZone,
 } from '@/lib/utils'
-import { REFERENCE_LAT, REFERENCE_LON } from '@/lib/constants'
+import { getZoneReference } from '@/lib/zoneReference'
 import { geocodeAddress } from '@/lib/geocode'
 import { useTranslation } from '@/lib/useTranslation'
 import {
@@ -319,7 +319,8 @@ export function TimeEntryForm({
       const result = await geocodeAddress(address)
       if (!result) return
 
-      const distance = haversineDistance(REFERENCE_LAT, REFERENCE_LON, result.lat, result.lon)
+      const ref = getZoneReference()
+      const distance = haversineDistance(ref.lat, ref.lon, result.lat, result.lon)
       const zone = calculateZone(distance)
 
       // Update the location in IndexedDB if it was a manual entry

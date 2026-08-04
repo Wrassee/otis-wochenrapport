@@ -64,6 +64,7 @@ const TEXT_ACTIVITY_CODES = new Set([
   'A03',
   'A04',
   'A05',
+  'A06',
   'A07',
 ])
 

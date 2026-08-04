@@ -2,7 +2,7 @@ import {
   getUnsyncedEntries,
   markEntrySynced,
   getSyncQueue,
-  clearSyncQueue,
+  removeSyncQueueItems,
   getAllLocations as getLocalLocations,
 } from './indexeddb'
 import {
@@ -206,43 +206,34 @@ export async function performSync() {
       }
     }
 
-    // Process queue: delete + location ops
+    // Process queue: delete + location ops. Only items that succeed are
+    // removed — a failed item (offline, network hiccup) stays queued so the
+    // next sync retries it. A blanket clear would silently drop a failed
+    // delete (resurrecting the row on the next merge) or a failed expense /
+    // language sync (losing the change). Unhandled 'upsert' no-ops (the synced
+    // flag drives entry pushes) count as done so the queue never accumulates.
+    const processed: number[] = []
     for (const item of queue) {
-      if (item.type === 'delete') {
-        try {
+      try {
+        if (item.type === 'delete') {
           await deleteRemoteEntry(item.entryId)
-        } catch (e) {
-          console.warn('Delete sync failed for', item.entryId, e)
-        }
-      } else if (item.type === 'location_upsert' && item.locationData) {
-        try {
+        } else if (item.type === 'location_upsert' && item.locationData) {
           await upsertLocation(item.locationData)
-        } catch (e) {
-          console.warn('Location upsert sync failed for', item.locationData?.anlagenummer, e)
-        }
-      } else if (item.type === 'location_delete' && item.locationDeleteAnlagenummer) {
-        try {
+        } else if (item.type === 'location_delete' && item.locationDeleteAnlagenummer) {
           await deleteLocationByAnlagenummer(item.locationDeleteAnlagenummer)
-        } catch (e) {
-          console.warn('Location delete sync failed for', item.locationDeleteAnlagenummer, e)
-        }
-      } else if (item.type === 'expenses_sync' && item.expenses && item.userId) {
-        try {
+        } else if (item.type === 'expenses_sync' && item.expenses && item.userId) {
           await syncExpensesToSupabase(item.userId, item.expenses)
-        } catch (e) {
-          console.warn('Expenses sync to Supabase failed:', e)
-        }
-      } else if (item.type === 'language_sync' && item.language && item.userId) {
-        try {
+        } else if (item.type === 'language_sync' && item.language && item.userId) {
           await updateProfileLanguage(item.userId, item.language)
-        } catch (e) {
-          console.warn('Language sync to Supabase failed:', e)
         }
+        processed.push(item.id)
+      } catch (e) {
+        console.warn(`Sync failed for queue item ${item.type} (${item.entryId ?? ''}):`, e)
       }
     }
 
-    // Clear sync queue
-    await clearSyncQueue()
+    // Remove the successfully processed items; failed ones stay queued for retry.
+    await removeSyncQueueItems(processed)
 
     clearTimeout(timeoutId)
     const now = new Date().toISOString()

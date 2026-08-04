@@ -7,7 +7,7 @@ import { useAppStore } from '@/stores/appStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
 import { getWeekDates, formatDateShort, calculateZone, haversineDistance } from '@/lib/utils'
-import { REFERENCE_LAT, REFERENCE_LON } from '@/lib/constants'
+import { getZoneReference } from '@/lib/zoneReference'
 import { cn } from '@/lib/cn'
 import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
@@ -62,6 +62,9 @@ export function ExportPage() {
   }, [timeEntries, calculateWeekSummary])
 
   const buildEntriesData = (): OfflineEntry[] => {
+    // The zone origin (profile override or Dietlikon default) is constant for
+    // the whole export — resolve once instead of per entry.
+    const zoneRef = getZoneReference()
     return timeEntries.map((e) => {
       let zone = e.location_zone || 0
       let lat = 0
@@ -87,7 +90,7 @@ export function ExportPage() {
       // every day — otherwise only days whose lift already had a zone would
       // receive a mark.
       if (!zone && lat && lon) {
-        zone = calculateZone(haversineDistance(REFERENCE_LAT, REFERENCE_LON, lat, lon))
+        zone = calculateZone(haversineDistance(zoneRef.lat, zoneRef.lon, lat, lon))
       }
       // Z0 lifts (no coordinates, no stored zone) default to Zone 1 so the
       // Spesenrapport always gets a zone mark for every work day. Absence

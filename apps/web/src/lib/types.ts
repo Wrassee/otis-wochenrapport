@@ -7,6 +7,9 @@ export interface Profile {
   personnel_number: string
   supervisor_email: string
   language: string
+  /** Per-user Spesen-zone reference point (origin for zone calculation). */
+  home_latitude?: number
+  home_longitude?: number
   created_at: string
   updated_at: string
 }

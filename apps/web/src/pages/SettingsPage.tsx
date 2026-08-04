@@ -9,6 +9,9 @@ import { useTranslation } from '@/lib/useTranslation'
 import { upsertProfile } from '@/db/supabase'
 import * as localDb from '@/db/indexeddb'
 import { geocodeAndApplyZone, locationsMissingZone } from '@/lib/locationZones'
+import { geocodeAddress } from '@/lib/geocode'
+import { REFERENCE_LAT, REFERENCE_LON } from '@/lib/constants'
+import type { Profile } from '@/lib/types'
 import {
   LogOut,
   Wifi,
@@ -76,13 +79,17 @@ export function SettingsPage() {
     supervisorEmail: string,
   ) => {
     if (!user) return
-    const updatedProfile = {
+    const updatedProfile: Profile = {
       id: user.id,
       email: user.email,
       full_name: fullName,
       personnel_number: personnelNumber,
       supervisor_email: supervisorEmail,
       language,
+      // Preserve the Spesen-zone reference point — the profile save replaces
+      // the store object, so without this the home point would be lost.
+      home_latitude: profile?.home_latitude,
+      home_longitude: profile?.home_longitude,
       created_at: profile?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -159,6 +166,9 @@ export function SettingsPage() {
         initialSupervisorEmail={profile?.supervisor_email || ''}
         onSave={handleSaveProfile}
       />
+
+      {/* Spesen-Zone reference point */}
+      <HomeZoneCard />
 
       {/* Monday Reminder Notification */}
       <Card>
@@ -1143,6 +1153,179 @@ function LiftZoneManager() {
             </div>
           ))}
         </div>
+      )}
+    </Card>
+  )
+}
+
+/**
+ * Spesen-Zone reference point — the origin every zone is measured from.
+ * Default is Dietlikon; a technician whose base is elsewhere can search an
+ * address (Nominatim geocoding, no API key needed) and store it on their
+ * profile so the calculation follows them across devices.
+ */
+function HomeZoneCard() {
+  const { t } = useTranslation()
+  const { profile, setProfile } = useAppStore(
+    useShallow((s) => ({ profile: s.profile, setProfile: s.setProfile })),
+  )
+  const [query, setQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [result, setResult] = useState<{
+    lat: number
+    lon: number
+    displayName: string
+  } | null>(null)
+  const [feedback, setFeedback] = useState<{ msg: string; ok: boolean } | null>(null)
+
+  const hasCustom =
+    typeof profile?.home_latitude === 'number' &&
+    typeof profile?.home_longitude === 'number' &&
+    (profile.home_latitude !== 0 || profile.home_longitude !== 0)
+
+  const handleSearch = async () => {
+    if (!query.trim() || searching) return
+    setSearching(true)
+    setFeedback(null)
+    setResult(null)
+    const r = await geocodeAddress(query.trim())
+    setSearching(false)
+    if (r) {
+      setResult(r)
+    } else {
+      setFeedback({ msg: t('settings.homezone.notfound'), ok: false })
+    }
+  }
+
+  const savePoint = async (lat: number, lon: number) => {
+    if (!profile) return
+    const updated: Profile = {
+      ...profile,
+      home_latitude: lat,
+      home_longitude: lon,
+      updated_at: new Date().toISOString(),
+    }
+    // Offline-first: store + IndexedDB immediately, then best-effort cloud push.
+    setProfile(updated)
+    setFeedback({ msg: t('settings.homezone.saved'), ok: true })
+    setResult(null)
+    setQuery('')
+    try {
+      await upsertProfile(updated)
+    } catch (e) {
+      console.warn('Failed to sync home location to Supabase:', e)
+    }
+  }
+
+  return (
+    <Card>
+      <div className="flex items-center gap-2.5 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-rose-700 flex items-center justify-center shadow-lg shadow-rose-500/20">
+          <MapPinned className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <CardTitle>{t('settings.homezone.title')}</CardTitle>
+          <p className="text-[10px] text-gray-400 dark:text-stone-300">
+            {t('settings.homezone.subtitle')}
+          </p>
+        </div>
+      </div>
+
+      {/* Current reference point */}
+      <div className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-otis-50/50 dark:bg-white/3 border border-otis-200/20 dark:border-white/5 mb-3">
+        <span className="text-xs text-gray-500 dark:text-stone-300 font-medium">
+          {t('settings.homezone.current')}
+        </span>
+        <span className="text-[11px] font-mono font-semibold text-otis-600 dark:text-otis-300">
+          {hasCustom
+            ? `${profile!.home_latitude!.toFixed(4)}, ${profile!.home_longitude!.toFixed(4)}`
+            : 'Dietlikon'}
+        </span>
+      </div>
+
+      {/* Address search */}
+      <div className="flex gap-2 mb-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-stone-300" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSearch()
+            }}
+            placeholder={t('settings.homezone.search.placeholder')}
+            className="w-full h-10 pl-9 pr-3 rounded-2xl text-sm glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none transition-all"
+          />
+        </div>
+        <button
+          onClick={handleSearch}
+          disabled={searching || !query.trim()}
+          className="h-10 px-4 rounded-2xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center gap-1.5 text-white text-xs font-semibold shadow-lg shadow-rose-500/20 hover:from-rose-500 hover:to-rose-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {searching ? (
+            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Search className="w-3.5 h-3.5" />
+          )}
+          <span className="hidden sm:inline">{t('settings.homezone.search')}</span>
+        </button>
+      </div>
+
+      {/* Geocoding result — confirm to save */}
+      {result && (
+        <div className="p-3 rounded-2xl bg-emerald-50/80 dark:bg-emerald-900/20 border border-emerald-200/60 dark:border-emerald-700/40 mb-2 animate-slide-down">
+          <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300 truncate">
+            {result.displayName}
+          </p>
+          <p className="text-[10px] font-mono text-emerald-600/80 dark:text-emerald-400/80 mt-0.5">
+            {result.lat.toFixed(5)}, {result.lon.toFixed(5)}
+          </p>
+          <button
+            onClick={() => savePoint(result.lat, result.lon)}
+            className="mt-2 w-full h-9 rounded-xl bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-all active:scale-95"
+          >
+            <Check className="w-3.5 h-3.5 inline mr-1 align-[-2px]" />
+            {t('settings.homezone.save')}
+          </button>
+        </div>
+      )}
+
+      {/* Feedback */}
+      {feedback && (
+        <div
+          className={cn(
+            'flex items-center gap-2 p-2.5 rounded-xl border mb-2',
+            feedback.ok
+              ? 'bg-emerald-50/80 dark:bg-emerald-900/20 border-emerald-200/60 dark:border-emerald-700/40'
+              : 'bg-red-50/80 dark:bg-red-900/20 border-red-200/60 dark:border-red-700/40',
+          )}
+        >
+          {feedback.ok ? (
+            <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+          ) : (
+            <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+          )}
+          <p
+            className={cn(
+              'text-xs font-medium',
+              feedback.ok ? 'text-emerald-600 dark:text-emerald-300' : 'text-red-600 dark:text-red-300',
+            )}
+          >
+            {feedback.msg}
+          </p>
+        </div>
+      )}
+
+      {/* Reset to Dietlikon */}
+      {hasCustom && (
+        <button
+          onClick={() => savePoint(REFERENCE_LAT, REFERENCE_LON)}
+          className="w-full h-9 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200/60 dark:border-white/10 text-gray-600 dark:text-stone-300 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/10 transition-all active:scale-95"
+        >
+          <RefreshCw className="w-3.5 h-3.5 inline mr-1 align-[-2px]" />
+          {t('settings.homezone.reset')}
+        </button>
       )}
     </Card>
   )

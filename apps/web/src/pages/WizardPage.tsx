@@ -18,6 +18,7 @@ import {
   Building2,
   Wrench,
   XCircle,
+  ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
@@ -31,12 +32,12 @@ interface WorkBlock {
   duration: number
 }
 
-/** Day status: worked at lifts / sick (A03) / vacation (A01) / not worked. */
-type DayStatus = 'work' | 'sick' | 'vacation' | 'off'
-
 /** Per-day plan collected by the wizard. */
 interface DayPlan {
-  status: DayStatus
+  /** Worked at lifts, or not worked. */
+  status: 'work' | 'off'
+  /** Absence reason code (A01–A07, A06 = Feiertag) when the day is off. */
+  absenceCode: string | null
   blocks: WorkBlock[]
   lunch: boolean
   lunchSkipped: boolean // lunch question already declined for this day
@@ -48,6 +49,7 @@ interface DayPlan {
 
 const emptyDay = (): DayPlan => ({
   status: 'off',
+  absenceCode: null,
   blocks: [],
   lunch: false,
   lunchSkipped: false,
@@ -57,8 +59,8 @@ const emptyDay = (): DayPlan => ({
   expenses: [],
 })
 
-/** Duration presets for a work block (decimal hours). */
-const DURATION_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8]
+/** Duration presets for a work block (decimal hours) — 15-minute steps. */
+const DURATION_OPTIONS = Array.from({ length: 32 }, (_, i) => 0.25 * (i + 1))
 
 const LUNCH_OPTIONS = [30, 45, 60]
 
@@ -80,8 +82,20 @@ const EXPENSE_TYPES: { type: ExpenseType; labelKey: TranslationKey }[] = [
 
 const TOTAL_DAYS = 5
 
+/** Absence options shown after answering "No" to the worked question. */
+const ABSENCE_CODES: { code: string; labelKey: TranslationKey }[] = [
+  { code: 'A01', labelKey: 'wizard.absence.A01' },
+  { code: 'A02', labelKey: 'wizard.absence.A02' },
+  { code: 'A03', labelKey: 'wizard.absence.A03' },
+  { code: 'A04', labelKey: 'wizard.absence.A04' },
+  { code: 'A05', labelKey: 'wizard.absence.A05' },
+  { code: 'A06', labelKey: 'wizard.absence.A06' },
+  { code: 'A07', labelKey: 'wizard.absence.A07' },
+]
+
 type Phase =
   | 'worked'
+  | 'absence'
   | 'anlage'
   | 'projekt'
   | 'adresse'
@@ -104,21 +118,22 @@ interface HistoryEntry {
 
 const PHASE_RANK: Record<Phase, number> = {
   worked: 0,
-  anlage: 1,
-  projekt: 2,
-  adresse: 3,
-  activity: 4,
-  start: 5,
-  duration: 6,
-  lunchQ: 7,
-  lunchStart: 8,
-  lunchDuration: 9,
-  moreLifts: 10,
-  spesen: 11,
-  expenses: 12,
+  absence: 1,
+  anlage: 2,
+  projekt: 3,
+  adresse: 4,
+  activity: 5,
+  start: 6,
+  duration: 7,
+  lunchQ: 8,
+  lunchStart: 9,
+  lunchDuration: 10,
+  moreLifts: 11,
+  spesen: 12,
+  expenses: 13,
 }
 
-const PHASES_PER_DAY = 13
+const PHASES_PER_DAY = 14
 
 /** Phases that show a lift counter badge. */
 const BLOCK_BADGE_PHASES: Phase[] = ['anlage', 'projekt', 'adresse', 'activity', 'start', 'duration']
@@ -273,9 +288,10 @@ export function WizardPage() {
     date: string,
     plan: DayPlan,
   ): Omit<TimeEntry, 'id' | 'created_at' | 'updated_at' | 'synced'>[] => {
-    if (plan.status === 'off') return []
-    if (plan.status === 'sick' || plan.status === 'vacation') {
-      const code = plan.status === 'sick' ? 'A03' : 'A01'
+    // Absence day (sick A03, vacation A01, Feiertag A06, …) — one full-day
+    // entry with the absence code; no Spesen for that day.
+    if (plan.absenceCode) {
+      const code = plan.absenceCode
       const idx = dates.indexOf(date)
       const required = idx === 4 ? 8.0 : 8.5
       return [
@@ -292,6 +308,7 @@ export function WizardPage() {
         },
       ]
     }
+    if (plan.status !== 'work') return []
     const entries: Omit<TimeEntry, 'id' | 'created_at' | 'updated_at' | 'synced'>[] = []
     for (const block of plan.blocks) {
       entries.push({
@@ -375,8 +392,8 @@ export function WizardPage() {
   /** ─── Summary screen ─── */
   if (dayIndex >= TOTAL_DAYS) {
     const entryCount = days.reduce((sum, d) => {
+      if (d.absenceCode) return sum + 1
       if (d.status === 'work') return sum + d.blocks.length + (d.lunch ? 1 : 0)
-      if (d.status === 'sick' || d.status === 'vacation') return sum + 1
       return sum
     }, 0)
     const expenseCount = days.reduce((sum, d) => sum + d.expenses.length, 0)
@@ -454,6 +471,8 @@ export function WizardPage() {
     switch (phase) {
       case 'worked':
         return t('wizard.worked', { day: dayNames[dayIndex] })
+      case 'absence':
+        return t('wizard.absence.title')
       case 'anlage':
         return t('wizard.anlage')
       case 'projekt':
@@ -564,7 +583,7 @@ export function WizardPage() {
             <div className="grid grid-cols-2 gap-4">
               <button
                 onClick={() => {
-                  updateDay({ status: 'work', blocks: day!.blocks, lunchSkipped: false })
+                  updateDay({ status: 'work', absenceCode: null, lunchSkipped: false })
                   goTo('anlage')
                 }}
                 className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95"
@@ -572,32 +591,40 @@ export function WizardPage() {
                 {t('wizard.yes')}
               </button>
               <button
-                onClick={() => {
-                  updateDay({ status: 'sick', blocks: [], hasSpesen: false, expenses: [] })
-                  advanceDay()
-                }}
-                className="py-5 rounded-2xl border-2 border-rose-300/30 bg-rose-500/15 text-rose-100 font-bold text-lg backdrop-blur-xl hover:bg-rose-500/25 transition-all active:scale-95"
-              >
-                {t('wizard.sick')}
-              </button>
-              <button
-                onClick={() => {
-                  updateDay({ status: 'vacation', blocks: [], hasSpesen: false, expenses: [] })
-                  advanceDay()
-                }}
-                className="py-5 rounded-2xl border-2 border-sky-300/30 bg-sky-500/15 text-sky-100 font-bold text-lg backdrop-blur-xl hover:bg-sky-500/25 transition-all active:scale-95"
-              >
-                {t('wizard.vacation')}
-              </button>
-              <button
-                onClick={() => {
-                  updateDay({ status: 'off', blocks: [], hasSpesen: false, expenses: [] })
-                  advanceDay()
-                }}
+                onClick={() => goTo('absence')}
                 className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95"
               >
                 {t('wizard.no')}
               </button>
+            </div>
+          )}
+
+          {phase === 'absence' && (
+            <div className="space-y-2 max-h-[55vh] overflow-y-auto">
+              {ABSENCE_CODES.map(({ code, labelKey }) => (
+                <button
+                  key={code}
+                  onClick={() => {
+                    updateDay({
+                      status: 'off',
+                      absenceCode: code,
+                      blocks: [],
+                      hasSpesen: false,
+                      expenses: [],
+                    })
+                    advanceDay()
+                  }}
+                  className="w-full flex items-center justify-between gap-3 py-4 px-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-semibold text-base backdrop-blur-xl hover:bg-white/20 transition-all active:scale-[0.98]"
+                >
+                  <span className="flex items-center gap-3">
+                    <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 text-white font-bold text-sm flex-shrink-0 shadow-lg shadow-purple-500/20">
+                      {code}
+                    </span>
+                    <span className="text-left">{t(labelKey)}</span>
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-white/40" />
+                </button>
+              ))}
             </div>
           )}
 
@@ -663,19 +690,10 @@ export function WizardPage() {
           )}
 
           {phase === 'duration' && (
-            <div className="max-h-[50vh] overflow-y-auto rounded-3xl p-3 bg-white/10 backdrop-blur-xl border border-white/15">
-              <div className="grid grid-cols-3 gap-1.5">
-                {DURATION_OPTIONS.map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => handleBlockDuration(d)}
-                    className="py-3 rounded-xl font-semibold text-base text-white/90 bg-white/10 hover:bg-white/20 transition-all active:scale-95"
-                  >
-                    {fmtDuration(d)}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <DurationWheel
+              defaultValue={day!.blocks[blockIndex]?.duration || 1}
+              onSelect={handleBlockDuration}
+            />
           )}
 
           {phase === 'lunchQ' && (
@@ -961,6 +979,10 @@ function ActivityStep({
 const WHEEL_ROW_H = 44
 const WHEEL_VISIBLE = 3
 const WHEEL_MINUTES = [0, 15, 30, 45]
+/** Mouse-wheel damping: a 100px notch scrolls ~45px ≈ a single 44px row. */
+const WHEEL_DAMPEN = 0.45
+/** Pause after scrolling stops before the column snaps to the nearest row. */
+const WHEEL_SNAP_DELAY = 120
 
 function TimeWheel({
   min,
@@ -1039,25 +1061,116 @@ function TimeWheel({
   )
 }
 
+/** Compact wheel for picking a work-block duration in decimal hours. */
+function DurationWheel({
+  defaultValue,
+  onSelect,
+}: {
+  defaultValue: number
+  onSelect: (value: number) => void
+}) {
+  const { t } = useTranslation()
+  const [duration, setDuration] = useState(defaultValue)
+
+  return (
+    <div>
+      <div
+        className="relative rounded-3xl bg-white/10 backdrop-blur-xl border border-white/15 overflow-hidden"
+        style={{ height: WHEEL_VISIBLE * WHEEL_ROW_H }}
+      >
+        {/* Center highlight band */}
+        <div
+          className="absolute inset-x-0 bg-white/15 border-y border-white/20 pointer-events-none"
+          style={{ top: WHEEL_ROW_H, height: WHEEL_ROW_H }}
+        />
+        {/* Flex wrapper constrains the column to the container height so the
+            wheel is actually scrollable (same pattern as TimeWheel). */}
+        <div className="absolute inset-0 flex">
+          <WheelColumn
+            items={DURATION_OPTIONS}
+            selected={duration}
+            onSelect={setDuration}
+            format={fmtDuration}
+          />
+        </div>
+      </div>
+
+      <p className="text-center text-3xl font-bold text-white mt-5 tabular-nums">
+        {fmtDuration(duration)}
+      </p>
+
+      <button
+        onClick={() => onSelect(duration)}
+        className="mt-5 w-full py-4 rounded-2xl bg-gradient-to-r from-otis-500 to-emerald-500 text-white font-bold text-lg shadow-lg shadow-otis-500/25 hover:shadow-otis-500/40 hover:brightness-110 active:scale-[0.98] transition-all"
+      >
+        {t('wizard.next')}
+      </button>
+    </div>
+  )
+}
+
 /** One scrollable wheel column with a centered selected row. */
 function WheelColumn({
   items,
   selected,
   onSelect,
+  format,
 }: {
   items: number[]
   selected: number
   onSelect: (value: number) => void
+  /** Optional custom label (e.g. '1h 30min'); defaults to zero-padded numbers. */
+  format?: (value: number) => string
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
   // Center the selected row when the column mounts or its item list changes.
-  // (Not on `selected`: that would programmatically re-set scrollTop on every
-  // scroll event while dragging and cancel the user's momentum flick.)
+  // (Not on `selected`: that would re-set scrollTop on every scroll event
+  // while dragging and cancel the user's momentum flick.)
   useEffect(() => {
     const idx = items.indexOf(selected)
     if (idx >= 0 && ref.current) ref.current.scrollTop = idx * WHEEL_ROW_H
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items])
+
+  // Fine-grained wheel control for desktop. The CSS `scroll-snap` made one
+  // wheel notch jump 2-3 rows (6 → 9), so we intercept the native wheel event
+  // (React's onWheel is passive and cannot preventDefault) and dampen the
+  // delta: a 100px notch now moves ~45px ≈ a single 44px row. After scrolling
+  // stops (wheel or touch) the column snaps to the nearest row to stay centered.
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    let snapTimer: number | undefined
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      // deltaMode: 0 = pixels, 1 = lines, 2 = pages
+      const px =
+        e.deltaMode === 1 ? e.deltaY * 24 : e.deltaMode === 2 ? e.deltaY * WHEEL_ROW_H : e.deltaY
+      el.scrollTop += px * WHEEL_DAMPEN
+    }
+
+    const scheduleSnap = () => {
+      window.clearTimeout(snapTimer)
+      snapTimer = window.setTimeout(() => {
+        const idx = Math.max(
+          0,
+          Math.min(items.length - 1, Math.round(el.scrollTop / WHEEL_ROW_H)),
+        )
+        // Instant snap: the jump is at most half a row, and it avoids the
+        // transient intermediate values a smooth scroll would emit.
+        el.scrollTop = idx * WHEEL_ROW_H
+      }, WHEEL_SNAP_DELAY)
+    }
+
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('scroll', scheduleSnap, { passive: true })
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('scroll', scheduleSnap)
+      window.clearTimeout(snapTimer)
+    }
   }, [items])
 
   const handleScroll = () => {
@@ -1073,7 +1186,7 @@ function WheelColumn({
       ref={ref}
       onScroll={handleScroll}
       className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden"
-      style={{ scrollbarWidth: 'none', scrollSnapType: 'y mandatory' }}
+      style={{ scrollbarWidth: 'none' }}
     >
       <div style={{ height: WHEEL_ROW_H }} />
       {items.map((v) => (
@@ -1083,7 +1196,7 @@ function WheelColumn({
             if (ref.current) ref.current.scrollTop = items.indexOf(v) * WHEEL_ROW_H
           }}
           className="flex items-center justify-center"
-          style={{ height: WHEEL_ROW_H, scrollSnapAlign: 'center' }}
+          style={{ height: WHEEL_ROW_H }}
         >
           <span
             className={cn(
@@ -1091,7 +1204,7 @@ function WheelColumn({
               v === selected ? 'text-white' : 'text-white/40',
             )}
           >
-            {String(v).padStart(2, '0')}
+            {format ? format(v) : String(v).padStart(2, '0')}
           </span>
         </div>
       ))}

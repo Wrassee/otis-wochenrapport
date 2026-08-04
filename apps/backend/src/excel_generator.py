@@ -50,7 +50,7 @@ ACTIVITY_COLUMNS = {
 # of a checkmark — e.g. 'I04' = Administration, absence codes A01-A07.
 TEXT_ACTIVITY_CODES = {
     "I04", "I5S", "I5Q", "I5T", "I5A",
-    "A01", "A02", "A03", "A04", "A05", "A07",
+    "A01", "A02", "A03", "A04", "A05", "A06", "A07",
 }
 
 

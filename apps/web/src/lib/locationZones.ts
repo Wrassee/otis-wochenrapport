@@ -10,7 +10,7 @@
 
 import { geocodeAddress } from './geocode'
 import { calculateZone, haversineDistance } from './utils'
-import { REFERENCE_LAT, REFERENCE_LON } from './constants'
+import { getZoneReference } from './zoneReference'
 import * as localDb from '@/db/indexeddb'
 import type { Location, FavoriteLocation } from './types'
 
@@ -42,7 +42,8 @@ export async function geocodeAndApplyZone(
   const result = await geocodeAddress(address)
   if (!result) return null
 
-  const distance = haversineDistance(REFERENCE_LAT, REFERENCE_LON, result.lat, result.lon)
+  const ref = getZoneReference()
+  const distance = haversineDistance(ref.lat, ref.lon, result.lat, result.lon)
   const computed = calculateZone(distance)
   const effectiveZone = current?.manual_zone ?? computed
 

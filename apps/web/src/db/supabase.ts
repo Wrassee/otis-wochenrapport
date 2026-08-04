@@ -69,6 +69,8 @@ export async function upsertProfile(profile: {
   personnel_number: string
   supervisor_email: string
   language?: string
+  home_latitude?: number
+  home_longitude?: number
 }) {
   const { data, error } = await supabase.from('profiles').upsert(profile).select().single()
   if (error) throw error
