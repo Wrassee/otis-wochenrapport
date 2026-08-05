@@ -77,11 +77,14 @@ export function EditEntrySheet({ open, entry, onClose, onSave }: EditEntrySheetP
     const foundCode = activityCodes.find((c) => c.code === entry.activity_code)
     setEditActivityCode(foundCode || null)
     setSearchQuery(entry.location_anlagenummer || '')
-    setSelectedProjectId(entry.location_project_id || '')
-    setSelectedAddress(entry.location_address || '')
     const loc = locations.find(
       (l) => l.anlagenummer.toUpperCase() === (entry.location_anlagenummer || '').toUpperCase(),
     )
+    // Fall back to the location cache when the stored entry is missing the
+    // project/address (old rows / quick-select gaps) — editing must show the
+    // lift's full details, not empty fields.
+    setSelectedProjectId(entry.location_project_id || loc?.project_id || '')
+    setSelectedAddress(entry.location_address || loc?.full_address || '')
     setSelectedLocation(loc || null)
     setShowSearchResults(false)
     setShowAddressResults(false)

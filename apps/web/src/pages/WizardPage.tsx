@@ -9,6 +9,7 @@ import {
   decimalToTime,
   findFirstOverlap,
   findOverlappingRanges,
+  findLatestLiftEntry,
 } from '@/lib/utils'
 import { DAY_NAMES } from '@/lib/translations'
 import type { TranslationKey } from '@/lib/translations'
@@ -470,18 +471,26 @@ export function WizardPage() {
     return locations
       .filter((l) => l.anlagenummer.toUpperCase().includes(q))
       .slice(0, 5)
-      .map((l) => ({
-        label: l.anlagenummer,
-        sublabel: `${l.project_id} · ${l.full_address}`,
-        onSelect: () => {
-          setBlockField({
-            anlagenummer: l.anlagenummer,
-            projektnummer: l.project_id,
-            adresse: l.full_address,
-          })
-          goTo('activity')
-        },
-      }))
+      .map((l) => {
+        // Fall back to the most recent time entry for this lift when the
+        // location cache holds an empty project/address — a lift picked here
+        // always carries its full details into the plan.
+        const latest = findLatestLiftEntry(timeEntries, l.anlagenummer)
+        const projektnummer = l.project_id || latest?.location_project_id || ''
+        const adresse = l.full_address || latest?.location_address || ''
+        return {
+          label: l.anlagenummer,
+          sublabel: `${projektnummer} · ${adresse}`,
+          onSelect: () => {
+            setBlockField({
+              anlagenummer: l.anlagenummer,
+              projektnummer,
+              adresse,
+            })
+            goTo('activity')
+          },
+        }
+      })
   }
 
   /** ─── Summary screen ─── */
@@ -507,7 +516,7 @@ export function WizardPage() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="w-full glass-strong dark:glass-dark rounded-3xl p-7 shadow-2xl">
+          <div className="w-full bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-7 shadow-2xl">
             <div className="flex flex-col items-center text-center mb-6">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30 mb-4">
                 <Check className="w-8 h-8 text-white" />

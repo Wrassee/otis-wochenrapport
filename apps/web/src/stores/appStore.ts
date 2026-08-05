@@ -517,7 +517,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   calculateWeekSummary: async () => {
-    const { timeEntries, currentWeek, language } = get()
+    const { timeEntries, currentWeek, language, activityCodes } = get()
     const dates = getWeekDates(currentWeek.year, currentWeek.week)
     const dayNames = DAY_NAMES[language]
 
@@ -527,6 +527,21 @@ export const useAppStore = create<AppState>((set, get) => ({
         .sort((a, b) => a.start_time - b.start_time)
       const lunchEntries = dayEntries.filter((e) => e.is_lunch)
       const workEntries = dayEntries.filter((e) => !e.is_lunch)
+
+      // Absence days (A01–A07: Ferien, Krankheit, Kompensation, …) are
+      // recorded as a single full-day entry WITHOUT a lunch break — a lunch
+      // requirement makes no sense for them, so they must not be flagged
+      // invalid for missing lunch.
+      const absenceCodes = new Set(
+        activityCodes.filter((c) => c.category === 'absence').map((c) => c.code),
+      )
+      const isAbsenceDay =
+        workEntries.length > 0 &&
+        workEntries.every(
+          (e) =>
+            absenceCodes.has(String(e.activity_code ?? '')) ||
+            absenceCodes.has(String(e.activity_code_id ?? '')),
+        )
 
       const totalHours = workEntries.reduce((sum, e) => sum + e.duration, 0)
       const lunchMinutes = lunchEntries.reduce((sum, e) => sum + e.duration * 60, 0)
@@ -544,12 +559,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
       }
 
-      if (lunchEntries.length === 0 && totalHours > 0) {
-        errors.push({ key: 'week.error.noLunch' })
-      } else if (lunchMinutes < 30) {
-        errors.push({ key: 'week.error.lunchShort', params: { min: Math.round(lunchMinutes) } })
-      } else if (lunchMinutes > 60) {
-        errors.push({ key: 'week.error.lunchLong', params: { min: Math.round(lunchMinutes) } })
+      if (!isAbsenceDay) {
+        if (lunchEntries.length === 0 && totalHours > 0) {
+          errors.push({ key: 'week.error.noLunch' })
+        } else if (lunchMinutes < 30) {
+          errors.push({ key: 'week.error.lunchShort', params: { min: Math.round(lunchMinutes) } })
+        } else if (lunchMinutes > 60) {
+          errors.push({ key: 'week.error.lunchLong', params: { min: Math.round(lunchMinutes) } })
+        }
       }
 
       // Time-overlap check — two work entries covering the same period. Lunch
@@ -585,6 +602,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         totalHours,
         lunchMinutes,
         hasLunch: lunchEntries.length > 0,
+        isAbsenceDay,
+        absenceCode: isAbsenceDay
+          ? String(workEntries[0].activity_code ?? workEntries[0].activity_code_id ?? '')
+          : undefined,
         entries: dayEntries,
         requiredHours,
         isValid: errors.length === 0,
@@ -931,20 +952,28 @@ export const useAppStore = create<AppState>((set, get) => ({
             // Remote first
             for (const rf of remoteFavorites) {
               seen.add(rf.anlagenummer.toUpperCase())
+              // Local-only copy of the same lift (if any) — used to fill gaps:
+              // an EMPTY remote project/address (e.g. an old row pushed before
+              // those columns were filled) must never wipe the richer local
+              // data, otherwise "Letzte Anlagen" quick-select would hand over
+              // a lift without its Projekt-Nr/Adresse.
+              const localFav = localFavorites.find(
+                (lf) => lf.anlagenummer.toUpperCase() === rf.anlagenummer.toUpperCase(),
+              )
               merged.push({
                 id: rf.id || `fav_${rf.anlagenummer}`,
                 user_id: rf.user_id,
                 anlagenummer: rf.anlagenummer,
-                project_id: rf.project_id || '',
-                full_address: rf.full_address || '',
-                latitude: rf.latitude || 0,
-                longitude: rf.longitude || 0,
-                zone: rf.zone || 0,
-                manual_zone: rf.manual_zone,
-                use_count: Math.max(rf.use_count || 1, 1),
-                last_used: rf.last_used,
-                created_at: rf.created_at,
-                updated_at: rf.updated_at,
+                project_id: rf.project_id || localFav?.project_id || '',
+                full_address: rf.full_address || localFav?.full_address || '',
+                latitude: rf.latitude || localFav?.latitude || 0,
+                longitude: rf.longitude || localFav?.longitude || 0,
+                zone: rf.zone || localFav?.zone || 0,
+                manual_zone: rf.manual_zone ?? localFav?.manual_zone,
+                use_count: Math.max(rf.use_count || 1, localFav?.use_count || 1),
+                last_used: rf.last_used || localFav?.last_used,
+                created_at: rf.created_at || localFav?.created_at,
+                updated_at: rf.updated_at || localFav?.updated_at,
               })
             }
             // Local-only items
@@ -1190,14 +1219,18 @@ export const useAppStore = create<AppState>((set, get) => ({
               )
               const fav = {
                 anlagenummer: existing?.anlagenummer || String(rec?.anlagenummer || ''),
-                project_id: String(rec?.project_id || ''),
-                full_address: String(rec?.full_address || ''),
-                latitude: Number(rec?.latitude) || 0,
-                longitude: Number(rec?.longitude) || 0,
-                zone: Number(rec?.zone) || 0,
-                manual_zone: rec?.manual_zone != null ? Number(rec.manual_zone) : undefined,
+                // Empty remote fields must not wipe the richer local row (see
+                // the initialize merge) — the quick-select in "Letzte Anlagen"
+                // relies on project/address being present.
+                project_id: String(rec?.project_id || existing?.project_id || ''),
+                full_address: String(rec?.full_address || existing?.full_address || ''),
+                latitude: Number(rec?.latitude) || existing?.latitude || 0,
+                longitude: Number(rec?.longitude) || existing?.longitude || 0,
+                zone: Number(rec?.zone) || existing?.zone || 0,
+                manual_zone:
+                  rec?.manual_zone != null ? Number(rec.manual_zone) : existing?.manual_zone,
                 use_count: Math.max(Number(rec?.use_count) || 1, existing?.use_count || 1),
-                last_used: String(rec?.last_used || new Date().toISOString()),
+                last_used: String(rec?.last_used || existing?.last_used || new Date().toISOString()),
               }
               return localDb.saveFavoriteLocation(fav).then(() => localDb.getFavoriteLocations())
             })

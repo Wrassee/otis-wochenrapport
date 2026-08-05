@@ -84,6 +84,10 @@ export interface DaySummary {
   totalHours: number
   lunchMinutes: number
   hasLunch: boolean
+  /** True when every work entry is an absence code (A01–A07) — no lunch required. */
+  isAbsenceDay: boolean
+  /** The absence code (A01–A07) when isAbsenceDay, else undefined. */
+  absenceCode?: string
   entries: TimeEntry[]
   requiredHours: number // 8.5 for Mon-Thu, 8.0 for Fri
   isValid: boolean

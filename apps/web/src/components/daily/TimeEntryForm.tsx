@@ -21,6 +21,7 @@ import {
   haversineDistance,
   calculateZone,
   findOverlappingRanges,
+  findLatestLiftEntry,
 } from '@/lib/utils'
 import { getZoneReference } from '@/lib/zoneReference'
 import { geocodeAddress } from '@/lib/geocode'
@@ -62,6 +63,7 @@ export function TimeEntryForm({
     setFavoriteLocations,
     activityCodes,
     searchLocations,
+    timeEntries,
   } = useAppStore(
     useShallow((s) => ({
       locations: s.locations,
@@ -71,6 +73,7 @@ export function TimeEntryForm({
       setFavoriteLocations: s.setFavoriteLocations,
       activityCodes: s.activityCodes,
       searchLocations: s.searchLocations,
+      timeEntries: s.timeEntries,
     })),
   )
 
@@ -372,23 +375,33 @@ export function TimeEntryForm({
   }
 
   const handleSelectFavorite = (fav: FavoriteLocation) => {
-    setSelectedAnlagenummer(fav.anlagenummer)
-    setSelectedProjectId(fav.project_id)
-    setSelectedAddress(fav.full_address)
-    setSearchQuery(fav.anlagenummer)
-    setShowSearchResults(false)
-    // Case-insensitive lookup to match the location in the store
+    // Resolve project/address from the richest available source. Favorites can
+    // hold stale/partial rows (e.g. an empty remote upsert overwrote the local
+    // project/address, or the lift was entered manually without them), so the
+    // location cache and the most recent time entry for this lift are used as
+    // fallbacks — a lift picked from "Letzte Anlagen" must always carry its
+    // full Anlage/Projekt/Adresse into the second block of the day too.
     const loc = locations.find(
       (l) => l.anlagenummer.toUpperCase() === fav.anlagenummer.toUpperCase(),
     )
+    // Most recent time entry that used this lift (fallback source).
+    const latest = findLatestLiftEntry(timeEntries, fav.anlagenummer)
+    const projectId = fav.project_id || loc?.project_id || latest?.location_project_id || ''
+    const address = fav.full_address || loc?.full_address || latest?.location_address || ''
+
+    setSelectedAnlagenummer(fav.anlagenummer)
+    setSelectedProjectId(projectId)
+    setSelectedAddress(address)
+    setSearchQuery(fav.anlagenummer)
+    setShowSearchResults(false)
     if (loc) {
       setSelectedLocation(loc)
     } else {
       setSelectedLocation({
         id: fav.anlagenummer,
         anlagenummer: fav.anlagenummer,
-        project_id: fav.project_id,
-        full_address: fav.full_address,
+        project_id: projectId,
+        full_address: address,
         latitude: fav.latitude,
         longitude: fav.longitude,
         zone: fav.zone,

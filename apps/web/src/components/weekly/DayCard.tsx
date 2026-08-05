@@ -7,6 +7,7 @@ import {
   XCircle,
   AlertTriangle,
   UtensilsCrossed,
+  CalendarOff,
   Clock,
   MapPin,
   Euro,
@@ -130,30 +131,42 @@ export function DayCard({
           </div>
         </div>
 
-        {/* Lunch info */}
+        {/* Lunch info — absence days (A01–A07) show the code neutrally instead
+            of a red "Keine Pause" (a lunch break is irrelevant on such days) */}
         <div className="flex items-center gap-1.5 mb-3">
-          <UtensilsCrossed
-            className={cn(
-              'w-4 h-4',
-              day.hasLunch && day.lunchMinutes >= 30 && day.lunchMinutes <= 60
-                ? 'text-emerald-500'
-                : 'text-red-400',
-            )}
-          />
-          <span
-            className={cn(
-              'text-sm',
-              day.hasLunch ? 'text-gray-600 dark:text-stone-300' : 'text-red-500',
-            )}
-          >
-            {day.hasLunch
-              ? t('day.pause', { min: Math.round(day.lunchMinutes) })
-              : t('day.no.pause')}
-          </span>
-          {day.hasLunch && (day.lunchMinutes < 30 || day.lunchMinutes > 60) && (
-            <span className="text-xs text-amber-500 font-medium">
-              ({day.lunchMinutes < 30 ? t('day.too.short') : t('day.too.long')})
-            </span>
+          {day.isAbsenceDay ? (
+            <>
+              <CalendarOff className="w-4 h-4 text-gray-400 dark:text-stone-400" />
+              <span className="text-sm text-gray-500 dark:text-stone-400 font-medium">
+                {day.absenceCode || t('day.absence')}
+              </span>
+            </>
+          ) : (
+            <>
+              <UtensilsCrossed
+                className={cn(
+                  'w-4 h-4',
+                  day.hasLunch && day.lunchMinutes >= 30 && day.lunchMinutes <= 60
+                    ? 'text-emerald-500'
+                    : 'text-red-400',
+                )}
+              />
+              <span
+                className={cn(
+                  'text-sm',
+                  day.hasLunch ? 'text-gray-600 dark:text-stone-300' : 'text-red-500',
+                )}
+              >
+                {day.hasLunch
+                  ? t('day.pause', { min: Math.round(day.lunchMinutes) })
+                  : t('day.no.pause')}
+              </span>
+              {day.hasLunch && (day.lunchMinutes < 30 || day.lunchMinutes > 60) && (
+                <span className="text-xs text-amber-500 font-medium">
+                  ({day.lunchMinutes < 30 ? t('day.too.short') : t('day.too.long')})
+                </span>
+              )}
+            </>
           )}
         </div>
 

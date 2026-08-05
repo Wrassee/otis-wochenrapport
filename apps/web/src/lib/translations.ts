@@ -697,6 +697,13 @@ export const translations = {
     hu: 'Nincs sz\u00fcnet',
     en: 'No break',
   },
+  'day.absence': {
+    de: 'Abwesenheit',
+    fr: 'Absence',
+    it: 'Assenza',
+    hu: 'T\u00e1voll\u00e9t',
+    en: 'Absence',
+  },
   'day.too.short': {
     de: 'zu kurz',
     fr: 'trop courte',

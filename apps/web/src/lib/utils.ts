@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { format, parseISO, startOfWeek, addDays, getISOWeek, getYear } from 'date-fns'
 import { de } from 'date-fns/locale'
+import type { TimeEntry } from '@/lib/types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -154,6 +155,29 @@ export function findOverlappingRanges<T>(
     const r = getRange(item)
     return hasOverlap(probe.start, probe.duration, r.start, r.duration)
   })
+}
+
+/**
+ * Find the most recently updated time entry that used a given lift.
+ *
+ * Shared fallback for resolving a lift's project number / address when the
+ * source row (favorite or location cache) holds empty values: the last time
+ * the lift was recorded usually carries its full details.
+ *
+ * @returns The newest matching entry, or undefined when the lift was never used.
+ * @example findLatestLiftEntry(timeEntries, 'H2957')?.location_project_id
+ */
+export function findLatestLiftEntry(
+  timeEntries: TimeEntry[],
+  anlagenummer: string,
+): TimeEntry | undefined {
+  return timeEntries
+    .filter(
+      (e) =>
+        e.location_anlagenummer &&
+        e.location_anlagenummer.toUpperCase() === anlagenummer.toUpperCase(),
+    )
+    .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))[0]
 }
 
 /**
