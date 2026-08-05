@@ -54,7 +54,7 @@ apps/web/src/
 ├── lib/           # Pure utilities, types, translations (Layer 1)
 │   ├── syncExpenses.ts   # 🏆 Example: pure function layer
 │   ├── types.ts           # All TypeScript interfaces
-│   ├── translations.ts    # DE/FR/IT/HU dictionary
+│   ├── translations.ts    # DE/FR/IT/HU/EN dictionary
 │   ├── utils.ts           # Time math, Haversine, formatters
 │   └── ...
 └── services/      # Offline Excel generator

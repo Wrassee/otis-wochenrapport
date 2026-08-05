@@ -307,9 +307,52 @@ Device A: channel "expense-photos-<userId>"   [filter: user_id=eq.<userId>]
 ```
 Manual add:  [SettingsPage] → localDb → sync_queue → Supabase
 Auto-add:    [TimeEntryForm] → if new anlagenummer → localDb → sync_queue
-Zone calc:   [Nominatim geocode] → Haversine formula → Zone 1-4
+Zone calc:   [Nominatim geocode] → Haversine formula → Zone 1-5
 Manual zone: [SettingsPage] → manual_zone override → localDb → Supabase
 ```
+
+#### Spesen-Zone calculation rules
+
+Every lift's zone is measured as the **straight-line (Haversine) distance from a reference point** — the technician's home base. The default reference is Dietlikon (`REFERENCE_LAT`/`REFERENCE_LON`), but each technician can override it in Settings (`profile.home_latitude` / `profile.home_longitude`) via `lib/zoneReference.ts` → `getZoneReference()`; every zone consumer resolves the origin through this single helper.
+
+| Zone | Distance (straight line) | Notes |
+|---|---|---|
+| **Z1** | 0–10 km | |
+| **Z2** | 10–30 km | |
+| **Z3** | 30–60 km | |
+| **Z4** | 60+ km | variable allowance applies (see below) |
+| **Z5** | 60+ km + overnight stay | variable allowance applies; only ever set **manually** (`manual_zone`) — auto-computed zones never assume an overnight stay |
+
+Implementation: `lib/utils.ts` → `calculateZone(distanceKm, overnightStay = false)`.
+
+**Zone trust model** — a stored `zone` value is only considered trustworthy when the lift has geocoded coordinates or a manual override. The display/report zone is **always recomputed from the coordinates** via `liftEffectiveZone` (SettingsPage) / `resolveEntryZone` (ExportPage): a stale stored zone — e.g. a leftover of the old `Z0→Z1` default — is never shown or written into the report. Lifts without coordinates honestly display **"Auto"** until the batch recalculation (Settings → "Zonen neu berechnen") geocodes and fixes them.
+
+**Batch recalculation** — `lib/locationZones.ts` → `locationsMissingZone()` collects every lift without a manual override whose zone is not trustworthy: no coordinates at all, **or** coordinates whose recomputed zone differs from the stored one. The recalc then re-geocodes coordinateless lifts (Nominatim, rate-limited to ~1 req/s) and recomputes the zone of geocoded ones from their stored coordinates (no second geocode needed).
+
+#### Z4/Z5 km allowance (variable Spesen)
+
+When the visited lift is **farther than 60 km straight-line** (zone Z4 or Z5), the technician is entitled to an extra **0.10 CHF per actually-driven kilometre** — the trigger is the zone, but the reimbursement is per **driven km**, not straight-line (e.g. 68 km straight-line ≈ 114 km driven one way → 228 km round trip → **22.80 CHF**).
+
+```
+Day with max zone ≥ 4 (straight-line 60+ km) + geocoded lift
+  │
+  ▼
+lib/routing.ts → getDrivingDistance(home → lift)   [OSRM public server]
+  │  real road route, 5s timeout, never throws
+  ├─ online:  one-way km = OSRM driven distance
+  └─ offline: one-way km = straight-line (Haversine) estimate
+  │
+  ▼
+CHF per day = 2 × one-way km × 0.10   (round-trip)
+  │
+  ▼
+Spesenrapport sheet → row 24 "Zone 4 + 5 (variable) · CHF -.10 / km"
+  (per-day column; both backend excel_generator.py and the offline
+   services/offlineGenerator.ts write the same value)
+```
+
+- Frontend: `ExportPage.collectKmAllowances()` — one candidate per day (the **farthest** lift among the max-zone entries); `lib/routing.ts` fetches the real route from OSRM (parallel, 5 s timeout each).
+- The allowance travels to both generators as `km_allowances: dict[int, float]` (weekday → CHF) in the `GenerateRequest` payload.
 
 ---
 
@@ -325,10 +368,13 @@ Manual zone: [SettingsPage] → manual_zone override → localDb → Supabase
 | `hooks/useTimeEntries.ts` | 🏆 Unified TimeEntry hook (Layer 2 — TimeEntries) |
 | `lib/syncExpenses.ts` | 🏆 Pure sync function (Layer 1) |
 | `lib/types.ts` | TypeScript interfaces (TimeEntry, ExpenseType, etc.) |
-| `lib/translations.ts` | DE/FR/IT/HU multi-language dictionary |
+| `lib/translations.ts` | DE/FR/IT/HU/EN multi-language dictionary |
 | `lib/constants.ts` | Reference coords, zone thresholds, activity codes |
 | `lib/utils.ts` | Time conversion, Haversine, ID generation |
 | `lib/geocode.ts` | Nominatim geocoding with rate limiting |
+| `lib/routing.ts` | OSRM driving-distance helper (Z4/Z5 km allowance) |
+| `lib/zoneReference.ts` | Spesen-zone origin resolver (Dietlikon or profile override) |
+| `lib/locationZones.ts` | Geocode + zone apply, batch-recalc candidate selection |
 | `lib/cn.ts` | Tailwind class merging utility |
 | `db/indexeddb.ts` | Local IndexedDB operations (source of truth) |
 | `db/supabase.ts` | Remote Supabase client + CRUD |
@@ -427,7 +473,7 @@ A naive "reload after every event" would **resurrect** rows the remote deleted: 
 Translations in `lib/translations.ts` use a dictionary pattern:
 
 ```typescript
-type Language = 'de' | 'fr' | 'it' | 'hu'  // German, French, Italian, Hungarian
+type Language = 'de' | 'fr' | 'it' | 'hu' | 'en'  // German, French, Italian, Hungarian, English
 
 translations: Record<string, Record<Language, string>>
 ```
