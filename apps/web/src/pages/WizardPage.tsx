@@ -4,7 +4,12 @@ import { useTranslation } from '@/lib/useTranslation'
 import { useAppStore } from '@/stores/appStore'
 import { useTimeEntries } from '@/hooks/useTimeEntries'
 import { useShallow } from 'zustand/react/shallow'
-import { getWeekDates, decimalToTime } from '@/lib/utils'
+import {
+  getWeekDates,
+  decimalToTime,
+  findFirstOverlap,
+  findOverlappingRanges,
+} from '@/lib/utils'
 import { DAY_NAMES } from '@/lib/translations'
 import type { TranslationKey } from '@/lib/translations'
 import type { ActivityCode, ExpenseType, TimeEntry } from '@/lib/types'
@@ -19,6 +24,7 @@ import {
   Wrench,
   XCircle,
   ChevronRight,
+  AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
@@ -146,6 +152,11 @@ function fmtDuration(hours: number): string {
   return `${h}h ${m}min`
 }
 
+/** "HH:MM–HH:MM" label for a time range (conflict messages). */
+function rangeLabel(start: number, duration: number): string {
+  return `${decimalToTime(start)}–${decimalToTime(start + duration)}`
+}
+
 /** YYYY-MM-DD → DD.MM. */
 function shortDate(dateStr: string): string {
   const [, mm, dd] = dateStr.split('-')
@@ -155,16 +166,26 @@ function shortDate(dateStr: string): string {
 export function WizardPage() {
   const navigate = useNavigate()
   const { t, language } = useTranslation()
-  const { currentWeek, dailyExpenses, toggleExpense, activityCodes, locations } = useAppStore(
-    useShallow((s) => ({
-      currentWeek: s.currentWeek,
-      dailyExpenses: s.dailyExpenses,
-      toggleExpense: s.toggleExpense,
-      activityCodes: s.activityCodes,
-      locations: s.locations,
-    })),
-  )
-  const { addEntry } = useTimeEntries()
+  const { currentWeek, dailyExpenses, toggleExpense, activityCodes, locations, timeEntries } =
+    useAppStore(
+      useShallow((s) => ({
+        currentWeek: s.currentWeek,
+        dailyExpenses: s.dailyExpenses,
+        toggleExpense: s.toggleExpense,
+        activityCodes: s.activityCodes,
+        locations: s.locations,
+        timeEntries: s.timeEntries,
+      })),
+    )
+  const { addEntry, loadWeek } = useTimeEntries()
+
+  // Make sure the store holds the current week's entries so the save-time
+  // overlap check can compare against entries created earlier (previous wizard
+  // runs or manual entries) instead of silently writing overlapping blocks.
+  useEffect(() => {
+    loadWeek().catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWeek.year, currentWeek.week])
 
   const dates = useMemo(() => getWeekDates(currentWeek.year, currentWeek.week), [currentWeek])
   const dayNames = DAY_NAMES[language]
@@ -176,6 +197,8 @@ export function WizardPage() {
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** Conflict warning shown inside a question phase (start/duration). */
+  const [phaseError, setPhaseError] = useState<string | null>(null)
 
   const day = days[dayIndex] // undefined on the summary screen (dayIndex === TOTAL_DAYS)
   const isLastDay = dayIndex === TOTAL_DAYS - 1
@@ -252,6 +275,7 @@ export function WizardPage() {
   const advanceDay = () => {
     pushHistory()
     setError(null)
+    setPhaseError(null)
     if (isLastDay) {
       setDayIndex(TOTAL_DAYS)
     } else {
@@ -264,12 +288,14 @@ export function WizardPage() {
   const goTo = (p: Phase, bi?: number) => {
     pushHistory()
     setError(null)
+    setPhaseError(null)
     setPhase(p)
     if (bi !== undefined) setBlockIndex(bi)
   }
 
   const goBack = () => {
     setError(null)
+    setPhaseError(null)
     const prev = history[history.length - 1]
     if (!prev) {
       navigate('/dashboard')
@@ -282,6 +308,69 @@ export function WizardPage() {
   }
 
   const exit = () => navigate('/dashboard')
+
+  /**
+   * Detect a time overlap for a day's plan: between the plan's own blocks
+   * (incl. lunch) and against entries that already exist in the store for
+   * that date. Returns the day index or -1.
+   */
+  /** Work-block ranges (duration > 0) + lunch range of a day plan. */
+  const plannedRanges = (plan: DayPlan): { start: number; duration: number }[] => {
+    const ranges = plan.blocks
+      .filter((b) => b.duration > 0)
+      .map((b) => ({ start: b.start, duration: b.duration }))
+    if (plan.lunch && plan.lunchStart != null && plan.lunchDuration != null) {
+      ranges.push({ start: plan.lunchStart, duration: plan.lunchDuration / 60 })
+    }
+    return ranges
+  }
+
+  /** Already-saved entry ranges for a date (from the store). */
+  const savedRanges = (date: string): { start: number; duration: number }[] =>
+    timeEntries
+      .filter((e) => e.date === date)
+      .map((e) => ({ start: e.start_time, duration: e.duration }))
+
+  const findOverlapDay = (): number => {
+    for (let i = 0; i < TOTAL_DAYS; i++) {
+      const plan = days[i]
+      if (plan.status !== 'work') continue
+      const planned = plannedRanges(plan)
+      const saved = savedRanges(dates[i])
+      // Planned vs planned — always an error.
+      if (findFirstOverlap(planned, (r) => r)) return i
+      // Planned vs already-saved entries.
+      if (planned.some((p) => findOverlappingRanges(p, saved, (r) => r).length > 0)) {
+        return i
+      }
+    }
+    return -1
+  }
+
+  /**
+   * Check whether a block with the given start/duration would conflict with
+   * another block of the same day (the edited one is skipped), the lunch break
+   * or an already-saved entry for that date. Returns the conflicting range as
+   * a short "HH:MM–HH:MM" label, or null when the block is fine.
+   */
+  const findBlockConflict = (start: number, duration: number, skipIndex: number): string | null => {
+    if (duration <= 0) return null
+    const day = days[dayIndex]
+    // plannedRanges lists the work blocks with duration > 0 in order, then the
+    // lunch range. Skip the edited block by matching the block object; a new
+    // block (duration still 0 in state) is not listed and can't self-conflict.
+    const durBlocks = day.blocks.filter((b) => b.duration > 0)
+    const others = plannedRanges(day).filter((_, i) => {
+      const blockAt = durBlocks[i]
+      return blockAt === undefined || blockAt !== day.blocks[skipIndex]
+    })
+    const hit = findOverlappingRanges(
+      { start, duration },
+      [...others, ...savedRanges(dates[dayIndex])],
+      (r) => r,
+    )[0]
+    return hit ? rangeLabel(hit.start, hit.duration) : null
+  }
 
   /** Build the time entries for a given day plan. */
   const buildDayEntries = (
@@ -346,6 +435,12 @@ export function WizardPage() {
     setSaving(true)
     setError(null)
     try {
+      // Validate the whole week BEFORE writing anything — no partial saves.
+      const clashDay = findOverlapDay()
+      if (clashDay >= 0) {
+        setError(t('wizard.overlap', { day: dayNames[clashDay] }))
+        return
+      }
       for (let i = 0; i < TOTAL_DAYS; i++) {
         const plan = days[i]
         const date = dates[i]
@@ -502,12 +597,35 @@ export function WizardPage() {
 
   const handleBlockStart = (start: number) => {
     const idx = blockIndex
-    setBlockField({ start })
+    // Hard-constrain the start: a later block may never begin before the
+    // previous block (or lunch) ends — guards against a stale wheel value
+    // slipping an earlier time in.
+    const clamped = completedBlocks.length > 0 ? Math.max(start, defaultNextStart) : start
+    // Live conflict check: editing an earlier block's start so it now slides
+    // into a later block (or lunch / saved entry) is caught here, not only at
+    // save time.
+    const duration = day?.blocks[idx]?.duration ?? 0
+    const conflict = findBlockConflict(clamped, duration, idx)
+    if (conflict) {
+      setPhaseError(t('wizard.overlap.phase', { time: conflict }))
+      return
+    }
+    setPhaseError(null)
+    setBlockField({ start: clamped })
     goTo('duration', idx)
   }
 
   const handleBlockDuration = (duration: number) => {
     const idx = blockIndex
+    // Extending an earlier block's duration can also collide with a later
+    // block — reject it right here.
+    const start = day!.blocks[idx]?.start ?? 0
+    const conflict = findBlockConflict(start, duration, idx)
+    if (conflict) {
+      setPhaseError(t('wizard.overlap.phase', { time: conflict }))
+      return
+    }
+    setPhaseError(null)
     const newBlocks = day!.blocks.map((b, i) => (i === idx ? { ...b, duration } : b))
     setDays((prev) => prev.map((d, i) => (i === dayIndex ? { ...d, blocks: newBlocks } : d)))
     // Lunch question becomes relevant once ≥4h of work has accumulated
@@ -568,6 +686,14 @@ export function WizardPage() {
           <h2 className="text-2xl font-bold text-white tracking-tight text-center mb-7">
             {question}
           </h2>
+
+          {/* Phase-level conflict warning (start / duration) */}
+          {phaseError && (
+            <div className="mb-6 flex items-start gap-2.5 p-3.5 rounded-2xl bg-red-500/15 border border-red-400/30 text-red-100 text-sm font-medium">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-300" />
+              <span>{phaseError}</span>
+            </div>
+          )}
 
           {/* Block counter badge for per-lift phases */}
           {BLOCK_BADGE_PHASES.includes(phase) && (
@@ -721,7 +847,8 @@ export function WizardPage() {
               min={lastBlockEnd}
               defaultValue={lastBlockEnd}
               onSelect={(v) => {
-                updateDay({ lunch: true, lunchStart: v })
+                // Lunch must start after the last work block ends.
+                updateDay({ lunch: true, lunchStart: Math.max(v, lastBlockEnd) })
                 goTo('lunchDuration')
               }}
             />

@@ -11,6 +11,10 @@ interface TimelineViewProps {
   onDeleteEntry?: (entryId: string) => void
   showActions?: boolean
   conflictEntryIds?: string[]
+  /** Suppress the auto-scroll-to-conflict behaviour — used inside week day
+   *  cards, where the red highlight should be visible without the page
+   *  jumping to the entry on mount. */
+  disableConflictScroll?: boolean
 }
 
 const ROW_HEIGHT = 52 // px — touch-friendly tap target
@@ -22,6 +26,7 @@ export function TimelineView({
   onDeleteEntry,
   showActions = true,
   conflictEntryIds = [],
+  disableConflictScroll = false,
 }: TimelineViewProps) {
   const { t } = useTranslation()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -29,6 +34,9 @@ export function TimelineView({
 
   // Scroll to and highlight conflicting entries when conflictEntryIds changes
   useEffect(() => {
+    // The highlight itself is pure render-time (isConflict below); the scroll
+    // is optional (Dashboard wants it, week day cards don't).
+    if (disableConflictScroll) return
     if (conflictEntryIds.length === 0) {
       prevConflictRef.current = []
       return
@@ -66,7 +74,7 @@ export function TimelineView({
     }, 100)
 
     return () => clearTimeout(timer)
-  }, [conflictEntryIds])
+  }, [conflictEntryIds, disableConflictScroll])
 
   if (entries.length === 0) return null
 

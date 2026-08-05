@@ -666,6 +666,13 @@ export const translations = {
     hu: 'Az eb\u00e9dsz\u00fcnet t\u00fal hossz\u00fa ({min} perc)',
     en: 'Lunch break too long ({min} min.)',
   },
+  'week.error.overlap': {
+    de: 'Zeit\u00fcberschneidung: {time1} und {time2} \u00fcberlappen sich',
+    fr: 'Chevauchement : {time1} et {time2} se chevauchent',
+    it: 'Sovrapposizione: {time1} e {time2} si sovrappongono',
+    hu: 'Id\u0151\u00fctk\u00f6z\u00e9s: {time1} \u00e9s {time2} \u00e1tfed\u00e9sben van',
+    en: 'Time overlap: {time1} and {time2} overlap',
+  },
 
   // ─── Day Card ───
   'day.fulfilled': {
@@ -2062,6 +2069,20 @@ export const translations = {
   },
   'wizard.yes': { de: 'Ja', fr: 'Oui', it: 'S\u00ec', hu: 'Igen', en: 'Yes' },
   'wizard.no': { de: 'Nein', fr: 'Non', it: 'No', hu: 'Nem', en: 'No' },
+  'wizard.overlap': {
+    de: 'Zeit\u00fcberschneidung am {day}: zwei Eintr\u00e4ge \u00fcberlappen sich. Bitte die Zeiten anpassen und erneut speichern.',
+    fr: 'Chevauchement le {day} : deux entr\u00e9es se chevauchent. Veuillez ajuster les heures et r\u00e9essayer.',
+    it: 'Sovrapposizione di {day}: due voci si sovrappongono. Regola gli orari e riprova.',
+    hu: 'Id\u0151\u00fctk\u00f6z\u00e9s {day}: k\u00e9t bejegyz\u00e9s \u00e1tfed\u00e9sben van. K\u00e9rj\u00fck, \u00e1ll\u00edtsa be az id\u0151ket, \u00e9s mentse \u00fajra.',
+    en: 'Time overlap on {day}: two entries overlap. Please adjust the times and save again.',
+  },
+  'wizard.overlap.phase': {
+    de: 'Konflikt mit {time}: zwei Eintr\u00e4ge \u00fcberlappen sich. Bitte Zeit oder Dauer anpassen.',
+    fr: 'Conflit avec {time} : deux entr\u00e9es se chevauchent. Ajustez l\u2019heure ou la dur\u00e9e.',
+    it: 'Conflitto con {time}: due voci si sovrappongono. Regola orario o durata.',
+    hu: '\u00dctk\u00f6z\u00e9s ezzel: {time} \u2014 k\u00e9t bejegyz\u00e9s \u00e1tfed\u00e9sben van. M\u00f3dos\u00edtsa az id\u0151pontot vagy az id\u0151tartamot.',
+    en: 'Conflict with {time}: two entries overlap. Please adjust the time or duration.',
+  },
   'wizard.next': {
     de: 'Weiter',
     fr: 'Continuer',

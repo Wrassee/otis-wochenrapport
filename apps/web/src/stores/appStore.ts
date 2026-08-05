@@ -23,6 +23,8 @@ import {
   calculateZone,
   generateId,
   isValidUuid,
+  decimalToTime,
+  findFirstOverlap,
 } from '@/lib/utils'
 import { ACTIVITY_CODES } from '@/lib/constants'
 import type { Language } from '@/lib/translations'
@@ -548,6 +550,27 @@ export const useAppStore = create<AppState>((set, get) => ({
         errors.push({ key: 'week.error.lunchShort', params: { min: Math.round(lunchMinutes) } })
       } else if (lunchMinutes > 60) {
         errors.push({ key: 'week.error.lunchLong', params: { min: Math.round(lunchMinutes) } })
+      }
+
+      // Time-overlap check — two work entries covering the same period. Lunch
+      // breaks are excluded: a break may legitimately fall inside the working
+      // time (same rule as the manual entry form's overlap warning).
+      const overlap = findFirstOverlap(workEntries, (e) => ({
+        start: e.start_time,
+        duration: e.duration,
+      }))
+      if (overlap) {
+        errors.push({
+          key: 'week.error.overlap',
+          params: {
+            time1: `${decimalToTime(overlap[0].start_time)}–${decimalToTime(
+              overlap[0].start_time + overlap[0].duration,
+            )}`,
+            time2: `${decimalToTime(overlap[1].start_time)}–${decimalToTime(
+              overlap[1].start_time + overlap[1].duration,
+            )}`,
+          },
+        })
       }
 
       // Calculate max zone for the day

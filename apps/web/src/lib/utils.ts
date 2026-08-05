@@ -109,6 +109,53 @@ export function hasOverlap(
   return start1 < end2 && start2 < end1
 }
 
+/** A time span in decimal hours (e.g. 7.5 = 07:30, duration 1.5 = 1h30min). */
+export interface TimeRange {
+  start: number
+  duration: number
+}
+
+/**
+ * Find the FIRST pair of overlapping ranges in a list. Half-open intervals:
+ * an item starting exactly where another ends is NOT an overlap (e.g.
+ * 07:30–11:30 followed by 11:30–15:00 is valid).
+ *
+ * @returns The two conflicting items, or null when the list is clean.
+ * @example findFirstOverlap(entries, (e) => ({ start: e.start_time, duration: e.duration }))
+ */
+export function findFirstOverlap<T>(
+  items: T[],
+  getRange: (item: T) => TimeRange,
+): [T, T] | null {
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const a = getRange(items[i])
+      const b = getRange(items[j])
+      if (hasOverlap(a.start, a.duration, b.start, b.duration)) return [items[i], items[j]]
+    }
+  }
+  return null
+}
+
+/**
+ * The items whose ranges overlap the given probe range (half-open intervals).
+ *
+ * @example findOverlappingRanges({ start: 7, duration: 8.5 }, entries, (e) => ({
+ *   start: e.start_time,
+ *   duration: e.duration,
+ * }))
+ */
+export function findOverlappingRanges<T>(
+  probe: TimeRange,
+  items: T[],
+  getRange: (item: T) => TimeRange,
+): T[] {
+  return items.filter((item) => {
+    const r = getRange(item)
+    return hasOverlap(probe.start, probe.duration, r.start, r.duration)
+  })
+}
+
 /**
  * Check if a total hours value meets the daily requirement
  */

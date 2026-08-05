@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import type { DaySummary, TimeEntry } from '@/lib/types'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -14,6 +15,7 @@ import {
 import { cn } from '@/lib/cn'
 import { TimelineView } from '@/components/ui/TimelineView'
 import { useTranslation } from '@/lib/useTranslation'
+import { findOverlappingRanges } from '@/lib/utils'
 
 interface DayCardProps {
   day: DaySummary
@@ -31,6 +33,27 @@ export function DayCard({
   expenseCount,
 }: DayCardProps) {
   const { t } = useTranslation()
+
+  // Entries that overlap ANY other work entry get the red timeline highlight.
+  // Lunch breaks are excluded (a break may legitimately fall inside the
+  // working time) — the same rule as the week summary's overlap error and the
+  // manual entry form's warning.
+  const conflictEntryIds = useMemo(() => {
+    const work = day.entries.filter((e) => !e.is_lunch)
+    return work
+      .filter((entry) => {
+        const others = work.filter((o) => o.id !== entry.id)
+        return (
+          findOverlappingRanges(
+            { start: entry.start_time, duration: entry.duration },
+            others,
+            (o) => ({ start: o.start_time, duration: o.duration }),
+          ).length > 0
+        )
+      })
+      .map((e) => e.id)
+  }, [day.entries])
+
   return (
     <Card variant={day.isValid ? 'default' : 'danger'}>
       <CardHeader>
@@ -182,6 +205,8 @@ export function DayCard({
                 onEditEntry={onEditEntry}
                 onDeleteEntry={onDeleteEntry}
                 showActions={true}
+                conflictEntryIds={conflictEntryIds}
+                disableConflictScroll
               />
             </div>
           </div>

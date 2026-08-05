@@ -20,6 +20,7 @@ import {
   snapToQuarter,
   haversineDistance,
   calculateZone,
+  findOverlappingRanges,
 } from '@/lib/utils'
 import { getZoneReference } from '@/lib/zoneReference'
 import { geocodeAddress } from '@/lib/geocode'
@@ -127,16 +128,14 @@ export function TimeEntryForm({
     const start = timeToDecimal(startTime)
     const dur = otisDurationToStandard(duration)
     if (dur <= 0) return
-    const end = start + dur
-    const conflicting = existingEntries.filter((e) => {
-      if (e.is_lunch) return false
-      const eEnd = e.start_time + e.duration
-      // Boundary case: if the new entry starts exactly where an existing entry ends,
-      // it is NOT an overlap (e.g. 07:30-11:30 then 11:30-15:00 is valid)
-      if (start >= eEnd) return false
-      if (end <= e.start_time) return false
-      return true
-    })
+    // Lunch breaks are excluded: a break may legitimately fall inside the
+    // working time. The helper uses half-open intervals, so an entry starting
+    // exactly where another ends (e.g. 07:30-11:30 then 11:30-15:00) is valid.
+    const conflicting = findOverlappingRanges(
+      { start, duration: dur },
+      existingEntries.filter((e) => !e.is_lunch),
+      (e) => ({ start: e.start_time, duration: e.duration }),
+    )
 
     if (conflicting.length > 0) {
       setOverlapWarning(
