@@ -156,7 +156,9 @@ export default function App() {
       stopBackgroundSync()
       unsubscribe()
     }
-  }, [])
+    // All deps are stable zustand store actions — listing them is safe and
+    // silences the exhaustive-deps error without re-running on every render.
+  }, [initialize, setUser, setSyncStatus, setLocations, setActivityCodes])
 
   if (initializing) {
     return (

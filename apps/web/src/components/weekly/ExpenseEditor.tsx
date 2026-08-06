@@ -53,6 +53,7 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
   // Reset local state when the sheet opens or date changes
   // The cleanup function captures the OLD date, so pending values
   // are saved to the correct day before the transition.
+  // (flushLocalValues is recreated each render — deliberately not in the deps.)
   useEffect(() => {
     return () => {
       flushLocalValues()
@@ -60,6 +61,7 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
       setLocalValues({})
       setSaveStatus(null)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, date])
 
   // Debounced auto-save: whenever localValues changes, wait 600ms then flush
@@ -90,7 +92,7 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current)
     }
-  }, [localValues, date, setExpenseValue])
+  }, [localValues, date, setExpenseValue, syncExpenses])
 
   // Flush pending values on unmount + cleanup timers
   // Uses refs to always have the latest values, even with [] closure

@@ -19,8 +19,6 @@ import {
   getWeekDates,
   getWeekInfo,
   getWeekKey,
-  haversineDistance,
-  calculateZone,
   generateId,
   isValidUuid,
   decimalToTime,

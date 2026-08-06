@@ -76,9 +76,9 @@ export function TimelineView({
     return () => clearTimeout(timer)
   }, [conflictEntryIds, disableConflictScroll])
 
-  if (entries.length === 0) return null
-
-  // Calculate dynamic time range from entries
+  // Calculate dynamic time range from entries (before the early return —
+  // hooks must be called unconditionally or React crashes with "Rendered
+  // fewer hooks than expected").
   const { rangeStart, totalHours, hourLabels } = useMemo(() => {
     const allStarts = entries.map((e) => e.start_time)
     const allEnds = entries.map((e) => e.start_time + e.duration)
@@ -100,6 +100,8 @@ export function TimelineView({
 
     return { rangeStart: start, totalHours: hours, hourLabels: labels }
   }, [entries])
+
+  if (entries.length === 0) return null
 
   // Bar position calculator
   const barStyle = (startTime: number, duration: number) => {

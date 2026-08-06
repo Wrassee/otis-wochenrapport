@@ -14,6 +14,8 @@ import {
 import { DAY_NAMES } from '@/lib/translations'
 import type { TranslationKey } from '@/lib/translations'
 import type { ActivityCode, ExpenseType, TimeEntry } from '@/lib/types'
+import * as localDb from '@/db/indexeddb'
+import { ensureLiftRow, geocodeAndApplyZone } from '@/lib/locationZones'
 import {
   X,
   ArrowLeft,
@@ -167,8 +169,16 @@ function shortDate(dateStr: string): string {
 export function WizardPage() {
   const navigate = useNavigate()
   const { t, language } = useTranslation()
-  const { currentWeek, dailyExpenses, toggleExpense, activityCodes, locations, timeEntries } =
-    useAppStore(
+  const {
+    currentWeek,
+    dailyExpenses,
+    toggleExpense,
+    activityCodes,
+    locations,
+    timeEntries,
+    setLocations,
+    setFavoriteLocations,
+  } = useAppStore(
       useShallow((s) => ({
         currentWeek: s.currentWeek,
         dailyExpenses: s.dailyExpenses,
@@ -176,6 +186,8 @@ export function WizardPage() {
         activityCodes: s.activityCodes,
         locations: s.locations,
         timeEntries: s.timeEntries,
+        setLocations: s.setLocations,
+        setFavoriteLocations: s.setFavoriteLocations,
       })),
     )
   const { addEntry, loadWeek } = useTimeEntries()
@@ -454,6 +466,43 @@ export function WizardPage() {
         for (const type of plan.expenses) {
           if (!existing.some((e) => e.expense_type === type)) toggleExpense(date, type)
         }
+      }
+
+      // Persist wizard-typed lifts (locations + favorites) — the same save the
+      // TimeEntryForm does for manual entries. Without it a lift typed here
+      // never appears in "Letzte Anlagen" and carries no coordinates, so the
+      // Spesenrapport falls back to the defaulted Z1 until an export heals it.
+      const liftsToPersist = new Map<string, { projectId: string; address: string }>()
+      for (let i = 0; i < TOTAL_DAYS; i++) {
+        const plan = days[i]
+        if (plan.status !== 'work') continue
+        for (const b of plan.blocks) {
+          const key = b.anlagenummer.trim().toUpperCase()
+          if (!key || !b.adresse.trim()) continue
+          liftsToPersist.set(key, {
+            projectId: b.projektnummer.trim(),
+            address: b.adresse.trim(),
+          })
+        }
+      }
+      for (const [key, { projectId, address }] of liftsToPersist) {
+        try {
+          // Shared helper: dedup against IndexedDB (never the render closure),
+          // update-or-create the location row and upsert the favorite. Only
+          // the IndexedDB-fast persistence is awaited; the geocode below is
+          // fire-and-forget — finishing the wizard must not wait on the
+          // network.
+          const { location } = await ensureLiftRow(key, projectId, address)
+          if (location && navigator.onLine) {
+            geocodeAndApplyZone(key, address, location).catch(() => {})
+          }
+        } catch (err) {
+          console.warn('Wizard lift persist failed for', key, err)
+        }
+      }
+      if (liftsToPersist.size > 0) {
+        setLocations(await localDb.getAllLocations())
+        setFavoriteLocations(await localDb.getFavoriteLocations())
       }
       navigate('/dashboard')
     } catch (e) {

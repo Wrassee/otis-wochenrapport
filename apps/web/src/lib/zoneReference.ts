@@ -12,6 +12,7 @@
 
 import { useAppStore } from '@/stores/appStore'
 import { REFERENCE_LAT, REFERENCE_LON } from './constants'
+import { calculateZone, haversineDistance } from './utils'
 
 export function getZoneReference(): { lat: number; lon: number } {
   const profile = useAppStore.getState().profile
@@ -21,4 +22,18 @@ export function getZoneReference(): { lat: number; lon: number } {
     return { lat, lon }
   }
   return { lat: REFERENCE_LAT, lon: REFERENCE_LON }
+}
+
+/**
+ * Compute the OTIS Spesen zone for a coordinate pair against the current
+ * reference point (profile override or Dietlikon default).
+ *
+ * Single shared zone-from-coordinates helper — every caller (Export page,
+ * Settings lift list, background geocoding, favorites badges) must go through
+ * this so the zone thresholds (10/30/60 km) and the reference point stay in
+ * sync everywhere.
+ */
+export function zoneForCoordinates(latitude: number, longitude: number): number {
+  const ref = getZoneReference()
+  return calculateZone(haversineDistance(ref.lat, ref.lon, latitude, longitude))
 }

@@ -14,17 +14,12 @@ import { useShallow } from 'zustand/react/shallow'
 import {
   decimalToTime,
   timeToDecimal,
-  standardToOtis,
   otisToStandard,
-  formatOtisDuration,
   snapToQuarter,
-  haversineDistance,
-  calculateZone,
   findOverlappingRanges,
   findLatestLiftEntry,
 } from '@/lib/utils'
-import { getZoneReference } from '@/lib/zoneReference'
-import { geocodeAddress } from '@/lib/geocode'
+import { ensureLiftRow } from '@/lib/locationZones'
 import { useTranslation } from '@/lib/useTranslation'
 import {
   Plus,
@@ -54,7 +49,7 @@ export function TimeEntryForm({
   onSave,
   onOverlapClick,
 }: TimeEntryFormProps) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const {
     locations,
     favoriteLocations,
@@ -79,7 +74,7 @@ export function TimeEntryForm({
 
   const [startTime, setStartTime] = useState(decimalToTime(defaultStartTime ?? 7.5))
   const [duration, setDuration] = useState('1.00')
-  const [selectedAnlagenummer, setSelectedAnlagenummer] = useState('')
+  const [_selectedAnlagenummer, setSelectedAnlagenummer] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedAddress, setSelectedAddress] = useState('')
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
@@ -151,7 +146,7 @@ export function TimeEntryForm({
       setOverlapWarning(null)
       setConflictingEntryIds([])
     }
-  }, [startTime, duration, existingEntries])
+  }, [startTime, duration, existingEntries, t])
 
   const handleSearch = async (query: string) => {
     // Only clear search-selected data if user was viewing a selected location
@@ -212,50 +207,23 @@ export function TimeEntryForm({
   const saveManualLift = async (anlagenummer: string, projectId: string, address: string) => {
     try {
       const key = anlagenummer.toUpperCase()
-      const existingLoc = locations.find((l) => l.anlagenummer.toUpperCase() === key)
-
-      if (existingLoc) {
-        // Update existing location with new project/address. updateLocationDetails
-        // queues a location_upsert sync UNCONDITIONALLY (cacheLocations only
-        // syncs 'manual_' ids, so edits to Supabase-synced lifts would otherwise
-        // never reach the cloud).
-        const updatedLoc = {
-          ...existingLoc,
-          project_id: projectId,
-          full_address: address,
+      // Shared helper: dedup against IndexedDB, update-or-create the location
+      // row and upsert the favorite. (updateLocationDetails queues a
+      // location_upsert sync UNCONDITIONALLY — cacheLocations only syncs
+      // 'manual_' ids, so edits to Supabase-synced lifts would otherwise never
+      // reach the cloud.)
+      const { location } = await ensureLiftRow(anlagenummer, projectId, address)
+      // Mirror the persisted row into the store (IndexedDB is the source of
+      // truth; the store slice only drives the UI).
+      if (location) {
+        const idx = locations.findIndex((l) => l.id === location.id)
+        if (idx >= 0) {
+          setLocations(locations.map((l) => (l.id === location.id ? location : l)))
+        } else {
+          setLocations([...locations, location])
         }
-        await localDb.updateLocationDetails(key, {
-          project_id: projectId,
-          full_address: address,
-        })
-        setLocations(locations.map((l) => (l.id === updatedLoc.id ? updatedLoc : l)))
-      } else {
-        // Create new location entry
-        const newId = `manual_${key}_${Date.now()}`
-        const newLoc = {
-          id: newId,
-          anlagenummer: key,
-          project_id: projectId,
-          full_address: address,
-          latitude: 0,
-          longitude: 0,
-          zone: 0,
-          created_at: new Date().toISOString(),
-        }
-        await localDb.cacheLocations([newLoc])
-        setLocations([...locations, newLoc])
       }
 
-      // Upsert into favorites (deduplicated by anlagenummer key)
-      await localDb.addFavoriteLocation({
-        anlagenummer: key,
-        project_id: projectId,
-        full_address: address,
-        latitude: existingLoc?.latitude ?? 0,
-        longitude: existingLoc?.longitude ?? 0,
-        zone: existingLoc?.manual_zone ?? existingLoc?.zone ?? 0,
-        manual_zone: existingLoc?.manual_zone,
-      })
       const refreshed = await localDb.getFavoriteLocations()
       setFavoriteLocations(refreshed.slice(0, 5))
 
@@ -271,11 +239,10 @@ export function TimeEntryForm({
             anlagenummer: key,
             project_id: projectId,
             full_address: address,
-            latitude: fav?.latitude ?? existingLoc?.latitude ?? 0,
-            longitude: fav?.longitude ?? existingLoc?.longitude ?? 0,
-            zone:
-              fav?.manual_zone ?? fav?.zone ?? existingLoc?.manual_zone ?? existingLoc?.zone ?? 0,
-            manual_zone: fav?.manual_zone ?? existingLoc?.manual_zone,
+            latitude: fav?.latitude ?? location?.latitude ?? 0,
+            longitude: fav?.longitude ?? location?.longitude ?? 0,
+            zone: fav?.manual_zone ?? fav?.zone ?? location?.manual_zone ?? location?.zone ?? 0,
+            manual_zone: fav?.manual_zone ?? location?.manual_zone,
             use_count: fav?.use_count ?? 1,
           })
         } catch (e) {
@@ -290,6 +257,9 @@ export function TimeEntryForm({
   /**
    * Auto-save manual lift when all 3 fields (Anlagenummer, Projekt, Adresse) are filled.
    * Debounced 1200ms after the last keystroke to avoid excessive writes.
+   * (saveManualLift is recreated each render — deliberately not in the deps,
+   *  otherwise the debounce timer would reset on every render and the
+   *  auto-save would never fire.)
    */
   useEffect(() => {
     if (isLunch || selectedLocation) return
@@ -306,6 +276,7 @@ export function TimeEntryForm({
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedProjectId, selectedAddress, selectedLocation, isLunch, locations])
 
   /**
@@ -318,57 +289,35 @@ export function TimeEntryForm({
     address: string,
   ) => {
     try {
-      const result = await geocodeAddress(address)
-      if (!result) return
-
-      const ref = getZoneReference()
-      const distance = haversineDistance(ref.lat, ref.lon, result.lat, result.lon)
-      const zone = calculateZone(distance)
-
-      // Update the location in IndexedDB if it was a manual entry
-      const locToUpdate = locations.find(
-        (l) => l.anlagenummer.toUpperCase() === anlagenummer.toUpperCase(),
-      )
-      if (locToUpdate) {
-        // If manual_zone is set, the user defined the zone manually in Settings
-        // so we keep their override and only update lat/lng
-        const effectiveZone = locToUpdate.manual_zone ?? zone
-        const updatedLoc = {
-          ...locToUpdate,
-          latitude: result.lat,
-          longitude: result.lon,
-          zone: effectiveZone,
-        }
-        // updateLocationGeo queues a location_upsert sync UNCONDITIONALLY
-        // (cacheLocations only syncs 'manual_' ids, so coordinates for
-        // Supabase-synced lifts would otherwise never reach the cloud).
-        await localDb.updateLocationGeo(anlagenummer, {
-          latitude: result.lat,
-          longitude: result.lon,
-          zone: effectiveZone,
-          manual_zone: locToUpdate.manual_zone,
-        })
-        setLocations(locations.map((l) => (l.id === updatedLoc.id ? updatedLoc : l)))
-      }
-
-      // Update the favorite with correct coordinates + zone
-      // Keep manual_zone if already set (reuse locToUpdate from above)
-      const favEffectiveZone = locToUpdate?.manual_zone ?? zone
-      await localDb.addFavoriteLocation({
-        anlagenummer,
-        project_id: projectId,
-        full_address: address,
-        latitude: result.lat,
-        longitude: result.lon,
-        zone: favEffectiveZone,
-        manual_zone: locToUpdate?.manual_zone,
+      // Shared helper with the geocode option: geocodes the address and
+      // persists the coordinates to the location row + favorite (a manual_zone
+      // override is kept).
+      const { geocoded } = await ensureLiftRow(anlagenummer, projectId, address, {
+        geocode: true,
       })
-      const refreshed = await localDb.getFavoriteLocations()
-      setFavoriteLocations(refreshed.slice(0, 5))
-
-      console.log(
-        `📍 ${anlagenummer}: Zone ${zone} (${result.lat.toFixed(4)}, ${result.lon.toFixed(4)})`,
-      )
+      if (geocoded) {
+        // Mirror the geocoded coords into the store's location slice.
+        const store = useAppStore.getState()
+        const loc = store.locations.find(
+          (l) => l.anlagenummer.toUpperCase() === anlagenummer.toUpperCase(),
+        )
+        if (loc) {
+          store.setLocations(
+            store.locations.map((l) =>
+              l.id === loc.id
+                ? {
+                    ...l,
+                    latitude: geocoded.latitude,
+                    longitude: geocoded.longitude,
+                    zone: geocoded.zone,
+                  }
+                : l,
+            ),
+          )
+        }
+        const refreshed = await localDb.getFavoriteLocations()
+        store.setFavoriteLocations(refreshed.slice(0, 5))
+      }
     } catch (err) {
       console.warn('Background geocoding failed:', err)
     }
@@ -523,7 +472,7 @@ export function TimeEntryForm({
     setConflictingEntryIds([])
   }
 
-  const todayStr = new Date(date + 'T12:00:00').toLocaleDateString('de-DE', {
+  const todayStr = new Date(date + 'T12:00:00').toLocaleDateString(language, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',

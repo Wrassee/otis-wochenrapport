@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { ExpensePhoto } from '@/lib/types'
 import { useAppStore } from '@/stores/appStore'
 import { getWeekKey } from '@/lib/utils'
 
@@ -15,7 +14,6 @@ import { getWeekKey } from '@/lib/utils'
  * can read the same data as the Spesen page without re-fetching.
  */
 export function useExpensePhotos(year: number, week: number) {
-  const user = useAppStore((s) => s.user)
   // Select the stable map reference and derive the week's array OUTSIDE the
   // selector. `s.expensePhotos[key] || []` in the selector would return a
   // brand-new empty array on every render while the week isn't loaded yet,

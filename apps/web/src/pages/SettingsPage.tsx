@@ -11,8 +11,7 @@ import * as localDb from '@/db/indexeddb'
 import { geocodeAndApplyZone, locationsMissingZone } from '@/lib/locationZones'
 import { geocodeAddress } from '@/lib/geocode'
 import { REFERENCE_LAT, REFERENCE_LON } from '@/lib/constants'
-import { calculateZone, haversineDistance } from '@/lib/utils'
-import { getZoneReference } from '@/lib/zoneReference'
+import { zoneForCoordinates } from '@/lib/zoneReference'
 import type { Profile } from '@/lib/types'
 import {
   LogOut,
@@ -35,7 +34,6 @@ import {
   Trash2,
   AlertTriangle,
   Plus,
-  Languages,
   MapPinned,
   Sun,
   Moon,
@@ -439,19 +437,15 @@ function liftEffectiveZone(loc: {
 }): number {
   if (loc.manual_zone !== undefined) return loc.manual_zone
   if (Number(loc.latitude) && Number(loc.longitude)) {
-    const ref = getZoneReference()
-    return calculateZone(
-      haversineDistance(ref.lat, ref.lon, Number(loc.latitude), Number(loc.longitude)),
-    )
+    return zoneForCoordinates(Number(loc.latitude), Number(loc.longitude))
   }
   return 0
 }
 
 function LiftZoneManager() {
   const { t } = useTranslation()
-  const { locations, setLocations, setFavoriteLocations } = useAppStore(
+  const { setLocations, setFavoriteLocations } = useAppStore(
     useShallow((s) => ({
-      locations: s.locations,
       setLocations: s.setLocations,
       setFavoriteLocations: s.setFavoriteLocations,
     })),
@@ -591,10 +585,7 @@ function LiftZoneManager() {
           (l) => l.anlagenummer.toUpperCase() === anlagenummer.toUpperCase(),
         )
         if (loc && Number(loc.latitude) && Number(loc.longitude)) {
-          const ref = getZoneReference()
-          effectiveZone = calculateZone(
-            haversineDistance(ref.lat, ref.lon, loc.latitude, loc.longitude),
-          )
+          effectiveZone = zoneForCoordinates(loc.latitude, loc.longitude)
         }
       }
       await localDb.updateLocationZone(anlagenummer, effectiveZone, manualZone)
@@ -618,7 +609,7 @@ function LiftZoneManager() {
           .then(() => loadLifts())
           .catch(() => {})
       }
-    } catch (err) {
+    } catch {
       showFeedback(t('lifts.save.error'), 'error')
       setEditingLift(null)
     }
@@ -638,7 +629,7 @@ function LiftZoneManager() {
       setDeleteConfirm(null)
       setEditingLift(null)
       loadLifts()
-    } catch (err) {
+    } catch {
       showFeedback(t('lifts.delete.error'), 'error')
       setDeleteConfirm(null)
     }
@@ -702,7 +693,7 @@ function LiftZoneManager() {
           .then(() => loadLifts())
           .catch(() => {})
       }
-    } catch (err) {
+    } catch {
       showFeedback(t('lifts.add.error'), 'error')
     }
   }
@@ -731,10 +722,7 @@ function LiftZoneManager() {
         if (Number(loc.latitude) && Number(loc.longitude)) {
           // Already geocoded → just recompute the zone from the coordinates
           // and the current reference point (no rate-limited geocode needed).
-          const ref = getZoneReference()
-          const zone = calculateZone(
-            haversineDistance(ref.lat, ref.lon, Number(loc.latitude), Number(loc.longitude)),
-          )
+          const zone = zoneForCoordinates(Number(loc.latitude), Number(loc.longitude))
           await localDb.updateLocationZone(loc.anlagenummer, zone, undefined)
           updated++
         } else {

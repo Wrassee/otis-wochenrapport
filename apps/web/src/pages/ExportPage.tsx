@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/Badge'
 import { useAppStore } from '@/stores/appStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
-import { getWeekDates, formatDateShort, calculateZone, haversineDistance } from '@/lib/utils'
-import { getZoneReference } from '@/lib/zoneReference'
-import { geocodeAndApplyZone } from '@/lib/locationZones'
+import { getWeekDates, formatDateShort, haversineDistance } from '@/lib/utils'
+import { getZoneReference, zoneForCoordinates } from '@/lib/zoneReference'
+import { ensureLiftRow, geocodeAndApplyZone } from '@/lib/locationZones'
+import { geocodeAddress } from '@/lib/geocode'
 import * as localDb from '@/db/indexeddb'
 import { getDrivingDistance } from '@/lib/routing'
 import { cn } from '@/lib/cn'
@@ -33,8 +34,6 @@ export function ExportPage() {
     calculateWeekSummary,
     timeEntries,
     dailyExpenses,
-    locations,
-    favoriteLocations,
     setLocations,
     setFavoriteLocations,
     user,
@@ -46,8 +45,6 @@ export function ExportPage() {
       calculateWeekSummary: s.calculateWeekSummary,
       timeEntries: s.timeEntries,
       dailyExpenses: s.dailyExpenses,
-      locations: s.locations,
-      favoriteLocations: s.favoriteLocations,
       setLocations: s.setLocations,
       setFavoriteLocations: s.setFavoriteLocations,
       user: s.user,
@@ -87,15 +84,38 @@ export function ExportPage() {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return
     const weekDates = getWeekDates(currentWeek.year, currentWeek.week)
     const inWeek = new Set(weekDates)
-    const lifts = new Map<string, Location | FavoriteLocation>()
+    // Authoritative lift lookups come from IndexedDB, not the render closure —
+    // the store's locations/favorites are only refreshed on syncs and may miss
+    // a lift that exists locally (e.g. one the wizard just persisted), which
+    // would otherwise create a duplicate row for the same Anlagenummer.
+    const [dbLocations, dbFavorites] = await Promise.all([
+      localDb.getAllLocations(),
+      localDb.getFavoriteLocations(),
+    ])
+    // Collect every distinct lift of the week. Lifts may exist in the DB
+    // (locations/favorites) OR only on the entries themselves (wizard-typed
+    // lifts that were never persisted) — both carry a healable address.
+    const lifts = new Map<
+      string,
+      { src: Location | FavoriteLocation | null; address: string; projectId: string }
+    >()
     for (const e of timeEntries) {
       if (e.is_lunch || !e.location_anlagenummer || !inWeek.has(e.date)) continue
       const key = e.location_anlagenummer.toUpperCase()
-      if (lifts.has(key)) continue
-      const loc = locations.find((l) => l.anlagenummer.toUpperCase() === key)
-      const fav = favoriteLocations.find((f) => f.anlagenummer.toUpperCase() === key)
-      const src = loc || fav
-      if (src) lifts.set(key, src)
+      const existing = lifts.get(key)
+      if (existing) {
+        if (!existing.address && e.location_address) existing.address = e.location_address
+        if (!existing.projectId && e.location_project_id) existing.projectId = e.location_project_id
+        continue
+      }
+      const loc = dbLocations.find((l) => l.anlagenummer.toUpperCase() === key)
+      const fav = dbFavorites.find((f) => f.anlagenummer.toUpperCase() === key)
+      const src = loc || fav || null
+      lifts.set(key, {
+        src,
+        address: src?.full_address || e.location_address || '',
+        projectId: src?.project_id || e.location_project_id || '',
+      })
     }
 
     // Cap the heal per export run: a long tail of ungeocoded lifts must not
@@ -104,22 +124,44 @@ export function ExportPage() {
     const HEAL_CAP = 8
     let healed = 0
     let attempted = 0
-    for (const [key, src] of lifts) {
+    for (const [key, { src, address, projectId }] of lifts) {
       // A manual override always wins; existing coordinates are already fine.
-      if (src.manual_zone !== undefined) continue
-      if (Number(src.latitude) && Number(src.longitude)) continue
-      const address = src.full_address || ''
-      if (address.trim().length < 5) continue
+      if (src && src.manual_zone !== undefined) continue
+      if (src && Number(src.latitude) && Number(src.longitude)) continue
+      if (!address || address.trim().length < 5) continue
       if (attempted >= HEAL_CAP) break
       attempted++
       try {
-        // Per-call budget: a hanging Nominatim request (like a hanging backend)
-        // must never stall the export — race the geocode against a timeout.
-        const result = await Promise.race([
-          geocodeAndApplyZone(key, address.trim(), src),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
-        ])
-        if (result) healed++
+        if (src) {
+          // Known lift — geocode + persist via the shared helper.
+          // Per-call budget: a hanging Nominatim request (like a hanging
+          // backend) must never stall the export — race the geocode against a
+          // timeout.
+          const result = await Promise.race([
+            geocodeAndApplyZone(key, address.trim(), src),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+          ])
+          if (result) healed++
+        } else {
+          // Entry-only lift (typed in the wizard, never persisted): geocode
+          // the entry's address, then create the location + favorite rows with
+          // the real coordinates (shared ensureLiftRow) so the report (and
+          // other devices) get the correct zone and future exports skip this
+          // lift.
+          const result = await Promise.race([
+            geocodeAddress(address.trim()),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+          ])
+          if (!result) continue
+          await ensureLiftRow(key, projectId, address.trim(), {
+            geo: {
+              latitude: result.lat,
+              longitude: result.lon,
+              zone: zoneForCoordinates(result.lat, result.lon),
+            },
+          })
+          healed++
+        }
       } catch (err) {
         console.warn('Export zone heal failed for', key, err)
       }
@@ -148,7 +190,6 @@ export function ExportPage() {
    * immediately by buildEntriesData and collectKmAllowances.
    */
   const resolveEntryZone = (e: TimeEntry): { zone: number; lat: number; lon: number } => {
-    const zoneRef = getZoneReference()
     const { locations: liveLocations, favoriteLocations: liveFavorites } =
       useAppStore.getState()
     let manualZone: number | undefined
@@ -173,7 +214,7 @@ export function ExportPage() {
     if (manualZone !== undefined) return { zone: manualZone, lat, lon }
     if (lat && lon) {
       return {
-        zone: calculateZone(haversineDistance(zoneRef.lat, zoneRef.lon, lat, lon)),
+        zone: zoneForCoordinates(lat, lon),
         lat,
         lon,
       }
@@ -192,9 +233,16 @@ export function ExportPage() {
       // Absence entries (A01/A03/…) never get a zone mark (no Spesen).
       const effectiveZone =
         !e.is_lunch && !zone && !(e.activity_code || '').startsWith('A') ? 1 : zone
+      // Absence days created before the 07:30 default (the wizard's
+      // ABSENCE_START) start at 7:00 — heal the report so A* days read
+      // 07:30–16:00 like the current rule.
+      const startTime =
+        !e.is_lunch && (e.activity_code || '').startsWith('A') && e.start_time === 7
+          ? 7.5
+          : e.start_time
       return {
         date: e.date,
-        start_time: e.start_time,
+        start_time: startTime,
         duration: e.duration,
         anlagenummer: e.location_anlagenummer || '',
         project_id: e.location_project_id || '',

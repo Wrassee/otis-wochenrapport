@@ -10,7 +10,6 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Clock,
   AlertTriangle,
   CheckCircle2,
   BarChart3,

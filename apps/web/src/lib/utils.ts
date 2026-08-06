@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { format, parseISO, startOfWeek, addDays, getISOWeek, getYear } from 'date-fns'
+import { format, parseISO, addDays, getISOWeek, getYear } from 'date-fns'
 import { de } from 'date-fns/locale'
 import type { TimeEntry } from '@/lib/types'
 
@@ -287,22 +287,3 @@ export function uuidFromString(input: string): string {
   )
 }
 
-/**
- * Check if running on a specific platform via Capacitor or userAgent
- */
-export function isPlatform(platform: 'android' | 'ios' | 'capacitor'): boolean {
-  if (platform === 'capacitor') {
-    return typeof (window as any).Capacitor !== 'undefined'
-  }
-  if (platform === 'android') {
-    return typeof (window as any).Capacitor?.getPlatform === 'function'
-      ? (window as any).Capacitor.getPlatform() === 'android'
-      : navigator.userAgent.toLowerCase().includes('android')
-  }
-  if (platform === 'ios') {
-    return typeof (window as any).Capacitor?.getPlatform === 'function'
-      ? (window as any).Capacitor.getPlatform() === 'ios'
-      : /iPad|iPhone|iPod/.test(navigator.userAgent)
-  }
-  return false
-}
