@@ -74,8 +74,8 @@ const LUNCH_OPTIONS = [30, 45, 60]
 /** Hours of work after which the lunch question becomes relevant. */
 const LUNCH_AFTER_HOURS = 4
 
-/** Default start time for absence days (07:00). */
-const ABSENCE_START = 7
+/** Default start time for absence days (07:30 — same as the work day start). */
+const ABSENCE_START = 7.5
 
 const EXPENSE_TYPES: { type: ExpenseType; labelKey: TranslationKey }[] = [
   { type: 'entschaedigung_10h', labelKey: 'spesen.10h' },

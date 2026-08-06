@@ -8,12 +8,14 @@ import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
 import { getWeekDates, formatDateShort, calculateZone, haversineDistance } from '@/lib/utils'
 import { getZoneReference } from '@/lib/zoneReference'
+import { geocodeAndApplyZone } from '@/lib/locationZones'
+import * as localDb from '@/db/indexeddb'
 import { getDrivingDistance } from '@/lib/routing'
 import { cn } from '@/lib/cn'
 import { Calendar, FileSpreadsheet, Info } from 'lucide-react'
 import { generateExcelOffline } from '@/services/offlineGenerator'
 import type { OfflineEntry, OfflineExpense } from '@/services/offlineGenerator'
-import type { TimeEntry } from '@/lib/types'
+import type { TimeEntry, Location, FavoriteLocation } from '@/lib/types'
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
@@ -33,6 +35,8 @@ export function ExportPage() {
     dailyExpenses,
     locations,
     favoriteLocations,
+    setLocations,
+    setFavoriteLocations,
     user,
   } = useAppStore(
     useShallow((s) => ({
@@ -44,6 +48,8 @@ export function ExportPage() {
       dailyExpenses: s.dailyExpenses,
       locations: s.locations,
       favoriteLocations: s.favoriteLocations,
+      setLocations: s.setLocations,
+      setFavoriteLocations: s.setFavoriteLocations,
       user: s.user,
     })),
   )
@@ -64,27 +70,99 @@ export function ExportPage() {
   }, [timeEntries, calculateWeekSummary])
 
   /**
+   * Auto-heal missing lift coordinates before building the report.
+   *
+   * A lift whose geocoded coordinates never reached the device (e.g. a Z0 row
+   * from before the zone pipeline, or a cloud row without lat/lon) resolves to
+   * a defaulted/stored zone (often the old Z1 fallback) even though the real
+   * distance puts it in a higher zone — Hausen am Albis ≈ 20 km must be Z2,
+   * not Z1. When online, geocode this week's work lifts that lack coordinates,
+   * persist the result (IndexedDB + sync queue → Supabase) and refresh the
+   * store so both the report marks and the Z4/Z5 km allowance use real
+   * coordinates. Offline this is a no-op and the stored fallback applies.
+   */
+  const ensureWeekLiftZones = async (): Promise<void> => {
+    // Offline (the common mobile export case) the geocoder is unreachable —
+    // skip the heal entirely instead of waiting ~1s per lift for failures.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+    const weekDates = getWeekDates(currentWeek.year, currentWeek.week)
+    const inWeek = new Set(weekDates)
+    const lifts = new Map<string, Location | FavoriteLocation>()
+    for (const e of timeEntries) {
+      if (e.is_lunch || !e.location_anlagenummer || !inWeek.has(e.date)) continue
+      const key = e.location_anlagenummer.toUpperCase()
+      if (lifts.has(key)) continue
+      const loc = locations.find((l) => l.anlagenummer.toUpperCase() === key)
+      const fav = favoriteLocations.find((f) => f.anlagenummer.toUpperCase() === key)
+      const src = loc || fav
+      if (src) lifts.set(key, src)
+    }
+
+    // Cap the heal per export run: a long tail of ungeocoded lifts must not
+    // stall the button — the first successful heal persists coordinates, so
+    // later exports skip them anyway.
+    const HEAL_CAP = 8
+    let healed = 0
+    let attempted = 0
+    for (const [key, src] of lifts) {
+      // A manual override always wins; existing coordinates are already fine.
+      if (src.manual_zone !== undefined) continue
+      if (Number(src.latitude) && Number(src.longitude)) continue
+      const address = src.full_address || ''
+      if (address.trim().length < 5) continue
+      if (attempted >= HEAL_CAP) break
+      attempted++
+      try {
+        // Per-call budget: a hanging Nominatim request (like a hanging backend)
+        // must never stall the export — race the geocode against a timeout.
+        const result = await Promise.race([
+          geocodeAndApplyZone(key, address.trim(), src),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+        ])
+        if (result) healed++
+      } catch (err) {
+        console.warn('Export zone heal failed for', key, err)
+      }
+    }
+
+    if (healed > 0) {
+      // Refresh the store so resolveEntryZone / collectKmAllowances use the
+      // freshly geocoded coordinates instead of the stored fallback.
+      const updatedLocs = await localDb.getAllLocations()
+      setLocations(updatedLocs)
+      const updatedFavs = await localDb.getFavoriteLocations()
+      setFavoriteLocations(updatedFavs)
+    }
+  }
+
+  /**
    * Resolve the TRUSTWORTHY zone for an entry — mirrors the Settings lift list
    * (liftEffectiveZone): a manual override always wins, otherwise the zone is
    * recomputed from the geocoded coordinates and the current reference point.
    * A stale stored zone (e.g. a leftover of the old Z0→Z1 default) is never
    * trusted — the report and the km allowance use the same zone the user sees.
    * Returns the coordinates too, for the Z4/Z5 km calculation.
+   *
+   * The lift lookup uses the LIVE store state (not this render's closure) so
+   * the export-time zone heal that refreshes locations/favorites is picked up
+   * immediately by buildEntriesData and collectKmAllowances.
    */
   const resolveEntryZone = (e: TimeEntry): { zone: number; lat: number; lon: number } => {
     const zoneRef = getZoneReference()
+    const { locations: liveLocations, favoriteLocations: liveFavorites } =
+      useAppStore.getState()
     let manualZone: number | undefined
     let lat = 0
     let lon = 0
     if (e.location_anlagenummer) {
       const key = e.location_anlagenummer.toUpperCase()
-      const loc = locations.find((l) => l.anlagenummer.toUpperCase() === key)
+      const loc = liveLocations.find((l) => l.anlagenummer.toUpperCase() === key)
       if (loc) {
         manualZone = loc.manual_zone
         lat = loc.latitude || 0
         lon = loc.longitude || 0
       } else {
-        const fav = favoriteLocations.find((f) => f.anlagenummer.toUpperCase() === key)
+        const fav = liveFavorites.find((f) => f.anlagenummer.toUpperCase() === key)
         if (fav) {
           manualZone = fav.manual_zone
           lat = fav.latitude || 0
@@ -250,6 +328,9 @@ export function ExportPage() {
    */
   const generateWeekBlob = async (): Promise<{ blob: Blob; usedOffline: boolean }> => {
     const state = useAppStore.getState()
+    // Geocode any of this week's lifts that lack coordinates so their zones
+    // (and the Z4/Z5 km allowance) are correct in the report.
+    await ensureWeekLiftZones()
     const entriesData = buildEntriesData()
     const allExpenses = collectWeekExpenses()
     const photoNotes = collectPhotoNotes()
