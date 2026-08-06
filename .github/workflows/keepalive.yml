@@ -1,0 +1,22 @@
+name: Render Keep-Alive
+
+# Render's free web services spin down after ~15 minutes of inactivity and a
+# cold start takes ~20s — the app's 30s export timeout handles it, but this
+# scheduled ping keeps the instance warm so exports are fast. Every 10 minutes
+# stays safely below the 15-minute idle threshold even when a scheduled run is
+# delayed by a few minutes (GitHub cron runs are best-effort).
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Wake Render service
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          curl -sS -o /dev/null -w 'Render health: HTTP %{http_code} in %{time_total}s\n' \
+            --max-time 90 https://otis-wochenrapport.onrender.com/health

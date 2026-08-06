@@ -62,6 +62,18 @@ export function ExportPage() {
     loadWeekEntries()
   }, [currentWeek, loadWeekEntries])
 
+  // Pre-warm the backend when the Export page opens: Render's free tier spins
+  // down after ~15 min idle and a cold start takes ~20s. This fire-and-forget
+  // health ping wakes the server while the user is still looking at the page,
+  // so the actual export/email fetch usually finds it warm instead of racing
+  // the cold start (the 30s AbortSignal timeout is the safety net either way).
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.onLine) return
+    const renderUrl = import.meta.env.VITE_RENDER_URL
+    if (!renderUrl) return
+    fetch(`${renderUrl}/health`, { signal: AbortSignal.timeout(15000) }).catch(() => {})
+  }, [])
+
   useEffect(() => {
     calculateWeekSummary()
   }, [timeEntries, calculateWeekSummary])
