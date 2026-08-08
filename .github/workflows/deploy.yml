@@ -205,8 +205,9 @@ jobs:
           if-no-files-found: error
 
       # Rolling tag: apk-latest. Every build updates THE SAME draft release
-      # (allowUpdates: true), so only one latest draft exists at any time
-      # instead of accumulating one draft per push.
+      # (softprops/action-gh-release@v2 updates an existing release for the tag
+      # by default), so only one latest draft exists at any time instead of
+      # accumulating one draft per push.
       # NOTE: publishing the draft is ONE-WAY — the tag moves with it, and the
       # next build will update that published release (the GitHub API has no
       # "unpublish" endpoint, so it can never go back to draft).
@@ -228,7 +229,6 @@ jobs:
             mindig csak a legfrissebb APK érhető el itt.
           files: apps/web/android/app/build/outputs/apk/debug/app-debug.apk
           draft: true
-          allowUpdates: true
 
   notify:
     name: Notify — Deploy complete
