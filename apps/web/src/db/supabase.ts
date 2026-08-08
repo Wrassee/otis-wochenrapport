@@ -34,11 +34,46 @@ export async function signIn(email: string, password: string) {
 }
 
 /**
- * Sign up with email and password
+ * The URL the e-mail-confirmation link should land on. On the web (dev +
+ * production) it is simply the caller's own origin — the supabase-js SDK
+ * picks up the session from the URL fragment after confirmation and logs
+ * the user straight in. In the Capacitor APK the origin is `http://localhost`
+ * (which a phone browser cannot open), so mobile users are pointed at the
+ * hosted web app instead: they confirm there and then log in once on the
+ * device.
+ */
+function getEmailRedirectTo(): string {
+  const cap = (window as any).Capacitor
+  if (cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()) {
+    return 'https://otis-wochenrapport.vercel.app'
+  }
+  return window.location.origin
+}
+
+/**
+ * Sign up with email and password.
+ *
+ * The confirmation e-mail redirects back to the app (see getEmailRedirectTo).
+ * That target must be on the Supabase dashboard's allowlist (Authentication →
+ * URL Configuration → Redirect URLs); until it is, signUp would hard-fail on
+ * the unknown redirect target — so we fall back to the dashboard default once
+ * instead of breaking registration entirely.
  */
 export async function signUp(email: string, password: string) {
-  const { data, error } = await supabase.auth.signUp({ email, password })
-  if (error) throw error
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: getEmailRedirectTo() },
+  })
+  if (error) {
+    const msg = String(error.message || '').toLowerCase()
+    if (msg.includes('redirect') || msg.includes('allowlist') || msg.includes('not allowed')) {
+      const { data: retry, error: retryErr } = await supabase.auth.signUp({ email, password })
+      if (retryErr) throw retryErr
+      return retry
+    }
+    throw error
+  }
   return data
 }
 

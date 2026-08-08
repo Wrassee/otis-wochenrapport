@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { UserPlus, Eye, EyeOff, Building2 } from 'lucide-react'
+import { UserPlus, Eye, EyeOff, Building2, MailCheck } from 'lucide-react'
 import { useTranslation } from '@/lib/useTranslation'
 
 interface RegisterFormProps {
@@ -13,9 +13,16 @@ interface RegisterFormProps {
   ) => Promise<void>
   onSwitchToLogin: () => void
   error?: string | null
+  /** True after a successful sign-up that requires e-mail confirmation. */
+  registered?: boolean
 }
 
-export function RegisterForm({ onRegister, onSwitchToLogin, error }: RegisterFormProps) {
+export function RegisterForm({
+  onRegister,
+  onSwitchToLogin,
+  error,
+  registered = false,
+}: RegisterFormProps) {
   const { t } = useTranslation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -72,7 +79,30 @@ export function RegisterForm({ onRegister, onSwitchToLogin, error }: RegisterFor
           <p className="text-otis-200/70 mt-1 text-sm">{t('auth.register.subtitle')}</p>
         </div>
 
-        <div className="glass-strong dark:glass-dark rounded-3xl p-7 shadow-2xl space-y-5">
+        {registered ? (
+          /* E-mail confirmation pending — tell the user what to do next
+             instead of leaving them with a silent form or an error. */
+          <div className="glass-strong dark:glass-dark rounded-3xl p-7 shadow-2xl space-y-5 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-400/30 mx-auto">
+              <MailCheck className="w-8 h-8 text-emerald-300" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-white">
+                {t('auth.register.confirm.title')}
+              </h2>
+              <p className="text-otis-200/80 text-sm leading-relaxed">
+                {t('auth.register.confirm.body', { email })}
+              </p>
+              <p className="text-otis-200/60 text-xs leading-relaxed">
+                {t('auth.register.confirm.hint')}
+              </p>
+            </div>
+            <Button type="button" fullWidth size="lg" variant="primary" onClick={onSwitchToLogin}>
+              {t('auth.switch.login')}
+            </Button>
+          </div>
+        ) : (
+          <div className="glass-strong dark:glass-dark rounded-3xl p-7 shadow-2xl space-y-5">
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               id="reg-name"
@@ -157,7 +187,8 @@ export function RegisterForm({ onRegister, onSwitchToLogin, error }: RegisterFor
               )}
             </Button>
           </form>
-        </div>
+          </div>
+        )}
 
         <p className="text-center mt-6 text-otis-200/70 text-sm">
           {t('auth.has.account')}{' '}

@@ -4,6 +4,15 @@ import type { ActivityCode } from './types'
 export const REFERENCE_LAT = 47.4196
 export const REFERENCE_LON = 8.6205
 
+/**
+ * localStorage key for the profile data entered during registration while
+ * the e-mail confirmation is still pending. The profiles row can only be
+ * written to Supabase once the user has a real session, so we keep the
+ * entered name / personnel number on the device and apply them at the first
+ * login after confirmation (see appStore.initialize).
+ */
+export const PENDING_REGISTRATION_KEY = 'otis_pending_registration'
+
 /** Zone distance thresholds in km */
 export const ZONE_THRESHOLDS = {
   ZONE1: 10,

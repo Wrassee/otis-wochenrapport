@@ -17,6 +17,7 @@ Futtasd mind a 9 fájlt **növekvő sorrendben**:
 008_user_favorites_realtime.sql ← kedvenc-realtime (idempotens, általában no-op)
 009_locations_write_policies.sql ← locations INSERT/UPDATE RLS-policy (kézi lift-szinkron)
 010_profile_home_location.sql     ← profil referenciakoordinátái (Spesen-zóna kiindulópont)
+011_profiles_policies_assert.sql ← profiles RLS-policy-k idempotens újra-rögzítése (drift-heal)
 ```
 
 > **💡 Egy fájl = egy futtatás.** Minden fájl teljes tartalmát másold be a SQL Editorba, és futtasd le. Ha egy fájl hibát dob, ne folytasd a következővel, amíg meg nem értetted az okot — a függőségek miatt a korábbi lépések nélkül a későbbiek elhasalhatnak.
@@ -35,6 +36,7 @@ Futtasd mind a 9 fájlt **növekvő sorrendben**:
 | 008 | `008_user_favorites_realtime.sql` | Kedvenc-realtime **biztosíték**: ha a 002 még nem kapcsolta be, itt bekapcsolja | ✅ | ✅ (tábla hiányában csendben kihagy) |
 | 009 | `009_locations_write_policies.sql` | `locations` INSERT + UPDATE RLS-policy — a kézi/offline liftek felhőbe szinkronjához (`upsertLocation`); a 001 csak SELECT-et adott, ami nélkül minden lift-push `new row violates row-level security policy` hibát dob | ✅ idempotens (`DROP POLICY IF EXISTS` + `CREATE POLICY`) | ✅ |
 | 010 | `010_profile_home_location.sql` | `home_latitude` + `home_longitude` oszlopok a `profiles`-en — a technikus saját Spesen-zóna kiindulópontja (ha nem Dietlikon); az app Dietlikonra esik vissza, ha NULL | ✅ (`ADD COLUMN IF NOT EXISTS`) | ✅ |
+| 011 | `011_profiles_policies_assert.sql` | A `profiles` RLS-policy-k (`SELECT`/`INSERT`/`UPDATE`, `auth.uid() = id`) idempotens újra-létrehozása — séma-drift esetén a regisztráció `new row violates row level security policy for table "profiles"` hibát dob; ez a fájl ezt heali | ✅ (`DROP POLICY IF EXISTS` + `CREATE POLICY` + `NOTIFY pgrst`) | ✅ |
 
 **Jelmagyarázat:**
 

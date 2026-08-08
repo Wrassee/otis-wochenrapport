@@ -24,11 +24,12 @@ import {
   decimalToTime,
   findFirstOverlap,
 } from '@/lib/utils'
-import { ACTIVITY_CODES } from '@/lib/constants'
+import { ACTIVITY_CODES, PENDING_REGISTRATION_KEY } from '@/lib/constants'
 import type { Language } from '@/lib/translations'
 import { DAY_NAMES } from '@/lib/translations'
 import {
   getProfile,
+  upsertProfile,
   upsertFavorite,
   getFavorites,
   getExpenses,
@@ -930,6 +931,45 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
         } catch (e) {
           console.warn('Failed to fetch profile from Supabase:', e)
+        }
+      }
+
+      // A registration done while the e-mail confirmation was still pending
+      // saved the entered name / personnel number locally (the profiles row
+      // can only be written once a real session exists). Now that the user is
+      // logged in, carry that data over into the cloud profile — this covers
+      // both "confirm in browser, then log in on the device" and the direct
+      // e-mail-link callback that logs the session in automatically.
+      // Offline → skip the upsert and keep the pending data on the device;
+      // it will be applied at the next login once connectivity returns
+      // (removing it here would silently drop the user's registration data).
+      if (navigator.onLine) {
+        try {
+          const pendingReg = localStorage.getItem(PENDING_REGISTRATION_KEY)
+          if (pendingReg) {
+            const reg = JSON.parse(pendingReg)
+            const currentProfile = get().profile
+            if (reg?.fullName && !currentProfile?.full_name) {
+              await withTimeout(
+                upsertProfile({
+                  id: userId,
+                  email: String(reg.email || ''),
+                  full_name: String(reg.fullName),
+                  personnel_number: String(reg.personnelNumber || ''),
+                  supervisor_email: '',
+                  language: get().language,
+                }),
+                8000,
+                'pendingProfile',
+              )
+              const created = await withTimeout(getProfile(userId), 8000, 'getProfile')
+              if (created) get().setProfile(created)
+            }
+            // Used up (applied or stale) — never apply it twice.
+            localStorage.removeItem(PENDING_REGISTRATION_KEY)
+          }
+        } catch (e) {
+          console.warn('Failed to apply pending registration profile:', e)
         }
       }
 

@@ -220,6 +220,55 @@ export const translations = {
     hu: 'Sikertelen regisztr\u00e1ci\u00f3',
     en: 'Registration failed',
   },
+  'auth.register.confirm.title': {
+    de: 'Fast geschafft!',
+    fr: 'Presque termin\u00e9 !',
+    it: 'Quasi fatto!',
+    hu: 'M\u00e1r majdnem k\u00e9sz!',
+    en: 'Almost done!',
+  },
+  'auth.register.confirm.body': {
+    de: 'Wir haben einen Best\u00e4tigungslink an {email} gesendet. Bitte \u00f6ffne die E-Mail und klicke auf den Link, um dein Konto zu aktivieren \u2014 danach kannst du dich anmelden.',
+    fr: "Nous avons envoy\u00e9 un lien de confirmation \u00e0 {email}. Ouvre l'e-mail et clique sur le lien pour activer ton compte, puis connecte-toi.",
+    it: "Abbiamo inviato un link di conferma a {email}. Apri l'e-mail e clicca sul link per attivare il tuo account, poi accedi.",
+    hu: 'Meger\u0151s\u00edt\u0151 linket k\u00fcldt\u00fcnk a(z) {email} c\u00edmre. Nyisd meg az e-mailt, \u00e9s kattints a linkre a fi\u00f3k aktiv\u00e1l\u00e1s\u00e1hoz \u2014 ezut\u00e1n bejelentkezhetsz.',
+    en: 'We sent a confirmation link to {email}. Open the e-mail and click the link to activate your account, then you can log in.',
+  },
+  'auth.register.confirm.hint': {
+    de: 'Keine E-Mail erhalten? Schau auch im Spam-Ordner nach \u2014 du kannst es in ein paar Minuten erneut versuchen.',
+    fr: "E-mail non re\u00e7u ? V\u00e9rifie aussi le dossier spam \u2014 tu pourras r\u00e9essayer dans quelques minutes.",
+    it: "Non hai ricevuto l'e-mail? Controlla anche lo spam \u2014 potrai riprovare tra qualche minuto.",
+    hu: 'Nem \u00e9rkezett e-mail? N\u00e9zd meg a spam mapp\u00e1t is \u2014 n\u00e9h\u00e1ny perc m\u00falva \u00fajra pr\u00f3b\u00e1lkozhatsz.',
+    en: 'No e-mail received? Also check your spam folder \u2014 you can try again in a few minutes.',
+  },
+  'auth.error.rate_limit': {
+    de: 'Zu viele Versuche. Bitte warte 25 Sekunden, bevor du es erneut versuchst.',
+    fr: 'Trop de tentatives. Veuillez attendre 25 secondes avant de r\u00e9essayer.',
+    it: 'Troppi tentativi. Attendi 25 secondi prima di riprovare.',
+    hu: 'T\u00fal sok pr\u00f3b\u00e1lkoz\u00e1s. K\u00e9rj\u00fck, v\u00e1rjon 25 m\u00e1sodpercet, miel\u0151tt \u00fajra pr\u00f3b\u00e1lkozik.',
+    en: 'Too many attempts. Please wait 25 seconds before trying again.',
+  },
+  'auth.error.exists': {
+    de: 'Diese E-Mail-Adresse ist bereits registriert. Bitte melde dich stattdessen an.',
+    fr: "Cette adresse e-mail est d\u00e9j\u00e0 inscrite. Connectez-vous \u00e0 la place.",
+    it: 'Questa email \u00e8 gi\u00e0 registrata. Accedi invece.',
+    hu: 'Ez az e-mail c\u00edm m\u00e1r regisztr\u00e1lva van. K\u00e9rj\u00fck, jelentkezzen be ink\u00e1bb.',
+    en: 'This e-mail address is already registered. Please log in instead.',
+  },
+  'auth.error.email.invalid': {
+    de: 'Bitte gib eine g\u00fcltige E-Mail-Adresse ein.',
+    fr: 'Veuillez saisir une adresse e-mail valide.',
+    it: 'Inserisci un indirizzo email valido.',
+    hu: 'K\u00e9rj\u00fck, adjon meg \u00e9rv\u00e9nyes e-mail c\u00edmet.',
+    en: 'Please enter a valid e-mail address.',
+  },
+  'auth.error.network': {
+    de: 'Keine Internetverbindung. Bitte pr\u00fcf\u00fc deine Verbindung und versuche es erneut.',
+    fr: 'Pas de connexion Internet. V\u00e9rifie ta connexion et r\u00e9essaie.',
+    it: 'Nessuna connessione Internet. Controlla la connessione e riprova.',
+    hu: 'Nincs internetkapcsolat. K\u00e9rj\u00fck, ellen\u0151rizze a kapcsolatot, \u00e9s pr\u00f3b\u00e1lja \u00fajra.',
+    en: 'No Internet connection. Please check your connection and try again.',
+  },
 
   // ─── Theme settings ───
   'theme.title': {

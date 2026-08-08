@@ -6,10 +6,60 @@ import { signIn, signUp, upsertProfile } from '@/db/supabase'
 import { useAppStore } from '@/stores/appStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
+import { PENDING_REGISTRATION_KEY } from '@/lib/constants'
+import type { TranslationKey } from '@/lib/translations'
+
+/**
+ * Map raw Supabase auth errors to friendly, localized messages. Registration
+ * throws raw English errors (rate limits, duplicate users, invalid e-mail, …)
+ * that would otherwise confuse users — every known case gets a translated
+ * equivalent, unknown ones fall back to a generic localized failure text.
+ */
+function friendlyAuthError(
+  err: unknown,
+  t: (key: TranslationKey) => string,
+  fallback: TranslationKey = 'auth.register.failed',
+): string {
+  const msg = String((err as any)?.message || (err as any)?.error_description || '').toLowerCase()
+  const status = Number((err as any)?.status)
+  const code = String((err as any)?.code || '')
+
+  // Supabase rate-limits signups/logins per address & IP ("For security
+  // purposes, you can only request this after 25 seconds.").
+  if (
+    status === 429 ||
+    code.includes('rate_limit') ||
+    code === 'over_email_send_rate_limit' ||
+    code === 'over_request_rate_limit' ||
+    msg.includes('security purposes') ||
+    msg.includes('25 seconds')
+  ) {
+    return t('auth.error.rate_limit')
+  }
+  if (code === 'user_already_exists' || msg.includes('already registered') || msg.includes('already been registered')) {
+    return t('auth.error.exists')
+  }
+  if (code === 'weak_password' || msg.includes('at least 6 characters')) {
+    return t('auth.password.short')
+  }
+  if (
+    code === 'invalid_email' ||
+    msg.includes('unable to validate email') ||
+    msg.includes('invalid email')
+  ) {
+    return t('auth.error.email.invalid')
+  }
+  if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+    return t('auth.login.failed')
+  }
+  if (!navigator.onLine) return t('auth.error.network')
+  return t(fallback)
+}
 
 export function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [error, setError] = useState<string | null>(null)
+  const [registered, setRegistered] = useState(false)
   const [_loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -33,7 +83,7 @@ export function LoginPage() {
         navigate('/dashboard')
       }
     } catch (err: any) {
-      setError(err.message || t('auth.login.failed'))
+      setError(friendlyAuthError(err, t, 'auth.login.failed'))
     } finally {
       setLoading(false)
     }
@@ -46,23 +96,50 @@ export function LoginPage() {
     personnelNumber: string,
   ) => {
     setError(null)
+    setRegistered(false)
     setLoading(true)
     try {
       const data = await signUp(email, password)
-      if (data.user) {
-        // Create profile with language preference
-        await upsertProfile({
-          id: data.user.id,
-          email: data.user.email || email,
-          full_name: fullName,
-          personnel_number: personnelNumber,
-          supervisor_email: '',
-          language,
-        })
-        setUser({ id: data.user.id, email: data.user.email || '' })
+      const user = data.user
+
+      // E-mail confirmation enabled → Supabase returns the user WITHOUT a
+      // session, so the account is not usable yet. Keep the entered profile
+      // data on this device (the profiles row can only be written to the
+      // cloud once a real session exists) and tell the user to confirm their
+      // inbox — instead of pretending they are logged in.
+      if (!data.session) {
+        if (user) {
+          localStorage.setItem(
+            PENDING_REGISTRATION_KEY,
+            JSON.stringify({ email, fullName, personnelNumber }),
+          )
+        }
+        setRegistered(true)
+        return
+      }
+
+      if (user) {
+        // E-mail confirmation OFF → the account is immediately usable.
+        // The profile row is best-effort: a cloud schema hiccup (e.g. a
+        // missing column) must never block the account from being usable —
+        // the user can still proceed and the background sync re-sends the
+        // profile later.
+        try {
+          await upsertProfile({
+            id: user.id,
+            email: user.email || email,
+            full_name: fullName,
+            personnel_number: personnelNumber,
+            supervisor_email: '',
+            language,
+          })
+        } catch (err) {
+          console.warn('Failed to sync new profile to Supabase:', err)
+        }
+        setUser({ id: user.id, email: user.email || '' })
         setProfile({
-          id: data.user.id,
-          email: data.user.email || email,
+          id: user.id,
+          email: user.email || email,
           full_name: fullName,
           personnel_number: personnelNumber,
           supervisor_email: '',
@@ -70,11 +147,11 @@ export function LoginPage() {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        await initialize(data.user.id)
+        await initialize(user.id)
         navigate('/settings')
       }
     } catch (err: any) {
-      setError(err.message || t('auth.register.failed'))
+      setError(friendlyAuthError(err, t))
     } finally {
       setLoading(false)
     }
@@ -84,7 +161,11 @@ export function LoginPage() {
     return (
       <LoginForm
         onLogin={handleLogin}
-        onSwitchToRegister={() => setMode('register')}
+        onSwitchToRegister={() => {
+          setError(null)
+          setRegistered(false)
+          setMode('register')
+        }}
         error={error}
       />
     )
@@ -93,8 +174,13 @@ export function LoginPage() {
   return (
     <RegisterForm
       onRegister={handleRegister}
-      onSwitchToLogin={() => setMode('login')}
+      onSwitchToLogin={() => {
+        setError(null)
+        setRegistered(false)
+        setMode('login')
+      }}
       error={error}
+      registered={registered}
     />
   )
 }
