@@ -69,7 +69,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <h1 className="text-lg font-bold text-otis-800 dark:text-white leading-tight">
                 {t('error.title')}
               </h1>
-              <p className="text-xs text-gray-500 dark:text-otis-300">{t('error.subtitle')}</p>
+              <p className="text-xs text-gray-600 dark:text-otis-300">{t('error.subtitle')}</p>
             </div>
           </div>
 

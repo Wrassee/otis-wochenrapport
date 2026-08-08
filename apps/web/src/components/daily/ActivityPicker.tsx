@@ -156,12 +156,12 @@ export function ActivityPicker({
                     <span className={cn('font-semibold text-sm', config.color)}>
                       {config.label}
                     </span>
-                    <span className="text-[9px] text-gray-400 dark:text-stone-400 font-medium">
+                    <span className="text-[9px] text-gray-500 dark:text-stone-300 font-medium">
                       {config.sublabel}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] text-gray-400 dark:text-stone-300">
+                    <span className="text-[10px] text-gray-500 dark:text-stone-200">
                       {t('activity.options', { n: groups.length })}
                     </span>
                     {hasAnySelected && (
@@ -173,7 +173,7 @@ export function ActivityPicker({
                 </div>
                 <ChevronDown
                   className={cn(
-                    'w-4 h-4 text-gray-400 dark:text-stone-300 transition-transform duration-200 flex-shrink-0',
+                    'w-4 h-4 text-gray-500 dark:text-stone-200 transition-transform duration-200 flex-shrink-0',
                     isOpen && 'rotate-180',
                   )}
                 />
@@ -210,7 +210,7 @@ export function ActivityPicker({
                               'w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0',
                               isSelected
                                 ? `${config.color} bg-white dark:bg-white/20`
-                                : 'bg-white/60 dark:bg-white/10 text-gray-500 dark:text-stone-400',
+                                : 'bg-white/60 dark:bg-white/10 text-gray-600 dark:text-stone-300',
                             )}
                           >
                             {badgeLetter}

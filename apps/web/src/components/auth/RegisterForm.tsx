@@ -149,7 +149,7 @@ export function RegisterForm({
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-[42px] text-gray-400 dark:text-stone-300 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                className="absolute right-4 top-[42px] text-gray-500 dark:text-stone-200 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                 tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}

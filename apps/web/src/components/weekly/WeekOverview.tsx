@@ -52,7 +52,7 @@ export function WeekOverview({
             onClick={onPrevWeek}
             className="flex items-center justify-center w-12 h-12 rounded-2xl glass dark:glass-dark hover:bg-white/20 transition-all active:scale-95"
           >
-            <ChevronLeft className="w-5 h-5 text-otis-600 dark:text-otis-400" />
+            <ChevronLeft className="w-5 h-5 text-otis-700 dark:text-otis-300" />
           </button>
 
           <div className="text-center flex-1">
@@ -65,7 +65,7 @@ export function WeekOverview({
                 {t('week.title', { number: weekSummary.weekNumber })}
               </span>
             </div>
-            <p className="text-xs text-gray-500 dark:text-stone-300 mt-0.5">
+            <p className="text-xs text-gray-600 dark:text-stone-200 mt-0.5">
               {formatDateShort(weekSummary.startDate)} – {formatDateShort(weekSummary.endDate)}
             </p>
           </div>
@@ -74,7 +74,7 @@ export function WeekOverview({
             onClick={onNextWeek}
             className="flex items-center justify-center w-12 h-12 rounded-2xl glass dark:glass-dark hover:bg-white/20 transition-all active:scale-95"
           >
-            <ChevronRight className="w-5 h-5 text-otis-600 dark:text-otis-400" />
+            <ChevronRight className="w-5 h-5 text-otis-700 dark:text-otis-300" />
           </button>
         </div>
       </Card>
@@ -102,9 +102,9 @@ export function WeekOverview({
                 <span className="font-bold text-2xl text-otis-800 dark:text-white">
                   {weekSummary.totalHours.toFixed(1)}h
                 </span>
-                <span className="text-sm text-gray-400 dark:text-stone-300">{t('week.total')}</span>
+                <span className="text-sm text-gray-600 dark:text-stone-200">{t('week.total')}</span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-stone-300 truncate">
+              <p className="text-xs text-gray-600 dark:text-stone-200 truncate">
                 {t('week.days.complete', { valid: validDays, total: totalDays })}
               </p>
             </div>

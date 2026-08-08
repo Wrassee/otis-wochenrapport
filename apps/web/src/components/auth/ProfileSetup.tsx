@@ -56,7 +56,7 @@ export function ProfileSetup({
         </div>
         <div>
           <h2 className="text-lg font-bold text-otis-800 dark:text-white">{t('profile.title')}</h2>
-          <p className="text-xs text-gray-400 dark:text-stone-300 mt-0.5">
+          <p className="text-xs text-gray-500 dark:text-stone-200 mt-0.5">
             {t('profile.subtitle')}
           </p>
         </div>
@@ -64,7 +64,7 @@ export function ProfileSetup({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="relative">
-          <User className="absolute left-4 top-[42px] w-4 h-4 text-gray-400 dark:text-stone-300" />
+          <User className="absolute left-4 top-[42px] w-4 h-4 text-gray-500 dark:text-stone-200" />
           <Input
             id="profile-name"
             label={t('profile.name')}
@@ -78,7 +78,7 @@ export function ProfileSetup({
         </div>
 
         <div className="relative">
-          <Hash className="absolute left-4 top-[42px] w-4 h-4 text-gray-400 dark:text-stone-300" />
+          <Hash className="absolute left-4 top-[42px] w-4 h-4 text-gray-500 dark:text-stone-200" />
           <Input
             id="profile-personnel"
             label={t('profile.personnel')}
@@ -92,7 +92,7 @@ export function ProfileSetup({
         </div>
 
         <div className="relative">
-          <Mail className="absolute left-4 top-[42px] w-4 h-4 text-gray-400 dark:text-stone-300" />
+          <Mail className="absolute left-4 top-[42px] w-4 h-4 text-gray-500 dark:text-stone-200" />
           <Input
             id="profile-supervisor"
             label={t('profile.supervisor')}

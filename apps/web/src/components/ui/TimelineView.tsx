@@ -130,7 +130,7 @@ export function TimelineView({
                 className="flex-shrink-0 flex items-end pb-0.5"
                 style={{ width: `${100 / totalHours}%`, minWidth: '112px' }}
               >
-                <span className="text-[10px] font-semibold text-otis-400 dark:text-otis-500 tracking-tight">
+                <span className="text-[10px] font-semibold text-otis-500 dark:text-otis-300 tracking-tight">
                   {hour.toString().padStart(2, '0')}
                 </span>
               </div>
@@ -177,11 +177,11 @@ export function TimelineView({
                         'absolute rounded-full transition-all duration-150 shadow-sm',
                         isLunch
                           ? 'bg-gradient-to-r from-amber-400/85 to-amber-500/70 dark:from-amber-500/55 dark:to-amber-600/45'
-                          : 'bg-gradient-to-r from-otis-500/85 to-otis-400/75 dark:from-otis-400/65 dark:to-otis-500/55',
+                          : 'bg-gradient-to-r from-otis-500 to-otis-600 dark:from-otis-400 dark:to-otis-500',
                         conflictEntryIds.includes(entry.id) &&
                           (isLunch
-                            ? 'from-red-400/90 to-red-500/80 dark:from-red-500/65 dark:to-red-600/55 ring-2 ring-red-300 dark:ring-red-600'
-                            : 'from-red-400/90 to-red-500/80 dark:from-red-500/65 dark:to-red-600/55 ring-2 ring-red-300 dark:ring-red-600'),
+                            ? 'from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 ring-2 ring-red-300 dark:ring-red-600'
+                            : 'from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 ring-2 ring-red-300 dark:ring-red-600'),
                       )}
                       style={{
                         left: bar.left,
@@ -204,53 +204,56 @@ export function TimelineView({
                           'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0',
                           isLunch
                             ? 'bg-amber-100 dark:bg-amber-900/40'
-                            : 'bg-otis-100 dark:bg-otis-800/40',
+                            : isConflict
+                              ? 'bg-red-600'
+                              : 'bg-otis-600',
                         )}
                       >
                         {isLunch ? (
                           <UtensilsCrossed className="w-4 h-4 text-amber-600 dark:text-amber-300" />
                         ) : (
-                          <Building2 className="w-4 h-4 text-otis-600 dark:text-otis-300" />
+                          <Building2 className="w-4 h-4 text-white" />
                         )}
                       </div>
 
-                      {/* Text label — truncated */}
-                      <span
-                        className={cn(
-                          'text-sm font-semibold truncate leading-none max-w-[80px]',
-                          isLunch
-                            ? 'text-amber-700 dark:text-amber-200'
-                            : 'text-otis-700 dark:text-white',
-                        )}
-                      >
-                        {isLunch ? t('timeline.lunch') : entry.location_anlagenummer || '—'}
-                      </span>
-
-                      {/* Time range — always visible */}
-                      <span
-                        className={cn(
-                          'text-[11px] font-medium whitespace-nowrap ml-1',
-                          isLunch
-                            ? 'text-amber-500 dark:text-amber-300'
-                            : 'text-gray-400 dark:text-white',
-                        )}
-                      >
-                        {decimalToTime(entry.start_time)}–{decimalToTime(endTime)}
-                      </span>
-
-                      {/* Duration badge */}
-                      <span
-                        className={cn(
-                          'text-[11px] font-bold whitespace-nowrap px-2 py-0.5 rounded-md',
-                          isLunch
-                            ? 'bg-amber-100/40 dark:bg-amber-900/20 text-amber-600 dark:text-amber-200'
-                            : 'bg-otis-100/40 dark:bg-otis-800/20 text-otis-500 dark:text-white',
-                        )}
-                      >
-                        {isLunch
-                          ? `${(entry.duration * 60).toFixed(0)} Min.`
-                          : formatOtisDuration(entry.duration)}
-                      </span>
+                      {isLunch ? (
+                        <>
+                          {/* Text label — truncated */}
+                          <span className="text-sm font-semibold truncate leading-none max-w-[80px] text-amber-700 dark:text-amber-200">
+                            {t('timeline.lunch')}
+                          </span>
+                          {/* Time range — always visible */}
+                          <span className="text-[11px] font-medium whitespace-nowrap ml-1 text-amber-600 dark:text-amber-300">
+                            {decimalToTime(entry.start_time)}–{decimalToTime(endTime)}
+                          </span>
+                          {/* Duration badge */}
+                          <span className="text-[11px] font-bold whitespace-nowrap px-2 py-0.5 rounded-md bg-amber-100/40 dark:bg-amber-900/20 text-amber-700 dark:text-amber-200">
+                            {`${(entry.duration * 60).toFixed(0)} Min.`}
+                          </span>
+                        </>
+                      ) : (
+                        /* Solid pill — white text on the bar color, so entries
+                           whose bar is shorter than the text (overflow) still
+                           keep perfectly readable text in both themes */
+                        <span
+                          className={cn(
+                            'flex items-center gap-1.5 rounded-full py-1 pl-2.5 pr-1.5 text-white',
+                            isConflict
+                              ? 'bg-gradient-to-r from-red-500 to-red-600 dark:from-red-600 dark:to-red-700'
+                              : 'bg-gradient-to-r from-otis-500 to-otis-600 dark:from-otis-400 dark:to-otis-500',
+                          )}
+                        >
+                          <span className="text-sm font-semibold truncate leading-none max-w-[80px]">
+                            {entry.location_anlagenummer || '—'}
+                          </span>
+                          <span className="text-[11px] font-medium whitespace-nowrap">
+                            {decimalToTime(entry.start_time)}–{decimalToTime(endTime)}
+                          </span>
+                          <span className="text-[11px] font-bold whitespace-nowrap px-2 py-0.5 rounded-full bg-white/25">
+                            {formatOtisDuration(entry.duration)}
+                          </span>
+                        </span>
+                      )}
 
                       {/* Action buttons — for ALL entries including lunch */}
                       {showActions && (
@@ -264,7 +267,7 @@ export function TimelineView({
                               className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-otis-100/50 dark:hover:bg-otis-800/30 transition-all active:scale-90"
                               title={t('timeline.edit')}
                             >
-                              <Pencil className="w-3.5 h-3.5 text-otis-400" />
+                              <Pencil className="w-3.5 h-3.5 text-otis-500" />
                             </button>
                           )}
                           {onDeleteEntry && (
@@ -276,7 +279,7 @@ export function TimelineView({
                               className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-red-50/50 dark:hover:bg-red-900/20 transition-all active:scale-90"
                               title={t('timeline.delete')}
                             >
-                              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                              <Trash2 className="w-3.5 h-3.5 text-red-500" />
                             </button>
                           )}
                         </div>

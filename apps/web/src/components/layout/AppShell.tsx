@@ -119,7 +119,7 @@ export function AppShell({ children }: AppShellProps) {
                     'w-5 h-5 transition-all duration-200',
                     isActive
                       ? 'text-otis-600 dark:text-otis-400 scale-110'
-                      : 'text-gray-400 dark:text-stone-400 group-hover:text-gray-600 dark:group-hover:text-gray-300',
+                      : 'text-gray-500 dark:text-stone-300 group-hover:text-gray-600 dark:group-hover:text-gray-300',
                   )}
                 />
                 <span
@@ -127,7 +127,7 @@ export function AppShell({ children }: AppShellProps) {
                     'text-[10px] font-semibold transition-colors duration-200 truncate max-w-full px-0.5',
                     isActive
                       ? 'text-otis-600 dark:text-otis-400'
-                      : 'text-gray-400 dark:text-stone-400',
+                      : 'text-gray-500 dark:text-stone-300',
                   )}
                 >
                   {t(item.key)}

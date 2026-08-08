@@ -97,7 +97,7 @@ export function WeeklyPage() {
       <div className="flex items-center justify-center min-h-[50dvh]">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500 dark:text-stone-400">{t('common.loading')}</p>
+          <p className="text-sm text-gray-600 dark:text-stone-200">{t('common.loading')}</p>
         </div>
       </div>
     )

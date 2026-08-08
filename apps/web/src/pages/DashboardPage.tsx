@@ -166,7 +166,7 @@ export function DashboardPage() {
               <Building2 className="w-4 h-4 text-otis-400" />
               <span className="font-bold text-lg text-otis-800 dark:text-white">{dayName}</span>
             </div>
-            <p className="text-xs text-gray-500 dark:text-stone-300 mt-0.5">{dateFormatted}</p>
+            <p className="text-xs text-gray-600 dark:text-stone-200 mt-0.5">{dateFormatted}</p>
           </div>
 
           <button
@@ -200,7 +200,7 @@ export function DashboardPage() {
               <span className="font-bold text-2xl text-otis-800 dark:text-white">
                 {totalHours.toFixed(1)}h
               </span>
-              <span className="text-sm text-gray-400 dark:text-stone-300 ml-1">
+              <span className="text-sm text-gray-500 dark:text-stone-200 ml-1">
                 / {requiredHours}h
               </span>
             </div>
@@ -231,7 +231,7 @@ export function DashboardPage() {
 
         {/* Lunch info */}
         {lunchMinutes > 0 && (
-          <div className="flex items-center gap-1.5 mt-3 text-xs text-gray-500 dark:text-stone-300">
+          <div className="flex items-center gap-1.5 mt-3 text-xs text-gray-600 dark:text-stone-200">
             <UtensilsCrossed className="w-3.5 h-3.5 text-amber-500" />
             <span>{t('dashboard.lunch', { min: Math.round(lunchMinutes) })}</span>
           </div>
@@ -247,15 +247,15 @@ export function DashboardPage() {
             <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
               <Euro className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="text-sm font-medium text-gray-600 dark:text-stone-300">
+            <span className="text-sm font-medium text-gray-600 dark:text-stone-200">
               {t('entry.spesen')}
             </span>
           </div>
-          <ChevronRight className="w-4 h-4 text-gray-400 dark:text-stone-300" />
+          <ChevronRight className="w-4 h-4 text-gray-500 dark:text-stone-200" />
         </button>
 
         <div className="flex items-center justify-between mt-2">
-          <span className="text-xs text-gray-400 dark:text-stone-300">
+          <span className="text-xs text-gray-500 dark:text-stone-200">
             {t('dashboard.entries', { count: todayEntries.length })}
           </span>
           {lunchEntries.length > 0 && (

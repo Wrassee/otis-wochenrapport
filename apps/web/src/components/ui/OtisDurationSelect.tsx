@@ -95,7 +95,7 @@ export function OtisDurationSelect({
           <span className="text-xs font-bold text-otis-600 dark:text-otis-300 tabular-nums">
             {value}
           </span>
-          <ChevronDown className="w-4 h-4 text-gray-400 dark:text-stone-300" />
+          <ChevronDown className="w-4 h-4 text-gray-500 dark:text-stone-200" />
         </div>
       </div>
 
@@ -110,7 +110,7 @@ export function OtisDurationSelect({
               'px-3 py-1 text-xs font-semibold rounded-lg border transition-all duration-150 active:scale-90',
               value === otis
                 ? 'bg-otis-500/20 border-otis-400/40 text-otis-700 dark:text-otis-300'
-                : 'bg-otis-50/50 dark:bg-white/5 border-otis-200/30 dark:border-white/10 text-gray-500 dark:text-stone-300 hover:border-otis-300/40 dark:hover:border-white/20',
+                : 'bg-otis-50/50 dark:bg-white/5 border-otis-200/30 dark:border-white/10 text-gray-600 dark:text-stone-200 hover:border-otis-300/40 dark:hover:border-white/20',
             )}
           >
             {otis}

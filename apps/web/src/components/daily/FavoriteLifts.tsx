@@ -69,10 +69,10 @@ export function FavoriteLifts({ favorites, onSelect }: FavoriteLiftsProps) {
               <span className="font-bold text-sm text-otis-700 dark:text-otis-300 relative z-10">
                 {fav.anlagenummer}
               </span>
-              <span className="text-[11px] text-gray-500 dark:text-stone-300 truncate max-w-[160px] relative z-10 font-medium">
+              <span className="text-[11px] text-gray-600 dark:text-stone-200 truncate max-w-[160px] relative z-10 font-medium">
                 {fav.project_id}
               </span>
-              <div className="flex items-start gap-1 text-[10px] text-gray-400 dark:text-stone-400 relative z-10">
+              <div className="flex items-start gap-1 text-[10px] text-gray-500 dark:text-stone-300 relative z-10">
                 <MapPin className="w-3 h-3 flex-shrink-0 mt-0.5" />
                 <span className="text-pretty break-words leading-snug max-w-[160px]">
                   {fav.full_address}

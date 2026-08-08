@@ -32,18 +32,18 @@ export function QuickAdd({ entries, onQuickAdd }: QuickAddProps) {
           <h3 className="font-bold text-otis-800 dark:text-white text-sm">
             {t('dashboard.quickadd.title')}
           </h3>
-          <p className="text-[10px] text-gray-400 dark:text-stone-300">
+          <p className="text-[10px] text-gray-500 dark:text-stone-200">
             {t('dashboard.quickadd.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-medium text-gray-400 dark:text-stone-300 bg-otis-50/50 dark:bg-white/5 px-2 py-1 rounded-full">
+          <span className="text-[10px] font-medium text-gray-500 dark:text-stone-200 bg-otis-50/50 dark:bg-white/5 px-2 py-1 rounded-full">
             {eligibleEntries.length}
           </span>
           {collapsed ? (
-            <ChevronDown className="w-4 h-4 text-gray-400 dark:text-stone-300 transition-transform duration-200" />
+            <ChevronDown className="w-4 h-4 text-gray-500 dark:text-stone-200 transition-transform duration-200" />
           ) : (
-            <ChevronUp className="w-4 h-4 text-gray-400 dark:text-stone-300 transition-transform duration-200" />
+            <ChevronUp className="w-4 h-4 text-gray-500 dark:text-stone-200 transition-transform duration-200" />
           )}
         </div>
       </button>
@@ -75,8 +75,8 @@ export function QuickAdd({ entries, onQuickAdd }: QuickAddProps) {
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <Clock className="w-3 h-3 text-gray-400 dark:text-stone-300" />
-                    <p className="text-xs text-gray-500 dark:text-stone-400">
+                    <Clock className="w-3 h-3 text-gray-500 dark:text-stone-200" />
+                    <p className="text-xs text-gray-600 dark:text-stone-300">
                       {decimalToTime(entry.start_time)} – {formatOtisDuration(entry.duration)}
                     </p>
                   </div>

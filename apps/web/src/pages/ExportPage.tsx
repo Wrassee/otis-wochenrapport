@@ -609,8 +609,8 @@ export function ExportPage() {
               </Badge>
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <Calendar className="w-3.5 h-3.5 text-gray-400 dark:text-stone-300" />
-              <p className="text-xs text-gray-500 dark:text-stone-400">
+              <Calendar className="w-3.5 h-3.5 text-gray-500 dark:text-stone-200" />
+              <p className="text-xs text-gray-600 dark:text-stone-300">
                 {formatDateShort(dates[0])} – {formatDateShort(dates[4])}
               </p>
             </div>
@@ -678,7 +678,7 @@ export function ExportPage() {
       <Card variant="outline">
         <div className="flex items-start gap-2.5">
           <Info className="w-4 h-4 text-otis-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-gray-400 dark:text-stone-300 leading-relaxed">
+          <p className="text-xs text-gray-500 dark:text-stone-200 leading-relaxed">
             {t('export.info')}
           </p>
         </div>

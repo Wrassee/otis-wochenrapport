@@ -90,7 +90,7 @@ export function SpesenPage() {
         </div>
         <div className="flex-1">
           <h2 className="text-lg font-bold text-otis-800 dark:text-white">{t('day.spesen')}</h2>
-          <p className="text-xs text-gray-400 dark:text-stone-300">
+          <p className="text-xs text-gray-500 dark:text-stone-200">
             {t('week.title', { number: currentWeek.week })} —{' '}
             {t('day.spesen.count', { n: totalActive })}
           </p>
@@ -116,7 +116,7 @@ export function SpesenPage() {
             </div>
             <div>
               <CardTitle>{t('spesen.photos.title')}</CardTitle>
-              <p className="text-[10px] text-gray-400 dark:text-stone-300">
+              <p className="text-[10px] text-gray-500 dark:text-stone-200">
                 {t('spesen.photos.subtitle')}
               </p>
             </div>
@@ -217,7 +217,7 @@ export function SpesenPage() {
                       setNoteEditingId(null)
                       setNoteDraft('')
                     }}
-                    className="h-11 px-4 rounded-xl bg-white/60 dark:bg-white/10 text-gray-500 dark:text-stone-200 text-sm font-medium transition-all active:scale-[0.98]"
+                    className="h-11 px-4 rounded-xl bg-white/60 dark:bg-white/10 text-gray-600 dark:text-stone-200 text-sm font-medium transition-all active:scale-[0.98]"
                   >
                     {t('spesen.photos.note.cancel')}
                   </button>
@@ -226,7 +226,7 @@ export function SpesenPage() {
             )}
           </>
         ) : (
-          <p className="text-[11px] text-gray-400 dark:text-stone-300 text-center mt-3">
+          <p className="text-[11px] text-gray-500 dark:text-stone-200 text-center mt-3">
             {t('spesen.photos.none')}
           </p>
         )}
@@ -247,7 +247,7 @@ export function SpesenPage() {
                     'w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold',
                     dayExp.length > 0
                       ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                      : 'bg-otis-100/50 dark:bg-otis-800/30 text-gray-500 dark:text-stone-300',
+                      : 'bg-otis-100/50 dark:bg-otis-800/30 text-gray-600 dark:text-stone-200',
                   )}
                 >
                   {dayName}
@@ -257,7 +257,7 @@ export function SpesenPage() {
                     <span className="font-bold text-sm text-otis-800 dark:text-white">
                       {fullDayName}
                     </span>
-                    <span className="text-[10px] text-gray-500 dark:text-stone-300 font-mono">
+                    <span className="text-[10px] text-gray-600 dark:text-stone-200 font-mono">
                       {date.slice(5)}
                     </span>
                   </div>
@@ -333,7 +333,7 @@ export function SpesenPage() {
                       {isActive ? (
                         <Check className="w-4 h-4 text-otis-500" />
                       ) : (
-                        <X className="w-4 h-4 text-gray-300 dark:text-stone-400" />
+                        <X className="w-4 h-4 text-gray-500 dark:text-stone-300" />
                       )}
                     </button>
 
@@ -349,7 +349,7 @@ export function SpesenPage() {
                           className="w-full h-[48px] px-3 rounded-xl text-sm glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none text-center font-mono"
                           placeholder={item.valueUnit === 'CHF' ? '0.00' : '0'}
                         />
-                        <p className="text-[9px] text-gray-500 dark:text-stone-200 text-center mt-0.5">
+                        <p className="text-[9px] text-gray-600 dark:text-stone-200 text-center mt-0.5">
                           {item.valueUnit}
                         </p>
                       </div>
@@ -360,7 +360,7 @@ export function SpesenPage() {
             </div>
 
             {dayExp.length === 0 && (
-              <p className="text-[11px] text-gray-500 dark:text-stone-300 text-center mt-3">
+              <p className="text-[11px] text-gray-600 dark:text-stone-200 text-center mt-3">
                 {t('day.spesen.none')}
               </p>
             )}

@@ -69,7 +69,7 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
               className="flex-1 flex justify-end"
               aria-label={t('common.close')}
             >
-              <X className="w-6 h-6 text-gray-400 dark:text-stone-300 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" />
+              <X className="w-6 h-6 text-gray-500 dark:text-stone-200 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" />
             </button>
           </div>
 

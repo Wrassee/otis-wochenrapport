@@ -333,6 +333,27 @@
   border-color: rgba(77, 163, 255, 0.08) !important;
 }
 
+/* Custom classes used with `dark:` don't generate Tailwind variants (they
+   aren't utilities), so the page backgrounds need the same insurance:
+   without this the app shell stays LIGHT in dark mode and the translucent
+   variant cards (e.g. the danger day card) end up as light pastel boxes
+   with near-white text on them — unreadable. */
+.dark .bg-otis-ambient {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -20%, rgba(0, 55, 166, 0.4), transparent),
+    radial-gradient(ellipse 40% 50% at 80% 20%, rgba(0, 119, 228, 0.15), transparent),
+    radial-gradient(ellipse 50% 40% at 20% 40%, rgba(0, 55, 166, 0.2), transparent),
+    linear-gradient(180deg, #030a18 0%, #071226 30%, #0b1a33 100%) !important;
+}
+
+.dark .bg-auth-ambient {
+  background:
+    radial-gradient(ellipse 100% 60% at 50% -10%, rgba(0, 85, 196, 0.4), transparent),
+    radial-gradient(ellipse 50% 40% at 20% 60%, rgba(0, 55, 166, 0.2), transparent),
+    radial-gradient(ellipse 40% 50% at 80% 30%, rgba(0, 119, 228, 0.12), transparent),
+    linear-gradient(170deg, #020812 0%, #050d1a 40%, #0a1628 100%) !important;
+}
+
 /* ── Decorative Orbs ── */
 .orb {
   position: absolute;

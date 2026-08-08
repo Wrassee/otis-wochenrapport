@@ -155,7 +155,7 @@ export function SettingsPage() {
         </div>
         <div>
           <h2 className="text-lg font-bold text-otis-800 dark:text-white">{t('nav.settings')}</h2>
-          <p className="text-xs text-gray-400 dark:text-stone-300">{t('nav.subtitle.settings')}</p>
+          <p className="text-xs text-gray-500 dark:text-stone-200">{t('nav.subtitle.settings')}</p>
         </div>
       </div>
 
@@ -190,7 +190,7 @@ export function SettingsPage() {
             </div>
             <div>
               <CardTitle>{t('settings.reminder')}</CardTitle>
-              <p className="text-[10px] text-gray-400 dark:text-stone-300">
+              <p className="text-[10px] text-gray-500 dark:text-stone-200">
                 {t('settings.reminder.subtitle')}
               </p>
             </div>
@@ -203,7 +203,7 @@ export function SettingsPage() {
         <div className="p-3.5 bg-otis-50/50 dark:bg-white/3 rounded-2xl border border-otis-200/20 dark:border-white/5 mb-4">
           <div className="flex items-start gap-2.5">
             <Calendar className="w-4 h-4 text-otis-400 mt-0.5 flex-shrink-0" />
-            <div className="text-xs text-gray-500 dark:text-stone-300 space-y-1">
+            <div className="text-xs text-gray-600 dark:text-stone-200 space-y-1">
               <p className="font-medium text-otis-600 dark:text-otis-300">
                 {t('settings.reminder.desc')}
               </p>
@@ -264,7 +264,7 @@ export function SettingsPage() {
             </div>
             <div>
               <CardTitle>{t('settings.sync')}</CardTitle>
-              <p className="text-[10px] text-gray-400 dark:text-stone-300">
+              <p className="text-[10px] text-gray-500 dark:text-stone-200">
                 {t('settings.sync.subtitle')}
               </p>
             </div>
@@ -274,10 +274,10 @@ export function SettingsPage() {
           </Badge>
         </div>
 
-        <div className="space-y-2.5 text-sm text-gray-600 dark:text-stone-300 mb-4 p-3.5 bg-otis-50/50 dark:bg-white/3 rounded-2xl border border-otis-200/20 dark:border-white/5">
+        <div className="space-y-2.5 text-sm text-gray-600 dark:text-stone-200 mb-4 p-3.5 bg-otis-50/50 dark:bg-white/3 rounded-2xl border border-otis-200/20 dark:border-white/5">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5">
-              <Wifi className="w-4 h-4 text-gray-400 dark:text-stone-300" />
+              <Wifi className="w-4 h-4 text-gray-500 dark:text-stone-200" />
               {t('settings.status')}
             </span>
             <span className="flex items-center gap-1.5 font-medium">
@@ -295,7 +295,7 @@ export function SettingsPage() {
           {syncStatus.lastSync && (
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-gray-400 dark:text-stone-300" />
+                <Clock className="w-4 h-4 text-gray-500 dark:text-stone-200" />
                 {t('settings.last.sync')}
               </span>
               <span className="font-medium">
@@ -305,7 +305,7 @@ export function SettingsPage() {
           )}
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5">
-              <Shield className="w-4 h-4 text-gray-400 dark:text-stone-300" />
+              <Shield className="w-4 h-4 text-gray-500 dark:text-stone-200" />
               {t('settings.pending')}
             </span>
             <Badge variant={syncStatus.pendingSync > 0 ? 'warning' : 'success'} size="sm">
@@ -328,7 +328,7 @@ export function SettingsPage() {
           <div className="w-9 h-9 rounded-xl bg-otis-100/50 dark:bg-otis-800/30 flex items-center justify-center flex-shrink-0">
             <Info className="w-4 h-4 text-otis-500" />
           </div>
-          <div className="text-xs text-gray-400 dark:text-stone-300 space-y-1">
+          <div className="text-xs text-gray-500 dark:text-stone-200 space-y-1">
             <p className="font-semibold text-otis-600 dark:text-otis-300">
               {t('settings.app.info')}
             </p>
@@ -341,7 +341,7 @@ export function SettingsPage() {
               })}
             </p>
             {user && (
-              <p className="font-mono text-[10px] text-gray-400 dark:text-stone-300">
+              <p className="font-mono text-[10px] text-gray-500 dark:text-stone-200">
                 {t('settings.user', { email: user.email })}
               </p>
             )}
@@ -384,7 +384,7 @@ function ThemeSwitcher() {
         </div>
         <div>
           <CardTitle>{t('theme.title')}</CardTitle>
-          <p className="text-[10px] text-gray-400 dark:text-stone-300">{t('theme.subtitle')}</p>
+          <p className="text-[10px] text-gray-500 dark:text-stone-200">{t('theme.subtitle')}</p>
         </div>
       </div>
 
@@ -400,7 +400,7 @@ function ThemeSwitcher() {
                 'flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-2xl border-2 transition-all duration-200 active:scale-95',
                 isActive
                   ? 'bg-otis-500/10 dark:bg-otis-500/20 border-otis-400/40 dark:border-otis-500/40 text-otis-700 dark:text-otis-300'
-                  : 'bg-otis-50/50 dark:bg-white/3 border-transparent text-gray-500 dark:text-stone-300 hover:border-otis-300/30 dark:hover:border-white/10 hover:text-otis-600 dark:hover:text-otis-300',
+                  : 'bg-otis-50/50 dark:bg-white/3 border-transparent text-gray-600 dark:text-stone-200 hover:border-otis-300/30 dark:hover:border-white/10 hover:text-otis-600 dark:hover:text-otis-300',
               )}
             >
               <Icon className={cn('w-5 h-5', isActive && 'text-otis-500')} />
@@ -773,7 +773,7 @@ function LiftZoneManager() {
           </div>
           <div>
             <CardTitle>{t('lifts.title')}</CardTitle>
-            <p className="text-[10px] text-gray-400 dark:text-stone-300">
+            <p className="text-[10px] text-gray-500 dark:text-stone-200">
               {t('lifts.count', { n: liftList.length })}{' '}
               {filteredList.length < liftList.length
                 ? t('lifts.filtered', { n: filteredList.length })
@@ -814,7 +814,7 @@ function LiftZoneManager() {
           >
             <RefreshCw
               className={cn(
-                'w-4 h-4 text-gray-400 dark:text-stone-300',
+                'w-4 h-4 text-gray-500 dark:text-stone-200',
                 isLoading && 'animate-spin',
               )}
             />
@@ -859,7 +859,7 @@ function LiftZoneManager() {
 
       {/* Search filter */}
       <div className="relative mb-3">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-stone-300" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-stone-200" />
         <input
           type="text"
           value={searchQuery}
@@ -872,7 +872,7 @@ function LiftZoneManager() {
             onClick={() => setSearchQuery('')}
             className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gray-200 dark:bg-white/10 flex items-center justify-center hover:bg-gray-300 dark:hover:bg-white/20 transition-all"
           >
-            <X className="w-3 h-3 text-gray-500 dark:text-stone-400" />
+            <X className="w-3 h-3 text-gray-600 dark:text-stone-300" />
           </button>
         )}
       </div>
@@ -1020,12 +1020,12 @@ function LiftZoneManager() {
       ) : filteredList.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <div className="w-12 h-12 rounded-2xl bg-otis-100/50 dark:bg-otis-800/30 flex items-center justify-center mb-2">
-            <MapPin className="w-6 h-6 text-gray-400 dark:text-stone-300" />
+            <MapPin className="w-6 h-6 text-gray-500 dark:text-stone-200" />
           </div>
-          <p className="text-sm text-gray-400 dark:text-stone-300 font-medium">
+          <p className="text-sm text-gray-500 dark:text-stone-200 font-medium">
             {searchQuery ? t('lifts.notfound') : t('lifts.empty')}
           </p>
-          <p className="text-[10px] text-gray-400 dark:text-stone-300 mt-0.5">
+          <p className="text-[10px] text-gray-500 dark:text-stone-200 mt-0.5">
             {searchQuery ? t('lifts.notfound.hint') : t('lifts.empty.hint')}
           </p>
         </div>
@@ -1155,13 +1155,13 @@ function LiftZoneManager() {
                         {lift.anlagenummer}
                       </span>
                       {lift.projectId && (
-                        <span className="text-[10px] font-mono font-medium text-gray-400 dark:text-stone-400 bg-otis-100/30 dark:bg-white/3 px-1.5 py-0.5 rounded-lg">
+                        <span className="text-[10px] font-mono font-medium text-gray-500 dark:text-stone-300 bg-otis-100/30 dark:bg-white/3 px-1.5 py-0.5 rounded-lg">
                           {lift.projectId}
                         </span>
                       )}
                     </div>
                     {lift.address && (
-                      <p className="text-[10px] text-gray-400 dark:text-stone-400 truncate mt-0.5">
+                      <p className="text-[10px] text-gray-500 dark:text-stone-300 truncate mt-0.5">
                         {lift.address}
                       </p>
                     )}
@@ -1262,7 +1262,7 @@ function HomeZoneCard() {
         </div>
         <div>
           <CardTitle>{t('settings.homezone.title')}</CardTitle>
-          <p className="text-[10px] text-gray-400 dark:text-stone-300">
+          <p className="text-[10px] text-gray-500 dark:text-stone-200">
             {t('settings.homezone.subtitle')}
           </p>
         </div>
@@ -1270,7 +1270,7 @@ function HomeZoneCard() {
 
       {/* Current reference point */}
       <div className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-otis-50/50 dark:bg-white/3 border border-otis-200/20 dark:border-white/5 mb-3">
-        <span className="text-xs text-gray-500 dark:text-stone-300 font-medium">
+        <span className="text-xs text-gray-600 dark:text-stone-200 font-medium">
           {t('settings.homezone.current')}
         </span>
         <span className="text-[11px] font-mono font-semibold text-otis-600 dark:text-otis-300">
@@ -1283,7 +1283,7 @@ function HomeZoneCard() {
       {/* Address search */}
       <div className="flex gap-2 mb-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-stone-300" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-stone-200" />
           <input
             type="text"
             value={query}
@@ -1358,7 +1358,7 @@ function HomeZoneCard() {
       {hasCustom && (
         <button
           onClick={() => savePoint(REFERENCE_LAT, REFERENCE_LON)}
-          className="w-full h-9 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200/60 dark:border-white/10 text-gray-600 dark:text-stone-300 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/10 transition-all active:scale-95"
+          className="w-full h-9 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200/60 dark:border-white/10 text-gray-600 dark:text-stone-200 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/10 transition-all active:scale-95"
         >
           <RefreshCw className="w-3.5 h-3.5 inline mr-1 align-[-2px]" />
           {t('settings.homezone.reset')}

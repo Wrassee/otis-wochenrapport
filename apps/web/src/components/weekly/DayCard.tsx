@@ -71,12 +71,12 @@ export function DayCard({
               {day.isValid ? (
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               ) : (
-                <XCircle className="w-3.5 h-3.5 text-red-500" />
+                <XCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-300" />
               )}
             </div>
             {day.dayName}
           </CardTitle>
-          <span className="text-xs text-gray-400 dark:text-stone-400 font-medium">
+          <span className="text-xs text-gray-600 dark:text-stone-200 font-medium">
             {day.date.slice(5)}
           </span>
         </div>
@@ -112,7 +112,7 @@ export function DayCard({
               <span className="font-bold text-xl text-otis-800 dark:text-white">
                 {day.totalHours.toFixed(1)}h
               </span>
-              <span className="text-sm text-gray-400 dark:text-stone-300">
+              <span className="text-sm text-gray-600 dark:text-stone-200">
                 / {day.requiredHours}h
               </span>
             </div>
@@ -136,8 +136,8 @@ export function DayCard({
         <div className="flex items-center gap-1.5 mb-3">
           {day.isAbsenceDay ? (
             <>
-              <CalendarOff className="w-4 h-4 text-gray-400 dark:text-stone-400" />
-              <span className="text-sm text-gray-500 dark:text-stone-400 font-medium">
+              <CalendarOff className="w-4 h-4 text-gray-600 dark:text-stone-200" />
+              <span className="text-sm text-gray-600 dark:text-stone-200 font-medium">
                 {day.absenceCode || t('day.absence')}
               </span>
             </>
@@ -154,7 +154,7 @@ export function DayCard({
               <span
                 className={cn(
                   'text-sm',
-                  day.hasLunch ? 'text-gray-600 dark:text-stone-300' : 'text-red-500',
+                  day.hasLunch ? 'text-gray-700 dark:text-stone-200' : 'text-red-500',
                 )}
               >
                 {day.hasLunch
@@ -174,7 +174,7 @@ export function DayCard({
         {day.maxZone > 0 && (
           <div className="flex items-center gap-1.5 mb-3">
             <MapPin className="w-4 h-4 text-purple-500" />
-            <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+            <span className="text-sm text-purple-700 dark:text-purple-300 font-medium">
               {t('day.zone', { n: day.maxZone })}
             </span>
           </div>
@@ -191,7 +191,7 @@ export function DayCard({
               <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
                 <Euro className="w-3.5 h-3.5 text-white" />
               </div>
-              <span className="text-sm font-medium text-gray-600 dark:text-stone-300">
+              <span className="text-sm font-medium text-gray-700 dark:text-stone-200">
                 {t('day.spesen')}
               </span>
               {expenseCount !== undefined && expenseCount > 0 && (
@@ -200,12 +200,12 @@ export function DayCard({
                 </Badge>
               )}
               {expenseCount !== undefined && expenseCount === 0 && (
-                <span className="text-[10px] text-gray-400 dark:text-stone-300">
+                <span className="text-[10px] text-gray-600 dark:text-stone-200">
                   {t('day.spesen.none')}
                 </span>
               )}
             </div>
-            <ChevronRight className="w-4 h-4 text-gray-400 dark:text-stone-300" />
+            <ChevronRight className="w-4 h-4 text-gray-600 dark:text-stone-200" />
           </button>
         )}
 

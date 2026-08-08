@@ -491,7 +491,7 @@ export function TimeEntryForm({
           </div>
           <div>
             <div className="text-sm font-bold text-otis-800 dark:text-white">{todayStr}</div>
-            <p className="text-[10px] text-gray-400 dark:text-stone-300">{t('entry.title')}</p>
+            <p className="text-[10px] text-gray-500 dark:text-stone-200">{t('entry.title')}</p>
           </div>
         </div>
 
@@ -503,7 +503,7 @@ export function TimeEntryForm({
             className={`w-full flex items-center justify-center gap-2 h-14 rounded-2xl border-2 font-semibold transition-all duration-200 ${
               isLunch
                 ? 'bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur border-amber-400/60 text-amber-700 dark:text-amber-300'
-                : 'glass dark:glass-dark border-otis-200/30 dark:border-white/5 text-gray-500 dark:text-stone-300 hover:border-amber-300/50 hover:text-amber-600 dark:hover:text-amber-400'
+                : 'glass dark:glass-dark border-otis-200/30 dark:border-white/5 text-gray-600 dark:text-stone-200 hover:border-amber-300/50 hover:text-amber-600 dark:hover:text-amber-400'
             }`}
           >
             <UtensilsCrossed className="w-5 h-5" />
@@ -520,7 +520,7 @@ export function TimeEntryForm({
                   {t('entry.anlagenummer')} <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-stone-300" />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-stone-200" />
                   <input
                     type="text"
                     value={searchQuery}
@@ -544,11 +544,11 @@ export function TimeEntryForm({
                           <span className="font-bold text-otis-600 dark:text-otis-400">
                             {loc.anlagenummer}
                           </span>
-                          <span className="text-xs text-gray-500 dark:text-stone-300 font-medium">
+                          <span className="text-xs text-gray-600 dark:text-stone-200 font-medium">
                             {loc.project_id}
                           </span>
                         </div>
-                        <span className="text-xs text-gray-400 dark:text-stone-400">
+                        <span className="text-xs text-gray-500 dark:text-stone-300">
                           {loc.full_address}
                         </span>
                       </button>
@@ -564,7 +564,7 @@ export function TimeEntryForm({
                     {t('entry.projekt')} <span className="text-red-400">*</span>
                   </label>
                   <div className="relative">
-                    <PenLine className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-stone-300" />
+                    <PenLine className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-stone-200" />
                     <input
                       type="text"
                       value={selectedProjectId}
@@ -588,7 +588,7 @@ export function TimeEntryForm({
                     {t('entry.address')} <span className="text-red-400">*</span>
                   </label>
                   <div className="relative">
-                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-stone-300" />
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-stone-200" />
                     <input
                       type="text"
                       value={selectedAddress}
@@ -611,11 +611,11 @@ export function TimeEntryForm({
                               <span className="font-bold text-otis-600 dark:text-otis-400">
                                 {loc.anlagenummer}
                               </span>
-                              <span className="text-xs text-gray-500 dark:text-stone-300 font-medium">
+                              <span className="text-xs text-gray-600 dark:text-stone-200 font-medium">
                                 {loc.project_id}
                               </span>
                             </div>
-                            <span className="text-xs text-gray-400 dark:text-stone-400">
+                            <span className="text-xs text-gray-500 dark:text-stone-300">
                               {loc.full_address}
                             </span>
                           </button>
@@ -623,7 +623,7 @@ export function TimeEntryForm({
                       </div>
                     )}
                   </div>
-                  <p className="text-[10px] text-gray-400 dark:text-stone-300 mt-1 pl-1">
+                  <p className="text-[10px] text-gray-500 dark:text-stone-200 mt-1 pl-1">
                     {t('entry.address.hint')}
                   </p>
                 </div>
@@ -693,16 +693,16 @@ export function TimeEntryForm({
                 {selectedActivityCode ? (
                   <div className="flex items-center gap-2">
                     <Badge variant="info">{selectedActivityCode.code}</Badge>
-                    <span className="text-sm text-gray-500 dark:text-stone-300">
+                    <span className="text-sm text-gray-600 dark:text-stone-200">
                       {selectedActivityCode.description_de}
                     </span>
                   </div>
                 ) : (
-                  <span className="text-gray-400 dark:text-stone-300">
+                  <span className="text-gray-500 dark:text-stone-200">
                     {t('entry.activity.select')}
                   </span>
                 )}
-                <ChevronDown className="w-5 h-5 text-gray-400 dark:text-stone-300" />
+                <ChevronDown className="w-5 h-5 text-gray-500 dark:text-stone-200" />
               </button>
             </div>
           )}

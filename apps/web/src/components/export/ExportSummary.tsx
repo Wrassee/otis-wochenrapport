@@ -80,13 +80,13 @@ export function ExportSummary({
                       {day.dayName}
                     </span>
                     <div className="flex items-center gap-1.5 text-xs">
-                      <Clock className="w-3 h-3 text-gray-400 dark:text-stone-300" />
-                      <span className="text-gray-500 dark:text-stone-400 font-medium">
+                      <Clock className="w-3 h-3 text-gray-500 dark:text-stone-200" />
+                      <span className="text-gray-600 dark:text-stone-300 font-medium">
                         {day.totalHours.toFixed(1)}h
                       </span>
                     </div>
                     {day.hasLunch && (
-                      <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-stone-300">
+                      <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-stone-200">
                         <UtensilsCrossed className="w-3 h-3" />
                         <span>{Math.round(day.lunchMinutes)}'</span>
                       </div>

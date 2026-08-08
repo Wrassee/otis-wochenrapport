@@ -186,8 +186,8 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
           <Euro className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1">
-          <p className="text-xs text-gray-500 dark:text-stone-200">{date}</p>
-          <p className="text-[11px] text-gray-500 dark:text-stone-300">
+          <p className="text-xs text-gray-600 dark:text-stone-200">{date}</p>
+          <p className="text-[11px] text-gray-600 dark:text-stone-200">
             {t('day.spesen.count', { n: dayExp.length })}
           </p>
         </div>
@@ -271,7 +271,7 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
                     {t('spesen.active')}
                   </Badge>
                 ) : (
-                  <span className="text-[11px] font-medium text-gray-500 dark:text-stone-200">
+                  <span className="text-[11px] font-medium text-gray-600 dark:text-stone-200">
                     {t('spesen.inactive')}
                   </span>
                 )}
@@ -289,7 +289,7 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
                     className="w-full h-[48px] px-3 rounded-xl text-sm glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none text-center font-mono"
                     placeholder={item.valueUnit === 'CHF' ? '0.00' : '0'}
                   />
-                  <p className="text-[9px] text-gray-500 dark:text-stone-200 text-center mt-0.5">
+                  <p className="text-[9px] text-gray-600 dark:text-stone-200 text-center mt-0.5">
                     {item.valueUnit}
                   </p>
                 </div>
@@ -299,7 +299,7 @@ export function ExpenseEditor({ open, onClose, date, dayName }: ExpenseEditorPro
         })}
       </div>
 
-      <p className="text-[10px] text-gray-500 dark:text-stone-300 mt-4 text-center">
+      <p className="text-[10px] text-gray-600 dark:text-stone-200 mt-4 text-center">
         {t('day.spesen.editor.hint')}
       </p>
     </BottomSheet>
