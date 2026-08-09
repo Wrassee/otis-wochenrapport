@@ -88,7 +88,6 @@ export function TimeEntryForm({
   const [isLunch, setIsLunch] = useState(false)
   const [overlapWarning, setOverlapWarning] = useState<string | null>(null)
   const [conflictingEntryIds, setConflictingEntryIds] = useState<string[]>([])
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** Values of the form at submit time — keeps overlap checks skipped until
    *  the chained (next) start time lands, surviving multiple intermediate
    *  renders caused by addEntry + loadWeek. */
@@ -149,14 +148,22 @@ export function TimeEntryForm({
   }, [startTime, duration, existingEntries, t])
 
   const handleSearch = async (query: string) => {
-    // Only clear search-selected data if user was viewing a selected location
-    // and is now typing something different. Don't clear manually entered
-    // address/project (selectedLocation is null).
-    if (selectedLocation && query.toUpperCase() !== selectedLocation.anlagenummer.toUpperCase()) {
+    const q = query.trim().toUpperCase()
+    const selNr = selectedLocation?.anlagenummer.toUpperCase()
+    // Editing the Anlagenummer invalidates the currently carried
+    // project/address — whether it came from a search-selected lift OR from
+    // the previous entry's fields (the form keeps them for chaining). Without
+    // this, a partial number (e.g. "1" while typing "1CE") would auto-save a
+    // bogus lift row carrying the OLD lift's Projekt-Nr/Adresse (e.g. AEV21's
+    // data) — the mixed-up identifiers seen in "Meine Lifte".
+    if (selectedLocation && q !== selNr) {
       setSelectedAnlagenummer('')
       setSelectedProjectId('')
       setSelectedAddress('')
       setSelectedLocation(null)
+    } else if (!selectedLocation) {
+      setSelectedProjectId('')
+      setSelectedAddress('')
     }
     setSearchQuery(query)
     // Close the address dropdown so both results lists can't overlap
@@ -255,33 +262,15 @@ export function TimeEntryForm({
   }
 
   /**
-   * Auto-save manual lift when all 3 fields (Anlagenummer, Projekt, Adresse) are filled.
-   * Debounced 1200ms after the last keystroke to avoid excessive writes.
-   * (saveManualLift is recreated each render — deliberately not in the deps,
-   *  otherwise the debounce timer would reset on every render and the
-   *  auto-save would never fire.)
-   */
-  useEffect(() => {
-    if (isLunch || selectedLocation) return
-    const nr = searchQuery.trim().toUpperCase()
-    const proj = selectedProjectId.trim()
-    const addr = selectedAddress.trim()
-    if (!nr || !proj || !addr) return
-
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
-    autoSaveTimer.current = setTimeout(() => {
-      saveManualLift(nr, proj, addr)
-    }, 1200)
-
-    return () => {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, selectedProjectId, selectedAddress, selectedLocation, isLunch, locations])
-
-  /**
    * Background geocode the address and update the location + favorite in IndexedDB.
    * This is fire-and-forget after the entry is already saved.
+   *
+   * NOTE: there is deliberately NO auto-save of the manual lift here. A new
+   * lift is only persisted when the user submits the entry ("Eintrag erfassen")
+   * — handleSubmit → saveManualLift — never while fields are still being
+   * typed. The old 1200ms debounced auto-save saved half-typed numbers with
+   * stale Projekt/Adresse from the previous entry ("1" / "sun" artifacts in
+   * Meine Lifte) and even looped forever via its `locations` dependency.
    */
   const geocodeAndUpdateLocation = async (
     anlagenummer: string,

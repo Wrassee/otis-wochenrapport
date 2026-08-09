@@ -92,8 +92,17 @@ export function EditEntrySheet({ open, entry, onClose, onSave }: EditEntrySheetP
   }, [entry, activityCodes, locations])
 
   const handleSearch = async (query: string) => {
-    if (selectedLocation && query.toUpperCase() !== selectedLocation.anlagenummer.toUpperCase()) {
+    const q = query.trim().toUpperCase()
+    const selNr = selectedLocation?.anlagenummer.toUpperCase()
+    // Editing the Anlagenummer invalidates the carried project/address — a
+    // retyped number must never be saved with the previous lift's data.
+    if (selectedLocation && q !== selNr) {
       setSelectedLocation(null)
+      setSelectedProjectId('')
+      setSelectedAddress('')
+    } else if (!selectedLocation) {
+      setSelectedProjectId('')
+      setSelectedAddress('')
     }
     setSearchQuery(query)
     setShowAddressResults(false)
@@ -148,6 +157,15 @@ export function EditEntrySheet({ open, entry, onClose, onSave }: EditEntrySheetP
       const originalNr = (entry.location_anlagenummer || '').toUpperCase()
       const liftChanged = Boolean(nr) && nr !== originalNr
       const locationId = liftChanged ? (selectedLocation?.id ?? null) : entry.location_id
+      // A CHANGED lift must not inherit the old entry's project/address — only
+      // the fields the user entered (a search-selected lift fills all three).
+      // An unchanged lift keeps the entry's values unless the user edited them.
+      const projectId = liftChanged
+        ? selectedProjectId || ''
+        : selectedProjectId || entry.location_project_id || ''
+      const address = liftChanged
+        ? selectedAddress || ''
+        : selectedAddress || entry.location_address || ''
 
       const updatedEntry: TimeEntry = {
         ...entry,
@@ -157,8 +175,8 @@ export function EditEntrySheet({ open, entry, onClose, onSave }: EditEntrySheetP
         activity_code_id: editActivityCode?.id || entry.activity_code_id,
         location_id: locationId,
         location_anlagenummer: liftChanged ? nr : entry.location_anlagenummer,
-        location_project_id: selectedProjectId || entry.location_project_id,
-        location_address: selectedAddress || entry.location_address,
+        location_project_id: projectId,
+        location_address: address,
         location_zone: selectedLocation?.manual_zone ?? selectedLocation?.zone ?? entry.location_zone,
       }
       await onSave(updatedEntry)

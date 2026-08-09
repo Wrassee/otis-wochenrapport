@@ -92,7 +92,11 @@ export async function ensureLiftRow(
 ): Promise<{ location: Location | null; geocoded: ZoneGeoResult | null }> {
   const key = anlagenummer.trim().toUpperCase()
   const addr = address.trim()
-  if (!key) return { location: null, geocoded: null }
+  // A bare number with neither project nor address is a partial-save artifact
+  // (e.g. the form's debounced auto-save catching a half-typed number) — never
+  // create a useless location row for it. The wizard and export heal already
+  // require an address before persisting.
+  if (!key || (!addr && !projectId.trim())) return { location: null, geocoded: null }
 
   // Dedup against IndexedDB, not the caller's (potentially stale) store slice.
   const all = await localDb.getAllLocations()
