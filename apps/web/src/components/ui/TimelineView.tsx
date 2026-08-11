@@ -115,12 +115,13 @@ export function TimelineView({
 
   return (
     <div className="select-none overflow-hidden">
-      {/* Single scrollable container: ruler + content scroll together */}{' '}
-      <div
-        ref={scrollContainerRef}
-        className="overflow-x-auto overscroll-x-contain timeline-scrollbar"
-        style={{ WebkitOverflowScrolling: 'touch' }}
-      >
+      <div className="flex items-stretch">
+        {/* Single scrollable container: ruler + content scroll together */}{' '}
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 min-w-0 overflow-x-auto overscroll-x-contain timeline-scrollbar"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
         <div style={{ minWidth: `${totalHours * 112}px` }}>
           {/* ⏱ Hour ruler */}
           <div className="h-7 flex items-end px-3 border-b border-otis-100/20 dark:border-white/5 flex-shrink-0">
@@ -158,6 +159,15 @@ export function TimelineView({
                 const endTime = entry.start_time + entry.duration
                 const bar = barStyle(entry.start_time, entry.duration)
                 const isConflict = conflictEntryIds.includes(entry.id)
+                // The label pill must NEVER be wider than the bar itself — a
+                // wider pill visually bleeds into the next entry's bar (two
+                // adjacent entries like 07:30–08:30 / 08:30–11:30 then look
+                // like one overlapping blob). The whole content row is clipped
+                // to the bar's exact span; the full text stays available in
+                // the tooltip.
+                const label = isLunch
+                  ? `${t('timeline.lunch')} ${decimalToTime(entry.start_time)}–${decimalToTime(endTime)} (${(entry.duration * 60).toFixed(0)} Min.)`
+                  : `${entry.location_anlagenummer || '—'} ${decimalToTime(entry.start_time)}–${decimalToTime(endTime)} · ${formatOtisDuration(entry.duration)}`
                 return (
                   <div
                     key={entry.id}
@@ -178,10 +188,8 @@ export function TimelineView({
                         isLunch
                           ? 'bg-gradient-to-r from-amber-400/85 to-amber-500/70 dark:from-amber-500/55 dark:to-amber-600/45'
                           : 'bg-gradient-to-r from-otis-500 to-otis-600 dark:from-otis-400 dark:to-otis-500',
-                        conflictEntryIds.includes(entry.id) &&
-                          (isLunch
-                            ? 'from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 ring-2 ring-red-300 dark:ring-red-600'
-                            : 'from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 ring-2 ring-red-300 dark:ring-red-600'),
+                        isConflict &&
+                          'from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 ring-2 ring-red-300 dark:ring-red-600',
                       )}
                       style={{
                         left: bar.left,
@@ -193,10 +201,23 @@ export function TimelineView({
                       data-timeline-bar
                     />
 
-                    {/* Entry info: icon + label + time + duration + actions — all inline */}
+                    {/* Entry info: icon + label + time. Work entries are clipped
+                        to the bar's exact span so adjacent bars never visually
+                        overlap. The lunch bar is far too short for any inline
+                        label (30 min ≈ a few px), so the lunch label renders
+                        AFTER the bar, on the row background, in dark blue —
+                        aligned with the bar and always fully readable. */}
                     <div
-                      className="flex items-center gap-1.5 relative z-10"
-                      style={{ marginLeft: bar.left }}
+                      className={cn(
+                        'flex items-center gap-1.5 relative z-10 min-w-0',
+                        isLunch ? 'overflow-visible' : 'overflow-hidden',
+                      )}
+                      style={
+                        isLunch
+                          ? { marginLeft: bar.left }
+                          : { marginLeft: bar.left, maxWidth: bar.width, width: bar.width }
+                      }
+                      title={label}
                     >
                       {/* Icon — prominent circle badge at the bar start */}
                       <div
@@ -217,80 +238,84 @@ export function TimelineView({
                       </div>
 
                       {isLunch ? (
-                        <>
-                          {/* Text label — truncated */}
-                          <span className="text-sm font-semibold truncate leading-none max-w-[80px] text-amber-700 dark:text-amber-200">
-                            {t('timeline.lunch')}
-                          </span>
-                          {/* Time range — always visible */}
-                          <span className="text-[11px] font-medium whitespace-nowrap ml-1 text-amber-600 dark:text-amber-300">
-                            {decimalToTime(entry.start_time)}–{decimalToTime(endTime)}
-                          </span>
-                          {/* Duration badge */}
-                          <span className="text-[11px] font-bold whitespace-nowrap px-2 py-0.5 rounded-md bg-amber-100/40 dark:bg-amber-900/20 text-amber-700 dark:text-amber-200">
-                            {`${(entry.duration * 60).toFixed(0)} Min.`}
-                          </span>
-                        </>
+                        /* Full label placed AFTER the bar (marginLeft: bar.width
+                           pushes it past the bar's right edge) — dark blue on
+                           the row's white background, never clipped. */
+                        <span
+                          className="text-sm font-semibold whitespace-nowrap leading-none text-otis-800 dark:text-otis-200"
+                          style={{ marginLeft: bar.width }}
+                        >
+                          {label}
+                        </span>
                       ) : (
-                        /* Solid pill — white text on the bar color, so entries
-                           whose bar is shorter than the text (overflow) still
-                           keep perfectly readable text in both themes */
+                        /* Solid pill — white text on the bar color. Clipped to
+                           the bar width by the row above, so a short entry
+                           can never push its label over the next entry. */
                         <span
                           className={cn(
-                            'flex items-center gap-1.5 rounded-full py-1 pl-2.5 pr-1.5 text-white',
+                            'flex items-center gap-1.5 rounded-full py-1 pl-2.5 pr-1.5 text-white whitespace-nowrap',
                             isConflict
                               ? 'bg-gradient-to-r from-red-500 to-red-600 dark:from-red-600 dark:to-red-700'
                               : 'bg-gradient-to-r from-otis-500 to-otis-600 dark:from-otis-400 dark:to-otis-500',
                           )}
                         >
-                          <span className="text-sm font-semibold truncate leading-none max-w-[80px]">
+                          <span className="text-sm font-semibold leading-none max-w-[80px] shrink-0">
                             {entry.location_anlagenummer || '—'}
                           </span>
                           <span className="text-[11px] font-medium whitespace-nowrap">
                             {decimalToTime(entry.start_time)}–{decimalToTime(endTime)}
                           </span>
-                          <span className="text-[11px] font-bold whitespace-nowrap px-2 py-0.5 rounded-full bg-white/25">
+                          <span className="text-[11px] font-bold whitespace-nowrap px-2 py-0.5 rounded-full bg-white/25 shrink-0">
                             {formatOtisDuration(entry.duration)}
                           </span>
                         </span>
                       )}
-
-                      {/* Action buttons — for ALL entries including lunch */}
-                      {showActions && (
-                        <div className="flex items-center gap-1 ml-1 flex-shrink-0">
-                          {onEditEntry && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onEditEntry(entry)
-                              }}
-                              className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-otis-100/50 dark:hover:bg-otis-800/30 transition-all active:scale-90"
-                              title={t('timeline.edit')}
-                            >
-                              <Pencil className="w-3.5 h-3.5 text-otis-500" />
-                            </button>
-                          )}
-                          {onDeleteEntry && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onDeleteEntry(entry.id)
-                              }}
-                              className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-red-50/50 dark:hover:bg-red-900/20 transition-all active:scale-90"
-                              title={t('timeline.delete')}
-                            >
-                              <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                            </button>
-                          )}
-                        </div>
-                      )}
                     </div>
+
                   </div>
                 )
               })}
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Fixed actions column — sits OUTSIDE the scrollport, so it can never
+          cover a bar, yet every row's buttons stay permanently visible (no
+          sticky overlay on top of the timeline). Row heights match the
+          timeline rows (ruler spacer = h-7, one cell per entry). */}
+      {showActions && (onEditEntry || onDeleteEntry) && (
+        <div className="flex-shrink-0 w-[84px] border-l border-otis-100/15 dark:border-white/5 bg-white/30 dark:bg-otis-900/20">
+          {/* Ruler spacer — matches the h-7 hour axis */}
+          <div className="h-7 border-b border-otis-100/15 dark:border-white/5" />
+          {entries.map((entry) => (
+            <div
+              key={entry.id}
+              className="flex items-center justify-center gap-1 px-1"
+              style={{ minHeight: ROW_HEIGHT }}
+            >
+              {onEditEntry && (
+                <button
+                  onClick={() => onEditEntry(entry)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-otis-600 hover:bg-otis-700 text-white shadow-sm transition-all active:scale-90"
+                  title={t('timeline.edit')}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
+              {onDeleteEntry && (
+                <button
+                  onClick={() => onDeleteEntry(entry.id)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white shadow-sm transition-all active:scale-90"
+                  title={t('timeline.delete')}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
       </div>
     </div>
   )

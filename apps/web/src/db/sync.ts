@@ -9,6 +9,7 @@ import {
   syncEntries,
   deleteEntry as deleteRemoteEntry,
   upsertLocation,
+  getLocationByAnlagenummer,
   deleteLocationByAnlagenummer,
   syncExpensesToSupabase,
   updateProfileLanguage,
@@ -124,19 +125,32 @@ async function prepareEntriesForPush(entries: any[]): Promise<any[]> {
       const key = (loc?.anlagenummer || nr).toUpperCase()
       let cloudId: string | null = upserted.get(key) ?? null
       if (!cloudId) {
-        cloudId = uuidFromString(key)
+        // Only CREATE the cloud row when the lift doesn't exist there yet.
+        // Linking an entry may run on a device that lacks the cached location
+        // row (loc === undefined) — upserting blindly would overwrite the
+        // cloud's full project/address/coordinates with empty placeholders
+        // (upsertLocation is merge-safe now, but the row should not be
+        // re-created empty in the first place).
         try {
-          await upsertLocation({
-            id: cloudId,
-            anlagenummer: key,
-            project_id: loc?.project_id ?? copy.location_project_id ?? '',
-            full_address: loc?.full_address ?? copy.location_address ?? '',
-            latitude: loc?.latitude ?? 0,
-            longitude: loc?.longitude ?? 0,
-            zone: loc?.zone ?? copy.location_zone ?? 0,
-            manual_zone: loc?.manual_zone,
-          })
-          upserted.set(key, cloudId)
+          let newId: string
+          const existingCloud = await getLocationByAnlagenummer(key)
+          if (existingCloud) {
+            newId = existingCloud.id
+          } else {
+            newId = uuidFromString(key)
+            await upsertLocation({
+              id: newId,
+              anlagenummer: key,
+              project_id: loc?.project_id ?? copy.location_project_id ?? '',
+              full_address: loc?.full_address ?? copy.location_address ?? '',
+              latitude: loc?.latitude ?? 0,
+              longitude: loc?.longitude ?? 0,
+              zone: loc?.zone ?? copy.location_zone ?? 0,
+              manual_zone: loc?.manual_zone,
+            })
+          }
+          cloudId = newId
+          upserted.set(key, newId)
         } catch (e) {
           console.warn('Lift upsert failed; entry will sync without lift link:', key, e)
           cloudId = null

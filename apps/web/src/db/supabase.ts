@@ -244,8 +244,32 @@ export async function deleteEntry(entryId: string) {
 }
 
 /**
+ * Fetch a single cloud location by anlagenummer (exact match).
+ *
+ * Used before any upsert so a partially-known lift (e.g. only the
+ * anlagenummer, from a device that lacks the cached row) can never clobber
+ * richer cloud data with empty placeholders.
+ */
+export async function getLocationByAnlagenummer(anlagenummer: string) {
+  const { data, error } = await supabase
+    .from('locations')
+    .select('*')
+    .eq('anlagenummer', anlagenummer)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+/**
  * Upsert a location (elevator) — syncs manual additions/edits to the cloud.
  * Uses anlagenummer as the conflict key so the same lift keeps one row.
+ *
+ * Non-destructive: if a cloud row already exists, its non-empty fields win
+ * over empty placeholders in the incoming object. This is what prevents the
+ * "lift lost its project/address/coordinates" bug — the push linker can only
+ * know the anlagenummer when the lift row isn't cached on the current device,
+ * and a plain upsert would otherwise overwrite the full cloud row with
+ * empty strings and 0/0 coordinates on every sync.
  */
 export async function upsertLocation(location: {
   id: string
@@ -262,9 +286,25 @@ export async function upsertLocation(location: {
   // anlagenummer so the same lift always maps to the same cloud row across
   // devices (the upsert key is anlagenummer, so repeated syncs are idempotent).
   const id = isValidUuid(location.id) ? location.id : uuidFromString(location.anlagenummer)
+
+  const existing = await getLocationByAnlagenummer(location.anlagenummer)
+  const merged = existing
+    ? {
+        ...location,
+        id: existing.id,
+        project_id: location.project_id || existing.project_id || '',
+        full_address: location.full_address || existing.full_address || '',
+        latitude: location.latitude || existing.latitude || 0,
+        longitude: location.longitude || existing.longitude || 0,
+        zone: location.zone || existing.zone || 0,
+        manual_zone:
+          location.manual_zone !== undefined ? location.manual_zone : (existing.manual_zone ?? undefined),
+      }
+    : location
+
   const { data, error } = await supabase
     .from('locations')
-    .upsert({ ...location, id }, { onConflict: 'anlagenummer' })
+    .upsert({ ...merged, id }, { onConflict: 'anlagenummer' })
     .select()
     .single()
   if (error) throw error

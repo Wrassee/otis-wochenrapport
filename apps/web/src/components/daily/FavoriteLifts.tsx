@@ -52,35 +52,37 @@ export function FavoriteLifts({ favorites, onSelect }: FavoriteLiftsProps) {
               onClick={() => onSelect(fav)}
               className={cn(
                 'flex-shrink-0 flex flex-col items-start gap-1.5 p-3.5 min-w-[150px] max-w-[200px] snap-start',
-                'glass-card dark:glass-card-dark rounded-2xl',
-                'hover:border-otis-400/40 dark:hover:border-otis-400/30',
-                'active:scale-[0.97] transition-all duration-200',
+                // Solid OTIS-blue — deliberately styled like the primary
+                // "+ Eintrag erfassen" button so these cards are unmistakably
+                // tappable (users previously mistook them for plain cards).
+                'bg-gradient-to-br from-otis-600 to-otis-800 text-white rounded-2xl',
+                'shadow-lg shadow-otis-600/25',
+                'hover:from-otis-500 hover:to-otis-700 hover:shadow-otis-500/40',
+                'active:scale-[0.96] active:shadow-md transition-all duration-200',
                 'relative overflow-hidden group',
               )}
             >
-              {/* Background gradient */}
-              <div className="absolute inset-0 bg-gradient-to-br from-otis-50/50 to-transparent dark:from-otis-800/20 dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              {/* Hover brightness lift */}
+              <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
 
               {/* Position indicator */}
-              <div className="absolute top-1.5 right-2 text-[9px] font-bold text-otis-300/40 dark:text-otis-600/40">
+              <div className="absolute top-1.5 right-2 text-[9px] font-bold text-white/40">
                 #{i + 1}
               </div>
 
-              <span className="font-bold text-sm text-otis-700 dark:text-otis-300 relative z-10">
-                {fav.anlagenummer}
-              </span>
-              <span className="text-[11px] text-gray-600 dark:text-stone-200 truncate max-w-[160px] relative z-10 font-medium">
+              <span className="font-bold text-sm text-white relative z-10">{fav.anlagenummer}</span>
+              <span className="text-[11px] text-otis-100/80 truncate max-w-[160px] relative z-10 font-medium">
                 {fav.project_id}
               </span>
-              <div className="flex items-start gap-1 text-[10px] text-gray-500 dark:text-stone-300 relative z-10">
-                <MapPin className="w-3 h-3 flex-shrink-0 mt-0.5" />
+              <div className="flex items-start gap-1 text-[10px] text-otis-100/70 relative z-10">
+                <MapPin className="w-3 h-3 flex-shrink-0 mt-0.5 text-white/60" />
                 <span className="text-pretty break-words leading-snug max-w-[160px]">
                   {fav.full_address}
                 </span>
               </div>
               <div className="flex items-center gap-1 mt-0.5 relative z-10">
-                <TrendingUp className="w-2.5 h-2.5 text-otis-400/50" />
-                <span className="text-[9px] text-otis-400/50 font-medium">
+                <TrendingUp className="w-2.5 h-2.5 text-white/60" />
+                <span className="text-[9px] text-white/80 font-medium">
                   {(() => {
                     // A stored zone is only trustworthy with a manual override
                     // — the auto zone is ALWAYS recomputed from the coordinates
@@ -98,12 +100,12 @@ export function FavoriteLifts({ favorites, onSelect }: FavoriteLiftsProps) {
                     return zone > 0 ? `Zone ${zone}` : t('lifts.zone.auto.short')
                   })()}
                   {fav.manual_zone !== undefined && (
-                    <span className="text-[8px] ml-0.5 text-amber-500 font-bold">✦</span>
+                    <span className="text-[8px] ml-0.5 text-amber-300 font-bold">✦</span>
                   )}
                 </span>
               </div>
               {/* Use count badge */}
-              <div className="absolute bottom-1.5 right-2 text-[8px] font-semibold text-otis-400/40 dark:text-otis-600/40 z-10">
+              <div className="absolute bottom-1.5 right-2 text-[8px] font-semibold text-white/50 z-10">
                 {fav.use_count}x
               </div>
             </button>

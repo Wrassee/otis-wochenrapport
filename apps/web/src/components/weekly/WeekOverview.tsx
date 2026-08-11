@@ -23,6 +23,8 @@ interface WeekOverviewProps {
   onNextWeek: () => void
   onDeleteEntry?: (entryId: string) => void
   onEditEntry?: (entry: TimeEntry) => void
+  /** Jump to the Erfassung page with a day pre-selected. */
+  onEditDay?: (date: string) => void
 }
 
 export function WeekOverview({
@@ -31,6 +33,7 @@ export function WeekOverview({
   onNextWeek,
   onDeleteEntry,
   onEditEntry,
+  onEditDay,
 }: WeekOverviewProps) {
   const { t } = useTranslation()
   const dailyExpenses = useAppStore((s) => s.dailyExpenses)
@@ -149,6 +152,7 @@ export function WeekOverview({
             onDeleteEntry={onDeleteEntry}
             onEditEntry={onEditEntry}
             onOpenExpenses={(date, dayName) => setExpenseEditor({ date, dayName })}
+            onEditDay={onEditDay}
             expenseCount={getExpenseCount(day.date)}
           />
         ))}

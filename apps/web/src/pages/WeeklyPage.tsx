@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { WeekOverview } from '@/components/weekly/WeekOverview'
 import { EditEntrySheet } from '@/components/daily/EditEntrySheet'
 import { useAppStore } from '@/stores/appStore'
@@ -10,11 +11,13 @@ import { useExpensePhotos } from '@/hooks/useExpensePhotos'
 import { ReceiptPhotos } from '@/components/export/ReceiptPhotos'
 
 export function WeeklyPage() {
+  const navigate = useNavigate()
   const { t } = useTranslation()
-  const { currentWeek, setCurrentWeek } = useAppStore(
+  const { currentWeek, setCurrentWeek, setCurrentDate } = useAppStore(
     useShallow((s) => ({
       currentWeek: s.currentWeek,
       setCurrentWeek: s.setCurrentWeek,
+      setCurrentDate: s.setCurrentDate,
     })),
   )
   const { timeEntries, weekSummary, updateEntry, deleteEntry, loadWeek, recalculate } =
@@ -89,6 +92,15 @@ export function WeeklyPage() {
     await loadWeek()
   }
 
+  /** "Bejegyzések szerkesztése" on a day card — open the Erfassung page with
+   *  that day pre-selected, where the full day editor (add / edit / delete)
+   *  lives. setCurrentDate also syncs the week, so the Dashboard shows the
+   *  right week automatically. */
+  const handleEditDay = (date: string) => {
+    setCurrentDate(date)
+    navigate('/dashboard')
+  }
+
   // Keep the spinner through both the week load AND the summary recalc, so no
   // blank frame flashes between them (calculateWeekSummary always sets the
   // summary, so this can never get stuck).
@@ -111,6 +123,7 @@ export function WeeklyPage() {
         onNextWeek={handleNextWeek}
         onDeleteEntry={handleDeleteEntry}
         onEditEntry={handleEditEntry}
+        onEditDay={handleEditDay}
       />
 
       {/* Week's receipt photos (Spesen Belege) — compact strip */}

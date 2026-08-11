@@ -28,11 +28,16 @@ import {
   XCircle,
   ChevronRight,
   AlertTriangle,
+  Briefcase,
+  RotateCcw,
+  CalendarDays,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
-/** One work block (a lift visit): plant data + start time + duration. */
+/** One work block (a lift visit or office work): plant data + start + duration. */
 interface WorkBlock {
+  /** 'lift' = at a lift (plant data entered), 'office' = I04/I5T\u2026 without a plant. */
+  kind: 'lift' | 'office'
   anlagenummer: string
   projektnummer: string
   adresse: string
@@ -54,6 +59,9 @@ interface DayPlan {
   lunchDuration: number | null // minutes
   hasSpesen: boolean
   expenses: ExpenseType[]
+  /** True when the day was pre-filled by the quick-fill flow — the wizard
+   * then only asks the Spesen question for it (blocks + lunch already done). */
+  quickFilled?: boolean
 }
 
 const emptyDay = (): DayPlan => ({
@@ -104,11 +112,13 @@ const ABSENCE_CODES: { code: string; labelKey: TranslationKey }[] = [
 
 type Phase =
   | 'worked'
+  | 'workType'
   | 'absence'
   | 'anlage'
   | 'projekt'
   | 'adresse'
   | 'activity'
+  | 'officeActivity'
   | 'start'
   | 'duration'
   | 'lunchQ'
@@ -117,6 +127,16 @@ type Phase =
   | 'moreLifts'
   | 'spesen'
   | 'expenses'
+  | 'quickAnlage'
+  | 'quickProjekt'
+  | 'quickAdresse'
+  | 'quickDays'
+  | 'quickLunch'
+  // Week-level Spesen questions after a quick-fill: ONE "any expenses this
+  // week?" question instead of the same per-day question 4–5 times in a row.
+  | 'spesenAny'
+  | 'spesenDay'
+  | 'spesenMore'
 
 /** History entry so the Back button can walk back through dynamic phases. */
 interface HistoryEntry {
@@ -127,11 +147,13 @@ interface HistoryEntry {
 
 const PHASE_RANK: Record<Phase, number> = {
   worked: 0,
+  workType: 1,
   absence: 1,
   anlage: 2,
   projekt: 3,
   adresse: 4,
   activity: 5,
+  officeActivity: 5,
   start: 6,
   duration: 7,
   lunchQ: 8,
@@ -140,12 +162,32 @@ const PHASE_RANK: Record<Phase, number> = {
   moreLifts: 11,
   spesen: 12,
   expenses: 13,
+  quickAnlage: 14,
+  quickProjekt: 15,
+  quickAdresse: 16,
+  quickDays: 17,
+  quickLunch: 18,
+  spesenAny: 19,
+  spesenDay: 20,
+  spesenMore: 21,
 }
 
-const PHASES_PER_DAY = 14
+const PHASES_PER_DAY = 22
 
-/** Phases that show a lift counter badge. */
-const BLOCK_BADGE_PHASES: Phase[] = ['anlage', 'projekt', 'adresse', 'activity', 'start', 'duration']
+/** Week-level phases (not tied to a single day's entry flow). */
+const WEEK_LEVEL_PHASES: Phase[] = ['spesenAny', 'spesenDay', 'spesenMore']
+
+/** Phases that show a block counter badge (Lift {n} / B\u00fcro {n}). */
+const BLOCK_BADGE_PHASES: Phase[] = [
+  'workType',
+  'anlage',
+  'projekt',
+  'adresse',
+  'activity',
+  'officeActivity',
+  'start',
+  'duration',
+]
 
 function fmtDuration(hours: number): string {
   const h = Math.floor(hours)
@@ -204,6 +246,12 @@ export function WizardPage() {
   const dayNames = DAY_NAMES[language]
 
   const [days, setDays] = useState<DayPlan[]>(() => Array.from({ length: TOTAL_DAYS }, emptyDay))
+  // Always-fresh mirror of `days` for handlers that may close over a stale
+  // render's state (advanceDay decides per-day phase from the next day's
+  // quickFilled flag — a stale array would re-ask "Did you work?" for days
+  // the quick-fill already filled).
+  const daysRef = useRef(days)
+  daysRef.current = days
   const [dayIndex, setDayIndex] = useState(0)
   const [phase, setPhase] = useState<Phase>('worked')
   const [blockIndex, setBlockIndex] = useState(0) // index of the block currently being entered
@@ -212,6 +260,83 @@ export function WizardPage() {
   const [error, setError] = useState<string | null>(null)
   /** Conflict warning shown inside a question phase (start/duration). */
   const [phaseError, setPhaseError] = useState<string | null>(null)
+
+  /**
+   * Quick-fill setup: same lift on several days at once. While the user
+   * answers the quick questions (anlage \u2192 projekt \u2192 adresse \u2192 days \u2192
+   * lunch), the collected data lives here; on finish the selected days are
+   * pre-filled with 4.5h + lunch + 4.0h blocks. Null = quick-fill inactive.
+   */
+  const [quickSetup, setQuickSetup] = useState<{
+    anlagenummer: string
+    projektnummer: string
+    adresse: string
+    days: number[]
+    lunchDuration: number | null
+  } | null>(null)
+
+  // ─── Draft persistence (exit / re-enter the wizard without data loss) ───
+  // The draft is keyed by ISO year-week, so a new week never restores the
+  // previous week's data. On a successful finish the draft is removed.
+  const draftKey = `wizard.draft.${currentWeek.year}.${currentWeek.week}`
+  const [hydrated, setHydrated] = useState(false)
+  const loadedRef = useRef(false)
+
+  useEffect(() => {
+    if (loadedRef.current) return
+    loadedRef.current = true
+    try {
+      const raw = localStorage.getItem(draftKey)
+      if (raw) {
+        const saved = JSON.parse(raw) as {
+          days: DayPlan[]
+          dayIndex: number
+          phase: Phase
+          blockIndex: number
+          history: HistoryEntry[]
+          quickSetup: {
+            anlagenummer: string
+            projektnummer: string
+            adresse: string
+            days: number[]
+            lunchDuration: number | null
+          } | null
+        }
+        if (Array.isArray(saved.days) && saved.days.length === TOTAL_DAYS) {
+          setDays(saved.days)
+          if (typeof saved.dayIndex === 'number') setDayIndex(saved.dayIndex)
+          if (saved.phase && PHASE_RANK[saved.phase] !== undefined) setPhase(saved.phase)
+          if (typeof saved.blockIndex === 'number') setBlockIndex(saved.blockIndex)
+          if (Array.isArray(saved.history)) setHistory(saved.history)
+          if (saved.quickSetup) setQuickSetup(saved.quickSetup)
+        }
+      }
+    } catch {
+      // Corrupt draft — ignore and start fresh.
+    }
+    setHydrated(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey])
+
+  // Persist the wizard state on every change so an accidental exit (X button)
+  // never loses the week already entered. Only writes after the restore pass
+  // has finished (otherwise the fresh mount would overwrite the draft).
+  useEffect(() => {
+    if (!hydrated) return
+    const payload = {
+      days,
+      dayIndex,
+      phase,
+      blockIndex,
+      history,
+      quickSetup,
+    }
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(payload))
+    } catch {
+      // Quota exceeded — draft persistence is best-effort.
+    }
+  }, [draftKey, hydrated, days, dayIndex, phase, blockIndex, history, quickSetup])
 
   const day = days[dayIndex] // undefined on the summary screen (dayIndex === TOTAL_DAYS)
   const isLastDay = dayIndex === TOTAL_DAYS - 1
@@ -254,11 +379,37 @@ export function WizardPage() {
     [activityCodes],
   )
 
+  /** Codes for office work (I04, I5T, \u2026) — non-productive only. */
+  const officeCodes = useMemo(
+    () => activityCodes.filter((c) => c.category === 'non_productive'),
+    [activityCodes],
+  )
+
   const updateDay = (patch: Partial<DayPlan>) => {
     setDays((prev) => prev.map((d, i) => (i === dayIndex ? { ...d, ...patch } : d)))
   }
 
+  /** Patch a SPECIFIC day (week-level Spesen flow targets days by index). */
+  const updateDayAt = (index: number, patch: Partial<DayPlan>) => {
+    setDays((prev) => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)))
+  }
+
+  /** Jump to the first day that still needs the normal entry flow, or to the
+   *  summary screen when the whole week is done. */
+  const goToNextUnfilledOrSummary = () => {
+    const idx = daysRef.current.findIndex((d) => d.blocks.length === 0 && !d.absenceCode)
+    if (idx === -1) {
+      setDayIndex(TOTAL_DAYS)
+      setBlockIndex(0)
+    } else {
+      setDayIndex(idx)
+      setBlockIndex(0)
+      setPhase('worked')
+    }
+  }
+
   const emptyBlock = (): WorkBlock => ({
+    kind: 'lift',
     anlagenummer: '',
     projektnummer: '',
     adresse: '',
@@ -292,10 +443,95 @@ export function WizardPage() {
     if (isLastDay) {
       setDayIndex(TOTAL_DAYS)
     } else {
-      setDayIndex((i) => i + 1)
+      const next = dayIndex + 1
+      setDayIndex(next)
+      // Quick-filled days already have their blocks + lunch — skip straight
+      // to the Spesen question instead of re-asking the whole entry flow.
+      // Read from daysRef so a stale closure can never miss the flag.
+      setPhase(daysRef.current[next]?.quickFilled ? 'spesen' : 'worked')
     }
-    setPhase('worked')
     setBlockIndex(0)
+  }
+
+  /**
+   * Apply the quick-fill setup: for every selected day create the standard
+   * 4.5h (07:30–12:00) + lunch + 4.0h afternoon block, then move to the first
+   * day that still needs input (quick-filled days only ask for Spesen).
+   */
+  const applyQuickFill = (lunchDuration: number) => {
+    if (!quickSetup) return
+    const { anlagenummer, projektnummer, adresse, days: selectedDays } = quickSetup
+    const filledDay = (): DayPlan => ({
+      status: 'work',
+      absenceCode: null,
+      blocks: [
+        {
+          kind: 'lift',
+          anlagenummer,
+          projektnummer,
+          adresse,
+          activityCode: 'NK',
+          start: 7.5,
+          duration: 4.5,
+        },
+        {
+          kind: 'lift',
+          anlagenummer,
+          projektnummer,
+          adresse,
+          activityCode: 'NK',
+          start: 12 + lunchDuration / 60,
+          duration: 4.0,
+        },
+      ],
+      lunch: true,
+      lunchSkipped: false,
+      lunchStart: 12,
+      lunchDuration,
+      hasSpesen: false,
+      expenses: [],
+      quickFilled: true,
+    })
+    const newDays = days.map((d, i) => (selectedDays.includes(i) ? filledDay() : d))
+    setDays(newDays)
+    setQuickSetup(null)
+    setHistory([])
+    setError(null)
+    setPhaseError(null)
+    setBlockIndex(0)
+    // Restart the walk from day 0. Instead of asking the same per-day
+    // "Spesen?" question for every quick-filled day (4–5 times in a row),
+    // ask ONE aggregated week-level question: "any expenses this week?" —
+    // only the days the user flags are then walked through the expense
+    // picker. Unfilled days afterwards get the normal entry flow.
+    setDayIndex(0)
+    setPhase(newDays.some((d) => d.quickFilled) ? 'spesenAny' : 'worked')
+  }
+
+  /** Live suggestions for the quick-fill Anlagen-Nr. input. */
+  const quickAnlageSuggestionsFor = (value: string): Suggestion[] => {
+    const q = value.trim().toUpperCase()
+    if (q.length < 1) return []
+    return locations
+      .filter((l) => l.anlagenummer.toUpperCase().includes(q))
+      .slice(0, 5)
+      .map((l) => {
+        const latest = findLatestLiftEntry(timeEntries, l.anlagenummer)
+        const projektnummer = l.project_id || latest?.location_project_id || ''
+        const adresse = l.full_address || latest?.location_address || ''
+        return {
+          label: l.anlagenummer,
+          sublabel: `${projektnummer} · ${adresse}`,
+          onSelect: () => {
+            setQuickSetup((qs) =>
+              qs
+                ? { ...qs, anlagenummer: l.anlagenummer, projektnummer, adresse }
+                : qs,
+            )
+            goTo('quickDays')
+          },
+        }
+      })
   }
 
   const goTo = (p: Phase, bi?: number) => {
@@ -321,6 +557,20 @@ export function WizardPage() {
   }
 
   const exit = () => navigate('/dashboard')
+
+  /** Discard the current week's draft and start over (with confirmation). */
+  const resetWeek = () => {
+    if (!window.confirm(t('wizard.reset.confirm'))) return
+    localStorage.removeItem(draftKey)
+    setDays(Array.from({ length: TOTAL_DAYS }, emptyDay))
+    setDayIndex(0)
+    setPhase('worked')
+    setBlockIndex(0)
+    setHistory([])
+    setQuickSetup(null)
+    setError(null)
+    setPhaseError(null)
+  }
 
   /**
    * Detect a time overlap for a day's plan: between the plan's own blocks
@@ -504,6 +754,8 @@ export function WizardPage() {
         setLocations(await localDb.getAllLocations())
         setFavoriteLocations(await localDb.getFavoriteLocations())
       }
+      // The week was saved — drop the draft so a re-entry starts fresh.
+      localStorage.removeItem(draftKey)
       navigate('/dashboard')
     } catch (e) {
       console.error('Wizard save failed:', e)
@@ -624,6 +876,8 @@ export function WizardPage() {
     switch (phase) {
       case 'worked':
         return t('wizard.worked', { day: dayNames[dayIndex] })
+      case 'workType':
+        return t('wizard.workType')
       case 'absence':
         return t('wizard.absence.title')
       case 'anlage':
@@ -633,6 +887,7 @@ export function WizardPage() {
       case 'adresse':
         return t('wizard.adresse')
       case 'activity':
+      case 'officeActivity':
         return t('wizard.activity')
       case 'start':
         return t('wizard.start')
@@ -648,6 +903,22 @@ export function WizardPage() {
         return t('wizard.moreLifts')
       case 'spesen':
         return t('wizard.spesen')
+      case 'spesenAny':
+        return t('wizard.spesenAny')
+      case 'spesenDay':
+        return t('wizard.spesenDay')
+      case 'spesenMore':
+        return t('wizard.spesenMore')
+      case 'quickAnlage':
+        return t('wizard.anlage')
+      case 'quickProjekt':
+        return t('wizard.projekt')
+      case 'quickAdresse':
+        return t('wizard.adresse')
+      case 'quickDays':
+        return t('wizard.quickDays')
+      case 'quickLunch':
+        return t('wizard.lunchDuration')
       default:
         return t('wizard.expenses')
     }
@@ -717,17 +988,31 @@ export function WizardPage() {
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
               {t('wizard.dayProgress', { day: dayIndex + 1, total: TOTAL_DAYS })}
             </span>
-            <span className="inline-flex items-center px-2.5 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/15 text-xs">
-              {dayNames[dayIndex]}, {shortDate(dates[dayIndex])}
-            </span>
+            {!WEEK_LEVEL_PHASES.includes(phase) && (
+              <span className="inline-flex items-center px-2.5 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/15 text-xs">
+                {dayNames[dayIndex]}, {shortDate(dates[dayIndex])}
+              </span>
+            )}
           </div>
-          <button
-            onClick={exit}
-            className="flex items-center justify-center w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 text-white hover:bg-white/20 transition-all active:scale-95"
-            aria-label={t('wizard.exit')}
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {hydrated && (
+              <button
+                onClick={resetWeek}
+                className="flex items-center justify-center w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 text-white/70 hover:text-white hover:bg-white/20 transition-all active:scale-95"
+                aria-label={t('wizard.reset')}
+                title={t('wizard.reset')}
+              >
+                <RotateCcw className="w-5 h-5" />
+              </button>
+            )}
+            <button
+              onClick={exit}
+              className="flex items-center justify-center w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 text-white hover:bg-white/20 transition-all active:scale-95"
+              aria-label={t('wizard.exit')}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
         {/* Progress bar */}
         <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
@@ -753,32 +1038,93 @@ export function WizardPage() {
             </div>
           )}
 
-          {/* Block counter badge for per-lift phases */}
+          {/* Block counter badge for per-block phases (Lift {n} / B\u00fcro {n}) */}
           {BLOCK_BADGE_PHASES.includes(phase) && (
             <div className="flex items-center justify-center gap-2 mb-5">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur border border-white/15 text-white/90 text-sm font-semibold">
-                <Building2 className="w-4 h-4 text-otis-300" />
-                {t('wizard.block', { n: blockIndex + 1 })}
+                {day!.blocks[blockIndex]?.kind === 'office' ? (
+                  <Briefcase className="w-4 h-4 text-amber-300" />
+                ) : (
+                  <Building2 className="w-4 h-4 text-otis-300" />
+                )}
+                {day!.blocks[blockIndex]?.kind === 'office'
+                  ? t('wizard.blockOffice', { n: blockIndex + 1 })
+                  : t('wizard.block', { n: blockIndex + 1 })}
               </span>
             </div>
           )}
 
           {phase === 'worked' && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => {
+                    updateDay({ status: 'work', absenceCode: null, lunchSkipped: false })
+                    goTo('workType')
+                  }}
+                  className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95"
+                >
+                  {t('wizard.yes')}
+                </button>
+                <button
+                  onClick={() => goTo('absence')}
+                  className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95"
+                >
+                  {t('wizard.no')}
+                </button>
+              </div>
+
+              {/* Quick fill — same lift on several days at once. Only offered
+                  on Monday (first day) and only while no day has any content
+                  yet, so it can never overwrite entered days. */}
+              {dayIndex === 0 && days.every((d) => d.blocks.length === 0 && !d.absenceCode) && (
+                <button
+                  onClick={() => {
+                    setQuickSetup({
+                      anlagenummer: '',
+                      projektnummer: '',
+                      adresse: '',
+                      // Start with NO day selected — the user taps exactly the
+                      // days to fill. (Pre-selecting all five was a trap: a
+                      // tap on an already-selected day toggles it OFF, so a
+                      // quick Mo–Th selection could silently end up as
+                      // K–Fr, and the wizard then re-asked "Did you work on
+                      // Monday?" for the unfilled day.)
+                      days: [],
+                      lunchDuration: null,
+                    })
+                    goTo('quickAnlage')
+                  }}
+                  className="w-full py-4 rounded-2xl border-2 border-dashed border-emerald-400/50 bg-emerald-500/10 text-emerald-100 font-bold text-base backdrop-blur-xl hover:bg-emerald-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-5 h-5 text-emerald-300" />
+                  {t('wizard.quick')}
+                </button>
+              )}
+            </div>
+          )}
+
+          {phase === 'workType' && (
+            <div className="space-y-3">
               <button
                 onClick={() => {
-                  updateDay({ status: 'work', absenceCode: null, lunchSkipped: false })
+                  setBlockField({ kind: 'lift' })
                   goTo('anlage')
                 }}
-                className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95"
+                className="w-full py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2.5"
               >
-                {t('wizard.yes')}
+                <Building2 className="w-5 h-5 text-otis-300" />
+                {t('wizard.workType.lift')}
               </button>
               <button
-                onClick={() => goTo('absence')}
-                className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95"
+                onClick={() => {
+                  setBlockField({ kind: 'office' })
+                  goTo('officeActivity')
+                }}
+                className="w-full py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2.5"
               >
-                {t('wizard.no')}
+                <Briefcase className="w-5 h-5 text-amber-300" />
+                {t('wizard.workType.office')}
               </button>
             </div>
           )}
@@ -865,6 +1211,116 @@ export function WizardPage() {
             />
           )}
 
+          {phase === 'officeActivity' && (
+            <ActivityStep
+              codes={officeCodes}
+              selected={day!.blocks[blockIndex]?.activityCode ?? 'NK'}
+              productiveLabel={t('activity.productive')}
+              nonProductiveLabel={t('activity.nonproductive')}
+              onSelect={(code) => {
+                setBlockField({ activityCode: code })
+                goTo('start')
+              }}
+            />
+          )}
+
+          {phase === 'quickAnlage' && (
+            <TextStep
+              key="quick-anlage"
+              initialValue={quickSetup?.anlagenummer ?? ''}
+              placeholder={t('wizard.anlage.placeholder')}
+              autoCapitalize="characters"
+              suggestionsFor={quickAnlageSuggestionsFor}
+              onNext={(v) => {
+                setQuickSetup((q) => (q ? { ...q, anlagenummer: v.toUpperCase() } : q))
+                goTo('quickProjekt')
+              }}
+            />
+          )}
+
+          {phase === 'quickProjekt' && (
+            <TextStep
+              key="quick-projekt"
+              initialValue={quickSetup?.projektnummer ?? ''}
+              placeholder={t('wizard.projekt.placeholder')}
+              autoCapitalize="characters"
+              onNext={(v) => {
+                setQuickSetup((q) => (q ? { ...q, projektnummer: v.toUpperCase() } : q))
+                goTo('quickAdresse')
+              }}
+            />
+          )}
+
+          {phase === 'quickAdresse' && (
+            <TextStep
+              key="quick-adresse"
+              initialValue={quickSetup?.adresse ?? ''}
+              placeholder={t('wizard.adresse.placeholder')}
+              autoCapitalize="words"
+              onNext={(v) => {
+                setQuickSetup((q) => (q ? { ...q, adresse: v } : q))
+                goTo('quickDays')
+              }}
+            />
+          )}
+
+          {phase === 'quickDays' && (
+            <div>
+              <div className="grid grid-cols-5 gap-2 mb-5">
+                {dayNames.map((name, i) => {
+                  const active = quickSetup?.days.includes(i) ?? false
+                  return (
+                    <button
+                      key={i}
+                      onClick={() =>
+                        setQuickSetup((q) => {
+                          if (!q) return q
+                          const days = active
+                            ? q.days.filter((d) => d !== i)
+                            : [...q.days, i].sort()
+                          return { ...q, days }
+                        })
+                      }
+                      className={cn(
+                        'py-3.5 rounded-xl border-2 font-bold text-sm transition-all active:scale-95 flex flex-col items-center gap-0.5',
+                        active
+                          ? 'border-emerald-400 bg-emerald-500/20 text-white'
+                          : 'border-white/25 bg-white/10 text-white/80 hover:bg-white/20',
+                      )}
+                    >
+                      <span>{name.slice(0, 2)}</span>
+                      <span className="text-[10px] font-medium opacity-70">
+                        {shortDate(dates[i])}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              <button
+                onClick={() => goTo('quickLunch')}
+                disabled={!quickSetup || quickSetup.days.length === 0}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-otis-500 to-emerald-500 text-white font-bold text-lg shadow-lg shadow-otis-500/25 hover:shadow-otis-500/40 hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:pointer-events-none"
+              >
+                {t('wizard.next')}
+              </button>
+            </div>
+          )}
+
+          {phase === 'quickLunch' && (
+            <div className="grid grid-cols-3 gap-3">
+              {LUNCH_OPTIONS.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => applyQuickFill(m)}
+                  className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <UtensilsCrossed className="w-5 h-5" />
+                  {m} min
+                </button>
+              ))}
+            </div>
+          )}
+
           {phase === 'start' && (
             <TimeWheel
               min={completedBlocks.length > 0 ? defaultNextStart : undefined}
@@ -933,7 +1389,7 @@ export function WizardPage() {
           {phase === 'moreLifts' && (
             <div className="grid grid-cols-2 gap-4">
               <button
-                onClick={() => goTo('anlage', day!.blocks.length)}
+                onClick={() => goTo('workType', day!.blocks.length)}
                 className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95"
               >
                 {t('wizard.yes')}
@@ -963,6 +1419,86 @@ export function WizardPage() {
                   updateDay({ hasSpesen: false, expenses: [] })
                   advanceDay()
                 }}
+                className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95"
+              >
+                {t('wizard.no')}
+              </button>
+            </div>
+          )}
+
+          {phase === 'spesenAny' && (
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => goTo('spesenDay')}
+                className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95"
+              >
+                {t('wizard.yes')}
+              </button>
+              <button
+                onClick={() => {
+                  // No expenses on any quick-filled day — mark them all done
+                  // and jump to the first day that still needs input.
+                  daysRef.current.forEach((d, i) => {
+                    if (d.quickFilled) updateDayAt(i, { hasSpesen: false, expenses: [] })
+                  })
+                  goToNextUnfilledOrSummary()
+                }}
+                className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95"
+              >
+                {t('wizard.no')}
+              </button>
+            </div>
+          )}
+
+          {phase === 'spesenDay' && (
+            <div className="space-y-3">
+              {days.map((d, i) =>
+                d.quickFilled ? (
+                  <button
+                    key={i}
+                    disabled={d.hasSpesen}
+                    onClick={() => {
+                      updateDayAt(i, { hasSpesen: true })
+                      setDayIndex(i)
+                      goTo('expenses')
+                    }}
+                    className={cn(
+                      'w-full py-4 px-5 rounded-2xl border-2 font-semibold text-base transition-all active:scale-[0.98] backdrop-blur-xl flex items-center justify-between',
+                      d.hasSpesen
+                        ? 'border-amber-400 bg-amber-500/20 text-white'
+                        : 'border-white/25 bg-white/10 text-white hover:bg-white/20',
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4 text-white/60" />
+                      {dayNames[i]}, {shortDate(dates[i])}
+                    </span>
+                    <span
+                      className={cn(
+                        'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors',
+                        d.hasSpesen
+                          ? 'border-amber-300 bg-amber-400 text-amber-950'
+                          : 'border-white/40',
+                      )}
+                    >
+                      {d.hasSpesen && <Check className="w-4 h-4" />}
+                    </span>
+                  </button>
+                ) : null,
+              )}
+            </div>
+          )}
+
+          {phase === 'spesenMore' && (
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => goTo('spesenDay')}
+                className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95"
+              >
+                {t('wizard.yes')}
+              </button>
+              <button
+                onClick={goToNextUnfilledOrSummary}
                 className="py-5 rounded-2xl border-2 border-white/25 bg-white/10 text-white font-bold text-lg backdrop-blur-xl hover:bg-white/20 transition-all active:scale-95"
               >
                 {t('wizard.no')}
@@ -1007,7 +1543,7 @@ export function WizardPage() {
               })}
 
               <button
-                onClick={advanceDay}
+                onClick={day?.quickFilled ? () => goTo('spesenMore') : advanceDay}
                 className="mt-2 w-full py-4 rounded-2xl bg-gradient-to-r from-otis-500 to-emerald-500 text-white font-bold text-lg shadow-lg shadow-otis-500/25 hover:shadow-otis-500/40 hover:brightness-110 active:scale-[0.98] transition-all"
               >
                 {t('wizard.next')}
@@ -1138,12 +1674,14 @@ function ActivityStep({
 
   return (
     <div className="max-h-[55vh] overflow-y-auto rounded-3xl p-3 bg-white/10 backdrop-blur-xl border border-white/15 space-y-4">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-otis-200/70 mb-2 px-1">
-          {productiveLabel}
-        </p>
-        {renderGroup(productive, 'wrench')}
-      </div>
+      {productive.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-otis-200/70 mb-2 px-1">
+            {productiveLabel}
+          </p>
+          {renderGroup(productive, 'wrench')}
+        </div>
+      )}
       {nonProductive.length > 0 && (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/70 mb-2 px-1">

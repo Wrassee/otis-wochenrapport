@@ -12,6 +12,7 @@ import {
   MapPin,
   Euro,
   ChevronRight,
+  PenLine,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { TimelineView } from '@/components/ui/TimelineView'
@@ -23,6 +24,8 @@ interface DayCardProps {
   onDeleteEntry?: (entryId: string) => void
   onEditEntry?: (entry: TimeEntry) => void
   onOpenExpenses?: (date: string, dayName: string) => void
+  /** Jump to the Erfassung page with this day pre-selected (full day editing). */
+  onEditDay?: (date: string) => void
   expenseCount?: number
 }
 
@@ -31,6 +34,7 @@ export function DayCard({
   onDeleteEntry,
   onEditEntry,
   onOpenExpenses,
+  onEditDay,
   expenseCount,
 }: DayCardProps) {
   const { t } = useTranslation()
@@ -180,6 +184,31 @@ export function DayCard({
           </div>
         )}
 
+        {/* Edit day — jump to the Erfassung page with this day selected, so
+            the whole day (add / edit / delete entries) can be modified. */}
+        {onEditDay && (
+          <button
+            type="button"
+            onClick={() => onEditDay(day.date)}
+            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border transition-all duration-150 mb-3 bg-white/50 dark:bg-white/5 border-otis-200/40 dark:border-otis-700/30 hover:border-otis-400/60 hover:bg-otis-50/40 dark:hover:bg-otis-800/30"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-otis-500 to-otis-700 flex items-center justify-center shadow-sm">
+                <PenLine className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="text-sm font-medium text-gray-700 dark:text-stone-200">
+                {t('day.edit.entries')}
+              </span>
+              {day.entries.length > 0 && (
+                <Badge variant="info" size="sm">
+                  {day.entries.length}
+                </Badge>
+              )}
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-600 dark:text-stone-200" />
+          </button>
+        )}
+
         {/* Spesen button */}
         {onOpenExpenses && (
           <button
@@ -213,11 +242,16 @@ export function DayCard({
         {day.entries.length > 0 && (
           <div className="mt-3">
             <div className="bg-white/40 dark:bg-otis-900/30 rounded-xl border border-otis-100/20 dark:border-otis-700/30">
+              {/* No per-row action chip here: the mini timeline is too narrow
+                  and the sticky chip would sit on top of the bars (e.g. a
+                  long morning block on Friday). Rows are still tappable
+                  (opens the edit sheet, which also offers delete), and the
+                  "Einträge bearbeiten" button above opens the full-day view. */}
               <TimelineView
                 entries={day.entries}
                 onEditEntry={onEditEntry}
                 onDeleteEntry={onDeleteEntry}
-                showActions={true}
+                showActions={false}
                 conflictEntryIds={conflictEntryIds}
                 disableConflictScroll
               />
