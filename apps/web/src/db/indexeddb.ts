@@ -78,6 +78,16 @@ export async function getAllEntriesForWeek(
   return index.getAll(range)
 }
 
+/**
+ * All locally stored time entries across every week — used to enrich lift
+ * suggestions with lifts the user has worked on before but that are missing
+ * from the shared `locations` table (their details live on the entry rows).
+ */
+export async function getAllTimeEntries(): Promise<TimeEntry[]> {
+  const db = await getDb()
+  return db.getAll('time_entries')
+}
+
 export async function getEntriesForDate(userId: string, date: string): Promise<TimeEntry[]> {
   const db = await getDb()
   const tx = db.transaction('time_entries', 'readonly')
@@ -193,9 +203,62 @@ export async function cacheLocations(locations: Location[]): Promise<void> {
 
 export async function searchLocations(query: string): Promise<Location[]> {
   const db = await getDb()
-  const all = await db.getAll('locations')
   const q = query.toLowerCase()
-  return all.filter(
+
+  // Merged, deduplicated lift pool — mirrors the wizard's suggestion logic:
+  // local `locations` rows first (full details), then the user's own favorites
+  // and past time entries filling in lifts that are missing from the shared
+  // locations table (their details live on the favorite/entry rows).
+  const byNr = new Map<string, Location>()
+  const put = (loc: Location) => {
+    const key = loc.anlagenummer.trim().toUpperCase()
+    if (!key) return
+    const cur = byNr.get(key)
+    if (!cur) {
+      byNr.set(key, loc)
+      return
+    }
+    // Fill gaps only — an existing row always wins over the fallbacks.
+    if (!cur.project_id && loc.project_id) cur.project_id = loc.project_id
+    if (!cur.full_address && loc.full_address) cur.full_address = loc.full_address
+  }
+
+  const [rows, favs, entries] = await Promise.all([
+    db.getAll('locations'),
+    db.getAll('favorites'),
+    db.getAll('time_entries'),
+  ])
+
+  for (const loc of rows) put(loc)
+  for (const f of favs) {
+    if (!f.anlagenummer) continue
+    put({
+      id: `fav-${f.anlagenummer}`,
+      anlagenummer: f.anlagenummer,
+      project_id: f.project_id || '',
+      full_address: f.full_address || '',
+      latitude: f.latitude || 0,
+      longitude: f.longitude || 0,
+      zone: f.zone || 1,
+      manual_zone: f.manual_zone,
+      created_at: f.created_at || '',
+    })
+  }
+  for (const e of entries) {
+    if (!e.location_anlagenummer) continue
+    put({
+      id: `entry-${e.location_anlagenummer}`,
+      anlagenummer: e.location_anlagenummer,
+      project_id: e.location_project_id || '',
+      full_address: e.location_address || '',
+      latitude: 0,
+      longitude: 0,
+      zone: e.location_zone || 1,
+      created_at: '',
+    })
+  }
+
+  return [...byNr.values()].filter(
     (loc) =>
       loc.anlagenummer.toLowerCase().includes(q) ||
       loc.project_id.toLowerCase().includes(q) ||

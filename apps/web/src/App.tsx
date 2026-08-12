@@ -109,7 +109,15 @@ export default function App() {
         }
 
         try {
-          const locations = await getSupabaseLocations()
+          let locations = await getSupabaseLocations()
+          // The shared locations table can be empty (e.g. a sync gap) while
+          // the device's own cache still holds the technician's known lifts.
+          // An empty cloud result must never wipe the store — keep the local
+          // rows so lift suggestions everywhere (wizard, search) still work.
+          if (locations.length === 0) {
+            const cached = await getLocalLocations()
+            if (cached.length > 0) locations = cached
+          }
           await cacheLocations(locations)
           setLocations(locations)
         } catch {

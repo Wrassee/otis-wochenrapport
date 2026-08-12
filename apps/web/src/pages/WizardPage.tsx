@@ -4,16 +4,10 @@ import { useTranslation } from '@/lib/useTranslation'
 import { useAppStore } from '@/stores/appStore'
 import { useTimeEntries } from '@/hooks/useTimeEntries'
 import { useShallow } from 'zustand/react/shallow'
-import {
-  getWeekDates,
-  decimalToTime,
-  findFirstOverlap,
-  findOverlappingRanges,
-  findLatestLiftEntry,
-} from '@/lib/utils'
+import { getWeekDates, decimalToTime, findFirstOverlap, findOverlappingRanges } from '@/lib/utils'
 import { DAY_NAMES } from '@/lib/translations'
 import type { TranslationKey } from '@/lib/translations'
-import type { ActivityCode, ExpenseType, TimeEntry } from '@/lib/types'
+import type { ActivityCode, ExpenseType, FavoriteLocation, Location, TimeEntry } from '@/lib/types'
 import * as localDb from '@/db/indexeddb'
 import { ensureLiftRow, geocodeAndApplyZone } from '@/lib/locationZones'
 import {
@@ -21,6 +15,7 @@ import {
   ArrowLeft,
   Check,
   Sparkles,
+  CheckCircle2,
   UtensilsCrossed,
   Clock,
   Building2,
@@ -98,6 +93,14 @@ const EXPENSE_TYPES: { type: ExpenseType; labelKey: TranslationKey }[] = [
 ]
 
 const TOTAL_DAYS = 5
+
+/**
+ * Fallback draft key — the week-scoped key is primary, but a second write
+ * keeps the latest draft under a stable key so a week-boundary or WebView
+ * storage edge case can never orphan the user's work. Restored only when the
+ * saved payload still belongs to the CURRENT week.
+ */
+const LATEST_DRAFT_KEY = 'wizard.draft.latest'
 
 /** Absence options shown after answering "No" to the worked question. */
 const ABSENCE_CODES: { code: string; labelKey: TranslationKey }[] = [
@@ -221,17 +224,51 @@ export function WizardPage() {
     setLocations,
     setFavoriteLocations,
   } = useAppStore(
-      useShallow((s) => ({
-        currentWeek: s.currentWeek,
-        dailyExpenses: s.dailyExpenses,
-        toggleExpense: s.toggleExpense,
-        activityCodes: s.activityCodes,
-        locations: s.locations,
-        timeEntries: s.timeEntries,
-        setLocations: s.setLocations,
-        setFavoriteLocations: s.setFavoriteLocations,
-      })),
-    )
+    useShallow((s) => ({
+      currentWeek: s.currentWeek,
+      dailyExpenses: s.dailyExpenses,
+      toggleExpense: s.toggleExpense,
+      activityCodes: s.activityCodes,
+      locations: s.locations,
+      timeEntries: s.timeEntries,
+      setLocations: s.setLocations,
+      setFavoriteLocations: s.setFavoriteLocations,
+    })),
+  )
+
+  // Extra lift-knowledge for the Anlagen-Nr. suggestions: the shared
+  // `locations` table can lack lifts the user has worked on before (they were
+  // never persisted as location rows, or the row was lost). The user's own
+  // favorites and past time entries carry the full details — merge all three
+  // pools so a known lift like "AEV21 Belariastrasse Z\u00fcrich" is always
+  // suggested, not just the cloud location rows.
+  const [pastEntries, setPastEntries] = useState<TimeEntry[]>([])
+  const [pastFavorites, setPastFavorites] = useState<FavoriteLocation[]>([])
+  // Local IndexedDB location rows — the store slice can be empty when the
+  // cloud locations table is empty (sync gap) while the device cache still
+  // holds the technician's known lifts with full details.
+  const [cachedLocations, setCachedLocations] = useState<Location[]>([])
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [entries, favs, cached] = await Promise.all([
+          localDb.getAllTimeEntries(),
+          localDb.getFavoriteLocations(),
+          localDb.getAllLocations(),
+        ])
+        if (cancelled) return
+        setPastEntries(entries)
+        setPastFavorites(favs)
+        setCachedLocations(cached)
+      } catch {
+        // Suggestions fall back to the store data already available.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const { addEntry, loadWeek } = useTimeEntries()
 
   // Make sure the store holds the current week's entries so the save-time
@@ -280,28 +317,52 @@ export function WizardPage() {
   // previous week's data. On a successful finish the draft is removed.
   const draftKey = `wizard.draft.${currentWeek.year}.${currentWeek.week}`
   const [hydrated, setHydrated] = useState(false)
+  /** Timestamp of the last successful draft write (shown in the header). */
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const loadedRef = useRef(false)
+
+  /** Shape stored under both the week key and the stable fallback key. */
+  interface DraftPayload {
+    week: { year: number; week: number }
+    days: DayPlan[]
+    dayIndex: number
+    phase: Phase
+    blockIndex: number
+    history: HistoryEntry[]
+    quickSetup: {
+      anlagenummer: string
+      projektnummer: string
+      adresse: string
+      days: number[]
+      lunchDuration: number | null
+    } | null
+  }
 
   useEffect(() => {
     if (loadedRef.current) return
     loadedRef.current = true
     try {
-      const raw = localStorage.getItem(draftKey)
+      // Primary: week-scoped key. Fallback: the stable "latest" key, restored
+      // only when its payload still belongs to the current week (so last week's
+      // draft can never bleed into a new week).
+      const raw =
+        localStorage.getItem(draftKey) ??
+        (() => {
+          const latestRaw = localStorage.getItem(LATEST_DRAFT_KEY)
+          if (!latestRaw) return null
+          try {
+            const latest = JSON.parse(latestRaw) as DraftPayload
+            return latest.week &&
+              latest.week.year === currentWeek.year &&
+              latest.week.week === currentWeek.week
+              ? latestRaw
+              : null
+          } catch {
+            return null
+          }
+        })()
       if (raw) {
-        const saved = JSON.parse(raw) as {
-          days: DayPlan[]
-          dayIndex: number
-          phase: Phase
-          blockIndex: number
-          history: HistoryEntry[]
-          quickSetup: {
-            anlagenummer: string
-            projektnummer: string
-            adresse: string
-            days: number[]
-            lunchDuration: number | null
-          } | null
-        }
+        const saved = JSON.parse(raw) as DraftPayload
         if (Array.isArray(saved.days) && saved.days.length === TOTAL_DAYS) {
           setDays(saved.days)
           if (typeof saved.dayIndex === 'number') setDayIndex(saved.dayIndex)
@@ -323,7 +384,8 @@ export function WizardPage() {
   // has finished (otherwise the fresh mount would overwrite the draft).
   useEffect(() => {
     if (!hydrated) return
-    const payload = {
+    const payload: DraftPayload = {
+      week: { year: currentWeek.year, week: currentWeek.week },
       days,
       dayIndex,
       phase,
@@ -332,11 +394,25 @@ export function WizardPage() {
       quickSetup,
     }
     try {
-      localStorage.setItem(draftKey, JSON.stringify(payload))
+      const json = JSON.stringify(payload)
+      localStorage.setItem(draftKey, json)
+      localStorage.setItem(LATEST_DRAFT_KEY, json)
+      setDraftSavedAt(Date.now())
     } catch {
       // Quota exceeded — draft persistence is best-effort.
     }
-  }, [draftKey, hydrated, days, dayIndex, phase, blockIndex, history, quickSetup])
+  }, [draftKey, hydrated, days, dayIndex, phase, blockIndex, history, quickSetup, currentWeek])
+
+  /** Any real content entered so far (blocks or an absence) — gates the
+   *  "Entwurf gespeichert" badge so an untouched week shows nothing. */
+  const hasDraftContent = days.some((d) => d.blocks.length > 0 || d.absenceCode)
+  const savedTimeLabel =
+    draftSavedAt != null
+      ? new Date(draftSavedAt).toLocaleTimeString(language === 'de' ? 'de-DE' : language, {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : ''
 
   const day = days[dayIndex] // undefined on the summary screen (dayIndex === TOTAL_DAYS)
   const isLastDay = dayIndex === TOTAL_DAYS - 1
@@ -373,9 +449,7 @@ export function WizardPage() {
   /** Codes selectable per lift (absence codes are day-level, chosen in the first question). */
   const liftCodes = useMemo(
     () =>
-      activityCodes.filter(
-        (c) => c.category === 'productive' || c.category === 'non_productive',
-      ),
+      activityCodes.filter((c) => c.category === 'productive' || c.category === 'non_productive'),
     [activityCodes],
   )
 
@@ -508,31 +582,61 @@ export function WizardPage() {
     setPhase(newDays.some((d) => d.quickFilled) ? 'spesenAny' : 'worked')
   }
 
-  /** Live suggestions for the quick-fill Anlagen-Nr. input. */
-  const quickAnlageSuggestionsFor = (value: string): Suggestion[] => {
+  /**
+   * Merged, deduplicated lift pool for the Anlagen-Nr. suggestions:
+   * cloud `locations` first (full rows), then the user's own favorites and
+   * past time entries filling in lifts and any empty project/address gaps.
+   */
+  const liftPool = useMemo(() => {
+    const byNr = new Map<string, { nr: string; projekt: string; adresse: string }>()
+    const put = (nr: string, projekt: string, adresse: string) => {
+      const key = nr.trim().toUpperCase()
+      if (!key) return
+      const cur = byNr.get(key)
+      if (!cur) {
+        byNr.set(key, { nr: nr.trim(), projekt: projekt || '', adresse: adresse || '' })
+        return
+      }
+      // Fill gaps only — an existing row always wins over the fallbacks.
+      if (!cur.projekt && projekt) cur.projekt = projekt
+      if (!cur.adresse && adresse) cur.adresse = adresse
+    }
+    for (const l of locations) put(l.anlagenummer, l.project_id || '', l.full_address || '')
+    for (const l of cachedLocations) put(l.anlagenummer, l.project_id || '', l.full_address || '')
+    for (const f of pastFavorites) put(f.anlagenummer, f.project_id || '', f.full_address || '')
+    for (const e of [...timeEntries, ...pastEntries]) {
+      if (e.location_anlagenummer) {
+        put(e.location_anlagenummer, e.location_project_id || '', e.location_address || '')
+      }
+    }
+    return byNr
+  }, [locations, cachedLocations, pastFavorites, pastEntries, timeEntries])
+
+  const liftMatchesFor = (value: string) => {
     const q = value.trim().toUpperCase()
     if (q.length < 1) return []
-    return locations
-      .filter((l) => l.anlagenummer.toUpperCase().includes(q))
-      .slice(0, 5)
-      .map((l) => {
-        const latest = findLatestLiftEntry(timeEntries, l.anlagenummer)
-        const projektnummer = l.project_id || latest?.location_project_id || ''
-        const adresse = l.full_address || latest?.location_address || ''
-        return {
-          label: l.anlagenummer,
-          sublabel: `${projektnummer} · ${adresse}`,
-          onSelect: () => {
-            setQuickSetup((qs) =>
-              qs
-                ? { ...qs, anlagenummer: l.anlagenummer, projektnummer, adresse }
-                : qs,
-            )
-            goTo('quickDays')
-          },
-        }
-      })
+    return [...liftPool.values()].filter((s) => s.nr.toUpperCase().includes(q)).slice(0, 6)
   }
+
+  /** Live suggestions for the quick-fill Anlagen-Nr. input. */
+  const quickAnlageSuggestionsFor = (value: string): Suggestion[] =>
+    liftMatchesFor(value).map((s) => ({
+      label: s.nr,
+      sublabel: [s.projekt, s.adresse].filter(Boolean).join(' · '),
+      onSelect: () => {
+        setQuickSetup((qs) =>
+          qs
+            ? {
+                ...qs,
+                anlagenummer: s.nr.toUpperCase(),
+                projektnummer: s.projekt,
+                adresse: s.adresse,
+              }
+            : qs,
+        )
+        goTo('quickDays')
+      },
+    }))
 
   const goTo = (p: Phase, bi?: number) => {
     pushHistory()
@@ -562,6 +666,7 @@ export function WizardPage() {
   const resetWeek = () => {
     if (!window.confirm(t('wizard.reset.confirm'))) return
     localStorage.removeItem(draftKey)
+    localStorage.removeItem(LATEST_DRAFT_KEY)
     setDays(Array.from({ length: TOTAL_DAYS }, emptyDay))
     setDayIndex(0)
     setPhase('worked')
@@ -756,6 +861,7 @@ export function WizardPage() {
       }
       // The week was saved — drop the draft so a re-entry starts fresh.
       localStorage.removeItem(draftKey)
+      localStorage.removeItem(LATEST_DRAFT_KEY)
       navigate('/dashboard')
     } catch (e) {
       console.error('Wizard save failed:', e)
@@ -766,33 +872,19 @@ export function WizardPage() {
   }
 
   /** Live suggestions for the Anlagen-Nr. input (matched against known lifts). */
-  const anlageSuggestionsFor = (value: string): Suggestion[] => {
-    const q = value.trim().toUpperCase()
-    if (q.length < 1) return []
-    return locations
-      .filter((l) => l.anlagenummer.toUpperCase().includes(q))
-      .slice(0, 5)
-      .map((l) => {
-        // Fall back to the most recent time entry for this lift when the
-        // location cache holds an empty project/address — a lift picked here
-        // always carries its full details into the plan.
-        const latest = findLatestLiftEntry(timeEntries, l.anlagenummer)
-        const projektnummer = l.project_id || latest?.location_project_id || ''
-        const adresse = l.full_address || latest?.location_address || ''
-        return {
-          label: l.anlagenummer,
-          sublabel: `${projektnummer} · ${adresse}`,
-          onSelect: () => {
-            setBlockField({
-              anlagenummer: l.anlagenummer,
-              projektnummer,
-              adresse,
-            })
-            goTo('activity')
-          },
-        }
-      })
-  }
+  const anlageSuggestionsFor = (value: string): Suggestion[] =>
+    liftMatchesFor(value).map((s) => ({
+      label: s.nr,
+      sublabel: [s.projekt, s.adresse].filter(Boolean).join(' · '),
+      onSelect: () => {
+        setBlockField({
+          anlagenummer: s.nr.toUpperCase(),
+          projektnummer: s.projekt,
+          adresse: s.adresse,
+        })
+        goTo('activity')
+      },
+    }))
 
   /** ─── Summary screen ─── */
   if (dayIndex >= TOTAL_DAYS) {
@@ -839,9 +931,7 @@ export function WizardPage() {
               ) : (
                 <div className="flex items-center gap-3 p-3.5 bg-white/10 backdrop-blur border border-white/15 rounded-2xl">
                   <Clock className="w-5 h-5 text-otis-300 flex-shrink-0" />
-                  <p className="text-sm text-white/90 font-medium">
-                    {t('wizard.summary.empty')}
-                  </p>
+                  <p className="text-sm text-white/90 font-medium">{t('wizard.summary.empty')}</p>
                 </div>
               )}
               <div className="flex items-center gap-3 p-3.5 bg-white/10 backdrop-blur border border-white/15 rounded-2xl">
@@ -1014,6 +1104,16 @@ export function WizardPage() {
             </button>
           </div>
         </div>
+        {/* Draft status — visible proof the entered week is being saved, so
+            an accidental exit never looks like data loss. */}
+        {draftSavedAt && hasDraftContent && (
+          <div className="flex items-center justify-center mb-3">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300/90">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {t('wizard.draftSaved')} · {savedTimeLabel}
+            </span>
+          </div>
+        )}
         {/* Progress bar */}
         <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
           <div
@@ -1531,9 +1631,7 @@ export function WizardPage() {
                     <span
                       className={cn(
                         'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors',
-                        active
-                          ? 'border-amber-300 bg-amber-400 text-amber-950'
-                          : 'border-white/40',
+                        active ? 'border-amber-300 bg-amber-400 text-amber-950' : 'border-white/40',
                       )}
                     >
                       {active && <Check className="w-4 h-4" />}
@@ -1763,7 +1861,10 @@ function TimeWheel({
         style={{ height: WHEEL_VISIBLE * WHEEL_ROW_H }}
       >
         {/* Center highlight band */}
-        <div className="absolute inset-x-0 bg-white/15 border-y border-white/20 pointer-events-none" style={{ top: WHEEL_ROW_H, height: WHEEL_ROW_H }} />
+        <div
+          className="absolute inset-x-0 bg-white/15 border-y border-white/20 pointer-events-none"
+          style={{ top: WHEEL_ROW_H, height: WHEEL_ROW_H }}
+        />
         <div className="absolute inset-0 flex">
           <WheelColumn items={hours} selected={hour} onSelect={setHour} />
           <WheelColumn items={minutes} selected={effectiveMinute} onSelect={setMinute} />
@@ -1877,10 +1978,7 @@ function WheelColumn({
     const scheduleSnap = () => {
       window.clearTimeout(snapTimer)
       snapTimer = window.setTimeout(() => {
-        const idx = Math.max(
-          0,
-          Math.min(items.length - 1, Math.round(el.scrollTop / WHEEL_ROW_H)),
-        )
+        const idx = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / WHEEL_ROW_H)))
         // Instant snap: the jump is at most half a row, and it avoids the
         // transient intermediate values a smooth scroll would emit.
         el.scrollTop = idx * WHEEL_ROW_H

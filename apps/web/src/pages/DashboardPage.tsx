@@ -9,7 +9,7 @@ import { useAppStore } from '@/stores/appStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
 import type { TimeEntry } from '@/lib/types'
-import { getWeekInfo } from '@/lib/utils'
+import { getWeekInfo, getWeekDates } from '@/lib/utils'
 import {
   Clock,
   ChevronLeft,
@@ -51,6 +51,8 @@ export function DashboardPage() {
   const [editEntry, setEditEntry] = useState<TimeEntry | null>(null)
   const [conflictEntryIds, setConflictEntryIds] = useState<string[]>([])
   const [showExpenseEditor, setShowExpenseEditor] = useState(false)
+  /** In-progress wizard draft for the active week (visible resume banner). */
+  const [wizardDraft, setWizardDraft] = useState<{ dayIndex: number } | null>(null)
   const syncExpensesOnClose = useExpensesSync()
 
   useEffect(() => {
@@ -58,6 +60,51 @@ export function DashboardPage() {
     // Reset conflict highlights when day changes
     setConflictEntryIds([])
   }, [currentDate, loadWeek])
+
+  // Show a resume banner when the wizard holds an unfinished draft for the
+  // active week — the draft only becomes visible after a block or absence was
+  // entered, so an untouched fresh mount never shows the banner.
+  // Mirror of the wizard's draft lookup: week key first, then the stable
+  // fallback key (only when its payload still belongs to the current week).
+  useEffect(() => {
+    try {
+      const weekRaw = localStorage.getItem(`wizard.draft.${currentWeek.year}.${currentWeek.week}`)
+      const fallbackRaw = localStorage.getItem('wizard.draft.latest')
+      const fallbackOk =
+        fallbackRaw &&
+        (() => {
+          try {
+            const latest = JSON.parse(fallbackRaw) as { week?: { year: number; week: number } }
+            return latest.week?.year === currentWeek.year && latest.week?.week === currentWeek.week
+          } catch {
+            return false
+          }
+        })()
+      const raw = weekRaw ?? (fallbackOk ? fallbackRaw : null)
+      if (!raw) {
+        setWizardDraft(null)
+        return
+      }
+      const saved = JSON.parse(raw) as { days?: unknown[]; dayIndex?: number }
+      const hasContent =
+        Array.isArray(saved.days) &&
+        saved.days.some(
+          (d) =>
+            typeof d === 'object' &&
+            d !== null &&
+            (((d as { blocks?: unknown[] }).blocks?.length ?? 0) > 0 ||
+              (d as { absenceCode?: string | null }).absenceCode),
+        )
+      // Clamp to a real weekday (dayIndex 5 = summary screen).
+      const dayIndex =
+        typeof saved.dayIndex === 'number' && saved.dayIndex >= 0 && saved.dayIndex <= 4
+          ? saved.dayIndex
+          : 0
+      setWizardDraft(hasContent ? { dayIndex } : null)
+    } catch {
+      setWizardDraft(null)
+    }
+  }, [currentWeek])
 
   const todayEntries = useMemo(
     () =>
@@ -123,13 +170,53 @@ export function DashboardPage() {
     year: 'numeric',
   })
 
+  // Day name of the day the wizard stopped at (for the resume banner).
+  const draftDayName = wizardDraft
+    ? new Date(
+        getWeekDates(currentWeek.year, currentWeek.week)[wizardDraft.dayIndex] + 'T12:00:00',
+      ).toLocaleDateString(language, { weekday: 'long' })
+    : ''
+
+  /** Discard the in-progress wizard draft (with confirmation). */
+  const discardWizardDraft = () => {
+    if (!window.confirm(t('wizard.resume.discardConfirm'))) return
+    localStorage.removeItem(`wizard.draft.${currentWeek.year}.${currentWeek.week}`)
+    localStorage.removeItem('wizard.draft.latest')
+    setWizardDraft(null)
+  }
+
   return (
     <div className="space-y-4">
+      {/* Wizard resume banner — the unfinished draft is kept, never lost */}
+      {wizardDraft && (
+        <div className="rounded-3xl border border-emerald-500/40 bg-emerald-500/10 p-4 space-y-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-emerald-500" />
+            </div>
+            <p className="font-semibold text-sm text-emerald-700 dark:text-emerald-300 leading-snug">
+              {t('wizard.resume.title', { day: draftDayName })}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => navigate('/wizard')}
+              className="flex-1 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-500/30 active:scale-[0.98] transition-all"
+            >
+              {t('wizard.resume.continue')}
+            </button>
+            <button
+              onClick={discardWizardDraft}
+              className="rounded-2xl border border-emerald-500/40 bg-white/60 dark:bg-white/10 px-4 py-2.5 text-sm font-medium text-emerald-700 dark:text-emerald-300 active:scale-[0.98] transition-all"
+            >
+              {t('wizard.resume.discard')}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Wizard entry — guided week entry */}
-      <button
-        onClick={() => navigate('/wizard')}
-        className="w-full text-left group"
-      >
+      <button onClick={() => navigate('/wizard')} className="w-full text-left group">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-otis-600 via-otis-500 to-emerald-500 p-5 shadow-lg shadow-otis-500/25 transition-all duration-300 hover:shadow-otis-500/40 hover:brightness-110 active:scale-[0.99]">
           <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
           <div className="flex items-center gap-4">
