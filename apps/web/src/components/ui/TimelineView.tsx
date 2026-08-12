@@ -282,12 +282,14 @@ export function TimelineView({
 
       {/* Fixed actions column — sits OUTSIDE the scrollport, so it can never
           cover a bar, yet every row's buttons stay permanently visible (no
-          sticky overlay on top of the timeline). Row heights match the
-          timeline rows (ruler spacer = h-7, one cell per entry). */}
+          sticky overlay on top of the timeline). The column itself is fully
+          transparent — only the buttons are visible, the page content shows
+          through behind them. Row heights match the timeline rows (ruler
+          spacer = h-7, one cell per entry). */}
       {showActions && (onEditEntry || onDeleteEntry) && (
-        <div className="flex-shrink-0 w-[84px] border-l border-otis-100/15 dark:border-white/5 bg-white/30 dark:bg-otis-900/20">
+        <div className="flex-shrink-0 w-[84px] bg-transparent">
           {/* Ruler spacer — matches the h-7 hour axis */}
-          <div className="h-7 border-b border-otis-100/15 dark:border-white/5" />
+          <div className="h-7" />
           {entries.map((entry) => (
             <div
               key={entry.id}
