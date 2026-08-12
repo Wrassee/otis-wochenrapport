@@ -114,15 +114,25 @@ export function TimelineView({
   }
 
   return (
-    <div className="select-none overflow-hidden">
-      <div className="flex items-stretch">
-        {/* Single scrollable container: ruler + content scroll together */}{' '}
-        <div
-          ref={scrollContainerRef}
-          className="flex-1 min-w-0 overflow-x-auto overscroll-x-contain timeline-scrollbar"
+    <div className="relative select-none overflow-hidden">
+      {/* Single scrollable container: ruler + content scroll together. It uses
+          the FULL card width; the action buttons float above its right edge
+          (see the absolutely-positioned overlay below). The scrollport's right
+          padding keeps the bars clear of the button column — bars can never
+          slide under the buttons, and no side panel shrinks the timeline. */}
+      <div          ref={scrollContainerRef}
+          className="overflow-x-auto overscroll-x-contain timeline-scrollbar"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-        <div style={{ minWidth: `${totalHours * 112}px` }}>
+        <div
+          style={{
+            minWidth: `${totalHours * 112}px`,
+            // Right padding on the CONTENT (not the scrollport): keeps the bars
+            // clear of the floating action column even while scrolling — bars
+            // end 84px before the content's right edge, where the buttons sit.
+            paddingRight: showActions && (onEditEntry || onDeleteEntry) ? 84 : 0,
+          }}
+        >
           {/* ⏱ Hour ruler */}
           <div className="h-7 flex items-end px-3 border-b border-otis-100/20 dark:border-white/5 flex-shrink-0">
             {hourLabels.map((hour) => (
@@ -280,26 +290,27 @@ export function TimelineView({
         </div>
       </div>
 
-      {/* Fixed actions column — sits OUTSIDE the scrollport, so it can never
-          cover a bar, yet every row's buttons stay permanently visible (no
-          sticky overlay on top of the timeline). The column itself is fully
-          transparent — only the buttons are visible, the page content shows
-          through behind them. Row heights match the timeline rows (ruler
-          spacer = h-7, one cell per entry). */}
+      {/* Floating action column — pinned to the card's RIGHT edge, hovering
+          OVER the scrollport (not beside it): the timeline keeps the FULL card
+          width, so nothing is shrunk or covered by a side panel. The column is
+          fully transparent and pointer-events-none — only the buttons
+          themselves are clickable. The scrollport's right padding (see above)
+          keeps bars clear of the button zone, so buttons never cover bars or
+          labels. Row-aligned: ruler spacer = h-7, one cell per entry. */}
       {showActions && (onEditEntry || onDeleteEntry) && (
-        <div className="flex-shrink-0 w-[84px] bg-transparent">
+        <div className="absolute right-0 top-0 bottom-0 w-[84px] flex flex-col pointer-events-none bg-transparent">
           {/* Ruler spacer — matches the h-7 hour axis */}
-          <div className="h-7" />
+          <div className="h-7 shrink-0" />
           {entries.map((entry) => (
             <div
               key={entry.id}
-              className="flex items-center justify-center gap-1 px-1"
+              className="flex items-center justify-center gap-1 shrink-0 pointer-events-none"
               style={{ minHeight: ROW_HEIGHT }}
             >
               {onEditEntry && (
                 <button
                   onClick={() => onEditEntry(entry)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center bg-otis-600 hover:bg-otis-700 text-white shadow-sm transition-all active:scale-90"
+                  className="pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center bg-otis-600 hover:bg-otis-700 text-white shadow-md transition-all active:scale-90"
                   title={t('timeline.edit')}
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -308,7 +319,7 @@ export function TimelineView({
               {onDeleteEntry && (
                 <button
                   onClick={() => onDeleteEntry(entry.id)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white shadow-sm transition-all active:scale-90"
+                  className="pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white shadow-md transition-all active:scale-90"
                   title={t('timeline.delete')}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -318,7 +329,6 @@ export function TimelineView({
           ))}
         </div>
       )}
-      </div>
     </div>
   )
 }
