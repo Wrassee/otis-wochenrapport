@@ -34,6 +34,28 @@ export function WeeklyPage() {
   // page can no longer be frozen by it.
   const [weekLoading, setWeekLoading] = useState(false)
 
+  // Is there an unfinished wizard draft for the currently VIEWED week? The
+  // wizard persists to a week-scoped key (plus a stable fallback that is only
+  // restored when it still belongs to the current week) — mirror that check so
+  // the "Continue draft in wizard" button shows exactly when re-entering the
+  // wizard would actually restore something.
+  const [hasWizardDraft, setHasWizardDraft] = useState(false)
+  useEffect(() => {
+    const weekKey = `wizard.draft.${currentWeek.year}.${currentWeek.week}`
+    const latestRaw = localStorage.getItem('wizard.draft.latest')
+    let fromLatest = false
+    if (latestRaw) {
+      try {
+        const parsed = JSON.parse(latestRaw) as { week?: { year: number; week: number } }
+        fromLatest =
+          parsed.week?.year === currentWeek.year && parsed.week?.week === currentWeek.week
+      } catch {
+        fromLatest = false
+      }
+    }
+    setHasWizardDraft(Boolean(localStorage.getItem(weekKey)) || fromLatest)
+  }, [currentWeek])
+
   const handleLoadWeek = useCallback(async () => {
     setWeekLoading(true)
     try {
@@ -124,6 +146,8 @@ export function WeeklyPage() {
         onDeleteEntry={handleDeleteEntry}
         onEditEntry={handleEditEntry}
         onEditDay={handleEditDay}
+        hasWizardDraft={hasWizardDraft}
+        onContinueWizard={() => navigate('/wizard')}
       />
 
       {/* Week's receipt photos (Spesen Belege) — compact strip */}

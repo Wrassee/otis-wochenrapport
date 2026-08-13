@@ -1990,6 +1990,20 @@ export const translations = {
     hu: '{day}. nap a {total}-b\u00f3l',
     en: 'Day {day} of {total}',
   },
+  'wizard.jumpToWeek': {
+    de: 'Zur Wochenansicht springen',
+    fr: 'Aller \u00e0 la vue hebdomadaire',
+    it: 'Vai alla vista settimanale',
+    hu: 'Ugr\u00e1s a heti n\u00e9zethez',
+    en: 'Go to week view',
+  },
+  'wizard.continueFromWeek': {
+    de: 'Entwurf im Assistenten fortsetzen',
+    fr: 'Continuer le brouillon dans l\u2019assistant',
+    it: 'Continua la bozza nell\u2019assistente',
+    hu: 'Piszkozat folytat\u00e1sa a var\u00e1zsl\u00f3ban',
+    en: 'Continue draft in wizard',
+  },
   'wizard.worked': {
     de: 'Hast du am {day} gearbeitet?',
     fr: 'As-tu travaill\u00e9 le {day}?',

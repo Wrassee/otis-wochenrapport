@@ -920,6 +920,21 @@ export function WizardPage() {
               </p>
             </div>
 
+            {/* Clickable week badge — opens the Woche page for this week, so
+                the technician can review the filled days before finishing. */}
+            <div className="flex justify-center mb-6">
+              <button
+                onClick={() => navigate('/weekly')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/15 text-white/85 text-sm font-semibold hover:bg-white/20 hover:text-white transition-all active:scale-95"
+                title={t('wizard.jumpToWeek')}
+                aria-label={t('wizard.jumpToWeek')}
+              >
+                <CalendarDays className="w-4 h-4 text-otis-300" />
+                {t('week.title', { number: currentWeek.week })} · {shortDate(dates[0])} –{' '}
+                {shortDate(dates[dates.length - 1])}
+              </button>
+            </div>
+
             <div className="space-y-3 mb-7">
               {entryCount > 0 ? (
                 <div className="flex items-center gap-3 p-3.5 bg-white/10 backdrop-blur border border-white/15 rounded-2xl">
@@ -1079,9 +1094,15 @@ export function WizardPage() {
               {t('wizard.dayProgress', { day: dayIndex + 1, total: TOTAL_DAYS })}
             </span>
             {!WEEK_LEVEL_PHASES.includes(phase) && (
-              <span className="inline-flex items-center px-2.5 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/15 text-xs">
+              <button
+                onClick={() => navigate('/weekly')}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/15 text-xs text-white/80 hover:bg-white/20 hover:text-white transition-all active:scale-95"
+                title={t('wizard.jumpToWeek')}
+                aria-label={t('wizard.jumpToWeek')}
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
                 {dayNames[dayIndex]}, {shortDate(dates[dayIndex])}
-              </span>
+              </button>
             )}
           </div>
           <div className="flex items-center gap-2">

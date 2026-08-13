@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   BarChart3,
+  Sparkles,
 } from 'lucide-react'
 import { formatDateShort } from '@/lib/utils'
 import { cn } from '@/lib/cn'
@@ -25,6 +26,10 @@ interface WeekOverviewProps {
   onEditEntry?: (entry: TimeEntry) => void
   /** Jump to the Erfassung page with a day pre-selected. */
   onEditDay?: (date: string) => void
+  /** True when the wizard holds an unfinished draft for this week. */
+  hasWizardDraft?: boolean
+  /** Continue the wizard draft for this week. */
+  onContinueWizard?: () => void
 }
 
 export function WeekOverview({
@@ -34,6 +39,8 @@ export function WeekOverview({
   onDeleteEntry,
   onEditEntry,
   onEditDay,
+  hasWizardDraft = false,
+  onContinueWizard,
 }: WeekOverviewProps) {
   const { t } = useTranslation()
   const dailyExpenses = useAppStore((s) => s.dailyExpenses)
@@ -80,6 +87,19 @@ export function WeekOverview({
             <ChevronRight className="w-5 h-5 text-otis-700 dark:text-otis-300" />
           </button>
         </div>
+
+        {/* Continue an unfinished wizard draft for this week — only when a
+            draft actually exists (same week-scoped key check as the wizard's
+            restore logic). */}
+        {hasWizardDraft && onContinueWizard && (
+          <button
+            onClick={onContinueWizard}
+            className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-otis-500 to-otis-600 text-white text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-otis-500/25 hover:brightness-110 active:scale-[0.98] transition-all"
+          >
+            <Sparkles className="w-4 h-4" />
+            {t('wizard.continueFromWeek')}
+          </button>
+        )}
       </Card>
 
       {/* Overall status */}
