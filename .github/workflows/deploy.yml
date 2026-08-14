@@ -28,8 +28,17 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      # npm run build runs: tsc -b && vite build (includes type-check)
+      # npm run build runs: tsc -b && vite build (includes type-check).
+      # The VITE_* values come from repo secrets when set — they make check:env
+      # validate the REAL values on every push (catches a bad secret before
+      # Vercel builds). Without secrets the build still passes as a compile
+      # check (check:env downgrades missing values to warnings in CI).
       - name: Build (TypeScript + Vite + PWA)
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_RENDER_URL: ${{ secrets.VITE_RENDER_URL }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         run: npm run build
 
   # ─── Backend: Python syntax + dependencies ───
@@ -181,9 +190,29 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      # npm run build runs: tsc -b && vite build (includes type-check + PWA)
+      # npm run build runs: tsc -b && vite build (includes type-check + PWA).
+      # The APK bundle MUST contain the real Supabase/Sentry config — without
+      # it the app would white-screen. Values come from repo secrets.
       - name: Build web app (TypeScript + Vite + PWA)
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_RENDER_URL: ${{ secrets.VITE_RENDER_URL }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         run: npm run build
+
+      # Never publish an unusable APK: if the Supabase secrets are missing, the
+      # bundle would boot to a white screen — skip the release in that case.
+      - name: Check APK env
+        id: check-apk-env
+        run: |
+          if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ] || [ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
+            echo "! GitHub secrets VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY not set — the APK bundle would be unusable (white screen)"
+            echo "  Add them: repo Settings > Secrets and variables > Actions"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Sync Capacitor assets
         run: npx cap sync android
@@ -215,6 +244,7 @@ jobs:
       # scheme) was done manually — those tags are gone, so no cleanup step
       # is needed anymore.
       - name: Create/Update Draft Release (rolling apk-latest)
+        if: steps.check-apk-env.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-latest

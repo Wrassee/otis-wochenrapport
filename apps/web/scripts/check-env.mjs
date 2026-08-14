@@ -30,6 +30,15 @@ if (skip) {
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url))) // apps/web
 
+// GitHub Actions sets CI=true + GITHUB_ACTIONS=true. In CI the repo checkout
+// has no .env files (gitignored) and no process VITE_* vars, so the required
+// values are EXPECTED to be missing — the CI build is a compile check only
+// (the real production bundle is built by Vercel with its own env, and the
+// APK job below receives the values from repo secrets). Missing required
+// values become warnings there instead of hard failures; placeholders and
+// invalid values still fail everywhere.
+const isCi = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true'
+
 // ── Load .env files with Vite precedence (lowest → highest) ────────────────
 const envFiles = ['.env', '.env.local', '.env.production', '.env.production.local']
 
@@ -91,9 +100,15 @@ for (const [name, rule] of Object.entries(RULES)) {
 
   if (!value) {
     if (rule.required) {
-      errors.push(
-        `${name} is missing or empty. The app cannot boot without it. Set it in .env / Vercel Environment Variables.`,
-      )
+      if (isCi) {
+        warnings.push(
+          `${name} is missing in CI (no .env, no process env) — compile-only check, skipping the hard requirement.`,
+        )
+      } else {
+        errors.push(
+          `${name} is missing or empty. The app cannot boot without it. Set it in .env / Vercel Environment Variables.`,
+        )
+      }
     } else {
       warnings.push(
         `${name} is missing or empty — the export falls back to http://localhost:8000 (fine locally, wrong in production).`,
