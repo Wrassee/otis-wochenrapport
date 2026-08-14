@@ -6,7 +6,7 @@ Provides endpoints for generating Excel files and sending emails.
 import os
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -329,6 +329,69 @@ async def _fetch_profile_from_supabase(user_id: str) -> Optional[dict]:
     except Exception as e:
         print(f"Failed to fetch profile: {e}")
         return None
+
+
+# ===================== Account Deletion =====================
+
+@app.post("/delete-account")
+async def delete_account_endpoint(authorization: str = Header(default="")):
+    """
+    Permanently delete the caller's account and ALL of their data.
+
+    The JWT from the Authorization header is verified against Supabase; the
+    identified auth user is then deleted with the service key. Every
+    user-scoped table references profiles(id) ON DELETE CASCADE, so the whole
+    dataset (entries, expenses, photos, favorites, settings) is removed by the
+    database itself. The shared tables (locations, activity_codes) are NOT
+    touched — they belong to the whole team.
+    """
+    try:
+        from supabase import create_client
+
+        supabase_url = os.getenv("SUPABASE_URL", "")
+        supabase_key = os.getenv("SUPABASE_SERVICE_KEY", "")
+        if not supabase_url or not supabase_key:
+            raise HTTPException(status_code=503, detail="Supabase not configured on the server")
+
+        token = authorization[7:].strip() if authorization.startswith("Bearer ") else authorization.strip()
+        if not token:
+            raise HTTPException(status_code=401, detail="Missing authorization token")
+
+        client = create_client(supabase_url, supabase_key)
+
+        # Verify the token and resolve the user id.
+        try:
+            user = client.auth.get_user(token)
+        except Exception as e:
+            raise HTTPException(status_code=401, detail=f"Invalid or expired token: {e}")
+
+        user_id = user.user.id
+
+        # Explicitly remove the user's rows first (defensive — the DB cascade
+        # would do it anyway when the auth user is deleted). profiles is keyed
+        # by id (= auth user id); the rest by user_id.
+        client.table("profiles").delete().eq("id", user_id).execute()
+        for table in (
+            "time_entries",
+            "user_settings",
+            "user_favorites",
+            "daily_expenses",
+            "expense_photos",
+        ):
+            try:
+                client.table(table).delete().eq("user_id", user_id).execute()
+            except Exception as e:
+                print(f"Failed to delete rows from {table}: {e}")
+
+        # Finally remove the auth user itself (cascades the rest if anything
+        # was missed above).
+        client.auth.admin.delete_user(user_id)
+        return {"success": True, "user_id": user_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Account deletion failed: {str(e)}")
 
 
 # ===================== Main Entry Point =====================

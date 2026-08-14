@@ -426,6 +426,41 @@ Details:
 
 ---
 
+## Auth: Password Reset & Account Deletion
+
+**Password reset** (`/reset-password`, `src/pages/ResetPasswordPage.tsx`):
+
+1. The login form links to `/reset-password` → the user enters their e-mail →
+   `supabase.auth.resetPasswordForEmail(email, { redirectTo: origin + '/reset-password' })`.
+2. The e-mail link lands back on `/reset-password`; supabase-js picks up the
+   **recovery session** from the URL fragment (`type=recovery`) and the page
+   shows the new-password form → `updatePassword()`.
+
+> **Supabase dashboard requirement:** both the site URL (`Authentication →
+> URL Configuration → Site URL`) and the redirect URL
+> `https://otis-wochenrapport.vercel.app/reset-password` (and
+> `http://localhost:5173/reset-password` for dev) must be allowlisted, or the
+> reset e-mail hard-fails on the unknown redirect target.
+
+Note: `/reset-password` is deliberately **not** wrapped in `PublicRoute` — a
+recovery session would otherwise redirect to `/dashboard` before the new
+password could be entered.
+
+**Data export & account deletion** (Settings → Data):
+
+- *Export* is fully client-side: every IndexedDB store (profile, locations,
+  favorites, time entries, daily expenses, expense photos, activity codes) is
+  serialized into one JSON file and downloaded.
+- *Deletion* goes through `POST /delete-account` on the backend (service
+  key): the caller's JWT is verified, user-scoped rows are removed, and the
+  auth user is deleted — the DB's `ON DELETE CASCADE` chains (auth.users →
+  profiles → time_entries/user_settings/user_favorites/daily_expenses/
+  expense_photos) guarantee a full wipe. The shared `locations` /
+  `activity_codes` tables are never touched. The device then clears its own
+  IndexedDB and session.
+
+---
+
 ## State Management Pattern
 
 The app uses **Zustand** for global state. Each data type follows the same pattern:

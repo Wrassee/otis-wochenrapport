@@ -6,8 +6,10 @@ import { Badge } from '@/components/ui/Badge'
 import { useAppStore } from '@/stores/appStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '@/lib/useTranslation'
-import { upsertProfile } from '@/db/supabase'
+import { upsertProfile, supabase, signOut } from '@/db/supabase'
 import * as localDb from '@/db/indexeddb'
+import { reportError } from '@/lib/sentry'
+import { Input } from '@/components/ui/Input'
 import { geocodeAndApplyZone, locationsMissingZone } from '@/lib/locationZones'
 import { geocodeAddress } from '@/lib/geocode'
 import { REFERENCE_LAT, REFERENCE_LON } from '@/lib/constants'
@@ -38,10 +40,11 @@ import {
   Sun,
   Moon,
   Monitor,
+  Download,
+  UserX,
 } from 'lucide-react'
 import { forceSync } from '@/db/sync'
 import { useNavigate } from 'react-router-dom'
-import { signOut } from '@/db/supabase'
 import { cn } from '@/lib/cn'
 import {
   scheduleMondayReminder,
@@ -68,6 +71,13 @@ export function SettingsPage() {
   const [notificationEnabled, setNotificationEnabled] = useState(false)
   const [notificationLoading, setNotificationLoading] = useState(false)
   const [notificationError, setNotificationError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportDone, setExportDone] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [deleteArmed, setDeleteArmed] = useState(false)
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     isReminderScheduled().then(setNotificationEnabled)
@@ -120,6 +130,97 @@ export function SettingsPage() {
     setUser(null)
     setProfile(null)
     navigate('/login')
+  }
+
+  /**
+   * Download every piece of the user's data as a JSON file — the device is
+   * the offline-first source of truth, so IndexedDB holds the full picture
+   * (profile, lifts, favorites, entries, expenses, receipt photos).
+   */
+  const handleExportData = async () => {
+    setExporting(true)
+    setExportError(null)
+    setExportDone(false)
+    try {
+      const [profile, locations, favorites, entries, expenses, photos, codes] = await Promise.all([
+        localDb.getLocalProfile(),
+        localDb.getAllLocations(),
+        localDb.getFavoriteLocations(),
+        localDb.getAllTimeEntries(),
+        localDb.getDailyExpenses(),
+        localDb.getAllExpensePhotos(),
+        localDb.getActivityCodes(),
+      ])
+      const payload = {
+        app: 'OTIS Wochenrapport',
+        exportedAt: new Date().toISOString(),
+        user: user ? { id: user.id, email: user.email } : null,
+        profile,
+        locations,
+        favoriteLocations: favorites,
+        timeEntries: entries,
+        dailyExpenses: expenses,
+        expensePhotos: photos,
+        activityCodes: codes,
+      }
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: 'application/json',
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `otis-daten-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      setExportDone(true)
+    } catch (err) {
+      console.error('Data export failed:', err)
+      setExportError(t('settings.data.export.error'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  /**
+   * Permanently delete the account: the backend (service key) removes the
+   * auth user — the DB cascades wipe every user-scoped row — then this device
+   * clears its own IndexedDB + session and lands on the login screen.
+   */
+  const handleDeleteAccount = async () => {
+    if (!user) return
+    if (deleteConfirmEmail.trim().toLowerCase() !== (user.email || '').toLowerCase()) {
+      setDeleteError(t('settings.data.delete.confirm.mismatch'))
+      return
+    }
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      const session = await supabase.auth.getSession()
+      const token = session.data.session?.access_token
+      const res = await fetch(`${import.meta.env.VITE_RENDER_URL}/delete-account`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ user_id: user.id }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.detail || `HTTP ${res.status}`)
+      }
+      // Account gone — wipe local data + session, then land on login.
+      await supabase.auth.signOut().catch(() => {})
+      await localDb.clearAllUserData().catch(() => {})
+      window.location.href = '/login'
+    } catch (err) {
+      console.error('Account deletion failed:', err)
+      reportError(err)
+      setDeleteError(t('settings.data.delete.error'))
+      setDeleting(false)
+    }
   }
 
   const toggleNotification = async () => {
@@ -320,6 +421,126 @@ export function SettingsPage() {
           <RefreshCw className={cn('w-4 h-4', syncStatus.syncing && 'animate-spin')} />
           {syncStatus.syncing ? t('settings.syncing') : t('settings.sync.now')}
         </Button>
+      </Card>
+
+      {/* Data export */}
+      <Card>
+        <div className="flex items-center gap-2.5 mb-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <Download className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <CardTitle>{t('settings.data.title')}</CardTitle>
+            <p className="text-[10px] text-gray-500 dark:text-stone-200">
+              {t('settings.data.subtitle')}
+            </p>
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-600 dark:text-stone-200 mb-4">
+          {t('settings.data.export.desc')}
+        </p>
+
+        {exportDone && (
+          <div className="flex items-start gap-2 p-3 bg-emerald-50/80 dark:bg-emerald-900/20 backdrop-blur rounded-2xl border border-emerald-200/60 dark:border-emerald-700/40 mb-4">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />
+            <p className="text-xs text-emerald-600 dark:text-emerald-300">
+              {t('settings.data.export.done')}
+            </p>
+          </div>
+        )}
+        {exportError && (
+          <div className="flex items-start gap-2 p-3 bg-red-50/80 dark:bg-red-900/20 backdrop-blur rounded-2xl border border-red-200/60 dark:border-red-700/40 mb-4">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
+            <p className="text-xs text-red-500">{exportError}</p>
+          </div>
+        )}
+
+        <Button onClick={handleExportData} variant="secondary" fullWidth disabled={exporting}>
+          <Download className="w-4 h-4" />
+          {exporting ? t('settings.data.export.exporting') : t('settings.data.export.button')}
+        </Button>
+      </Card>
+
+      {/* Delete account */}
+      <Card variant="outline">
+        <div className="flex items-center gap-2.5 mb-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/20">
+            <AlertTriangle className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <CardTitle>{t('settings.data.delete.title')}</CardTitle>
+            <p className="text-[10px] text-gray-500 dark:text-stone-200">
+              {t('settings.data.delete.subtitle')}
+            </p>
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-600 dark:text-stone-200 mb-4">
+          {t('settings.data.delete.desc')}
+        </p>
+
+        {!deleteArmed ? (
+          <Button
+            onClick={() => {
+              setDeleteArmed(true)
+              setDeleteError(null)
+            }}
+            variant="danger"
+            fullWidth
+          >
+            <Trash2 className="w-4 h-4" />
+            {t('settings.data.delete.button')}
+          </Button>
+        ) : (
+          <div className="space-y-3 p-3.5 bg-red-50/60 dark:bg-red-900/10 rounded-2xl border border-red-200/50 dark:border-red-700/30">
+            <p className="text-xs text-red-600 dark:text-red-300 font-medium">
+              {t('settings.data.delete.confirm.desc')}
+            </p>
+            <Input
+              id="delete-confirm-email"
+              label={t('settings.data.delete.confirm.label')}
+              type="email"
+              placeholder={user?.email || ''}
+              value={deleteConfirmEmail}
+              onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+              autoComplete="off"
+            />
+            {deleteError && (
+              <div className="flex items-start gap-2 p-3 bg-red-50/80 dark:bg-red-900/20 rounded-2xl border border-red-200/60 dark:border-red-700/40">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
+                <p className="text-xs text-red-500">{deleteError}</p>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <Button
+                onClick={() => {
+                  setDeleteArmed(false)
+                  setDeleteConfirmEmail('')
+                  setDeleteError(null)
+                }}
+                variant="secondary"
+                fullWidth
+                disabled={deleting}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button onClick={handleDeleteAccount} variant="danger" fullWidth disabled={deleting}>
+                {deleting ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    {t('settings.data.delete.deleting')}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <UserX className="w-4 h-4" />
+                    {t('settings.data.delete.confirm.button')}
+                  </span>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* App Info */}
@@ -581,9 +802,7 @@ function LiftZoneManager() {
       let effectiveZone = manualZone ?? 0
       if (!manualZone) {
         const allLocs = await localDb.getAllLocations()
-        const loc = allLocs.find(
-          (l) => l.anlagenummer.toUpperCase() === anlagenummer.toUpperCase(),
-        )
+        const loc = allLocs.find((l) => l.anlagenummer.toUpperCase() === anlagenummer.toUpperCase())
         if (loc && Number(loc.latitude) && Number(loc.longitude)) {
           effectiveZone = zoneForCoordinates(loc.latitude, loc.longitude)
         }
@@ -846,9 +1065,7 @@ function LiftZoneManager() {
                 className="h-full rounded-full bg-gradient-to-r from-indigo-400 to-indigo-600 transition-all duration-300"
                 style={{
                   width: `${
-                    geoProgress.total > 0
-                      ? (geoProgress.done / geoProgress.total) * 100
-                      : 0
+                    geoProgress.total > 0 ? (geoProgress.done / geoProgress.total) * 100 : 0
                   }%`,
                 }}
               />
@@ -1170,7 +1387,9 @@ function LiftZoneManager() {
                   {/* Zone badge + edit button — Z0 (auto/unknown) is shown as 'Auto' */}
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <Badge variant={lift.isManual ? 'warning' : 'zone'} size="sm">
-                      {lift.effectiveZone > 0 ? `Z${lift.effectiveZone}` : t('lifts.zone.auto.short')}
+                      {lift.effectiveZone > 0
+                        ? `Z${lift.effectiveZone}`
+                        : t('lifts.zone.auto.short')}
                       {lift.isManual && (
                         <span className="ml-0.5 text-[9px] text-amber-600 dark:text-amber-300">
                           &bull;
@@ -1346,7 +1565,9 @@ function HomeZoneCard() {
           <p
             className={cn(
               'text-xs font-medium',
-              feedback.ok ? 'text-emerald-600 dark:text-emerald-300' : 'text-red-600 dark:text-red-300',
+              feedback.ok
+                ? 'text-emerald-600 dark:text-emerald-300'
+                : 'text-red-600 dark:text-red-300',
             )}
           >
             {feedback.msg}

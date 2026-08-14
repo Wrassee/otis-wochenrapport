@@ -187,6 +187,7 @@ export function LoginPage() {
           setRegistered(false)
           setMode('register')
         }}
+        onForgotPassword={() => navigate('/reset-password')}
         error={error}
       />
     )

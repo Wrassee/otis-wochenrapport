@@ -7,10 +7,16 @@ import { useTranslation } from '@/lib/useTranslation'
 interface LoginFormProps {
   onLogin: (email: string, password: string) => Promise<void>
   onSwitchToRegister: () => void
+  onForgotPassword: () => void
   error?: string | null
 }
 
-export function LoginForm({ onLogin, onSwitchToRegister, error }: LoginFormProps) {
+export function LoginForm({
+  onLogin,
+  onSwitchToRegister,
+  onForgotPassword,
+  error,
+}: LoginFormProps) {
   const { t } = useTranslation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -90,6 +96,16 @@ export function LoginForm({ onLogin, onSwitchToRegister, error }: LoginFormProps
                 <p className="text-sm text-red-300 font-medium">{error}</p>
               </div>
             )}
+
+            <div className="text-right -mt-1">
+              <button
+                type="button"
+                onClick={onForgotPassword}
+                className="text-xs text-otis-200/70 hover:text-white transition-colors underline underline-offset-2"
+              >
+                {t('auth.forgot.password')}
+              </button>
+            </div>
 
             <Button type="submit" fullWidth disabled={loading} size="lg" variant="primary" glow>
               {loading ? (

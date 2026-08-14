@@ -92,6 +92,30 @@ export async function signOut() {
 }
 
 /**
+ * Request a password-reset e-mail. The link lands on /reset-password, where
+ * the recovery session lets the user choose a new password. The redirect
+ * target must be on the Supabase dashboard's allowlist (Authentication → URL
+ * Configuration → Redirect URLs) — same as the signup confirmation link.
+ */
+export async function resetPassword(email: string) {
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: getEmailRedirectTo() + '/reset-password',
+  })
+  if (error) throw error
+  return data
+}
+
+/**
+ * Set a new password. Only valid inside a recovery session (i.e. after the
+ * user clicked the reset link from the e-mail).
+ */
+export async function updatePassword(newPassword: string) {
+  const { data, error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw error
+  return data
+}
+
+/**
  * Get user profile
  */
 export async function getProfile(userId: string) {

@@ -8,6 +8,7 @@ import { WeeklyPage } from '@/pages/WeeklyPage'
 import { ExportPage } from '@/pages/ExportPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { WizardPage } from '@/pages/WizardPage'
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { useAppStore } from '@/stores/appStore'
 import { useShallow } from 'zustand/react/shallow'
 import { getCurrentSession } from '@/db/supabase'
@@ -223,6 +224,11 @@ export default function App() {
               </PublicRoute>
             }
           />
+
+          {/* Password reset — NOT wrapped in PublicRoute: the recovery link
+              creates a (recovery) session, and PublicRoute would redirect to
+              /dashboard before the new password could be entered. */}
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           <Route
             path="/dashboard"

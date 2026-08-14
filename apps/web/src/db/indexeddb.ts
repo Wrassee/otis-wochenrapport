@@ -628,3 +628,31 @@ export async function deleteExpensePhoto(id: string): Promise<void> {
   const db = await getDb()
   await db.delete('expense_photos', id)
 }
+
+/**
+ * ALL expense photos across every week (newest first) — used by the Settings
+ * data export.
+ */
+export async function getAllExpensePhotos(): Promise<ExpensePhoto[]> {
+  const db = await getDb()
+  const all = await db.getAll('expense_photos')
+  return all.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+}
+
+/**
+ * Wipe every object store — used after a full account deletion so no
+ * personal data survives on the device.
+ */
+export async function clearAllUserData(): Promise<void> {
+  const db = await getDb()
+  const stores = [
+    'time_entries',
+    'locations',
+    'profile',
+    'activity_codes',
+    'favorites',
+    'sync_queue',
+    'expense_photos',
+  ]
+  await Promise.all(stores.map((store) => db.clear(store)))
+}
