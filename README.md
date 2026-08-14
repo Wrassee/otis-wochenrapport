@@ -16,6 +16,7 @@ auch ohne Internet in der Liftgrube.
 |---|---|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Systemarchitektur, Layer-Modell, Datenflüsse, CI/CD, Umgebungsvariablen |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Entwickler-Guide, Code-Beispiele, drei-Layer-Muster, Übersetzungen |
+| [SENTRY_SETUP.md](./SENTRY_SETUP.md) | Sentry-Einrichtung Schritt für Schritt (Konto, DSNs in Vercel + Render) — auf Ungarisch |
 
 ---
 
