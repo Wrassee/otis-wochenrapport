@@ -1,0 +1,81 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      # The E2E suite runs against the REAL hosted Supabase with a throwaway
+      # user (created/removed through the admin API). Without the service key
+      # the suite cannot run — skip instead of failing, mirroring the Vercel
+      # deploy job's pattern. Add these repo secrets to enable it:
+      #   SUPABASE_URL            (https://xxx.supabase.co)
+      #   SUPABASE_ANON_KEY       (publishable/anon key — public by design)
+      #   SUPABASE_SERVICE_KEY    (service role key — SECRET, never in the bundle)
+      - name: Check Supabase secrets
+        id: check
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_KEY }}" ]; then
+            echo "! SUPABASE_URL / SUPABASE_SERVICE_KEY not set — skipping E2E"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.check.outputs.skip != 'true'
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Playwright browser
+        if: steps.check.outputs.skip != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare web env
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          cat > .env <<EOF
+          VITE_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          EOF
+          cat > .env.production <<EOF
+          VITE_RENDER_URL=http://localhost:8000
+          EOF
+
+      - name: Prepare backend env
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          mkdir -p ../backend
+          cat > ../backend/.env <<EOF
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+          EOF
+
+      - name: Run E2E tests
+        if: steps.check.outputs.skip != 'true'
+        run: npx playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure() && steps.check.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7

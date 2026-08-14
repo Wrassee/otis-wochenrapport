@@ -84,7 +84,13 @@ export function LoginPage() {
       if (data.user) {
         setUser({ id: data.user.id, email: data.user.email || '' })
         await initialize(data.user.id)
-        navigate('/dashboard')
+        // Guard: as soon as the session arrives, PublicRoute already redirects
+        // /login → /dashboard. A slow initialize() (its Supabase calls carry
+        // 8s timeouts) may finish SECONDS later — navigating then would yank
+        // the user out of whatever screen they moved to (e.g. the wizard).
+        if (window.location.pathname.startsWith('/login')) {
+          navigate('/dashboard')
+        }
       }
     } catch (err: any) {
       // Surface the REAL error to the console — the friendly message below
@@ -157,7 +163,12 @@ export function LoginPage() {
           updated_at: new Date().toISOString(),
         })
         await initialize(user.id)
-        navigate('/settings')
+        // Same guard as handleLogin: only navigate when still on the auth
+        // screen, so a slow initialize cannot redirect away from a page the
+        // user already reached.
+        if (window.location.pathname.startsWith('/login')) {
+          navigate('/settings')
+        }
       }
     } catch (err: any) {
       console.error('Register failed — raw error:', err)

@@ -12,6 +12,8 @@
     "dev:docker:backend": "cd .. && docker compose -f docker-compose.backend.yml up -d",
     "dev:docker:backend:stop": "cd .. && docker compose -f docker-compose.backend.yml down",
     "check:env": "node scripts/check-env.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "build": "npm run check:env && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
@@ -43,6 +45,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
