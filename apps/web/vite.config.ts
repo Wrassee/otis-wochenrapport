@@ -14,6 +14,11 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
+      // NOTE: with the injectManifest strategy the `workbox` option is inert
+      // (no automatic runtime caching) — all caching lives in src/sw.ts, which
+      // precaches the app shell (index.html, hashed bundles, the Excel
+      // template) and deliberately leaves API calls (Supabase / Render) on the
+      // network, because the app has its own IndexedDB sync layer.
       includeAssets: ['favicon.svg', 'icons.svg', 'templates/template.xlsx'],
       manifest: {
         name: 'OTIS Wochenrapport',
@@ -27,22 +32,6 @@ export default defineConfig({
         icons: [
           { src: '/favicon.svg', sizes: '192x192', type: 'image/svg+xml' },
           { src: '/favicon.svg', sizes: '512x512', type: 'image/svg+xml' },
-        ],
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/[a-z]+\.supabase\.co\/rest\/v1\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'supabase-api-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 7,
-              },
-            },
-          },
         ],
       },
     }),

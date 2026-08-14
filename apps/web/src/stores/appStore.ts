@@ -1268,7 +1268,9 @@ export const useAppStore = create<AppState>((set, get) => ({
                 manual_zone:
                   rec?.manual_zone != null ? Number(rec.manual_zone) : existing?.manual_zone,
                 use_count: Math.max(Number(rec?.use_count) || 1, existing?.use_count || 1),
-                last_used: String(rec?.last_used || existing?.last_used || new Date().toISOString()),
+                last_used: String(
+                  rec?.last_used || existing?.last_used || new Date().toISOString(),
+                ),
               }
               return localDb.saveFavoriteLocation(fav).then(() => localDb.getFavoriteLocations())
             })

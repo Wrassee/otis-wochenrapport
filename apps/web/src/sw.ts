@@ -13,9 +13,105 @@
 declare const self: ServiceWorkerGlobalScope
 
 // InjectManifest injection point — DO NOT REMOVE
-// This line is replaced at build time with the precache manifest
-// eslint-disable-next-line @typescript-eslint/no-unused-expressions
-;(self as unknown as { __WB_MANIFEST: unknown[] }).__WB_MANIFEST
+// This line is replaced at build time with the precache manifest. Workbox
+// matches the COMPILED `self.__WB_MANIFEST` (the TS type assertion is erased
+// at build time) and must find it EXACTLY once — so this is the ONLY place
+// in the file that touches __WB_MANIFEST; everything else reads WB_MANIFEST.
+const WB_MANIFEST: unknown[] = (self as unknown as { __WB_MANIFEST: unknown[] }).__WB_MANIFEST
+
+// ── Offline app shell (precache + cache-first) ─────────────────────────────
+// The app's data lives in IndexedDB (offline-first), so the SW only needs to
+// serve the SHELL — index.html + the hashed JS/CSS bundles + the Excel
+// template — from cache when the network is down. API calls (Supabase, the
+// Render backend) are deliberately NEVER cached: the app has its own sync
+// layer and would show stale data otherwise.
+const SHELL_CACHE = 'otis-shell-v1'
+
+interface ManifestEntry {
+  url: string
+  revision?: string
+}
+
+function manifestUrls(): string[] {
+  if (!Array.isArray(WB_MANIFEST)) return []
+  return (WB_MANIFEST as (string | ManifestEntry)[]).map((m) => (typeof m === 'string' ? m : m.url))
+}
+
+self.addEventListener('install', (event) => {
+  const urls = manifestUrls()
+  event.waitUntil(
+    caches
+      .open(SHELL_CACHE)
+      .then((cache) =>
+        // The manifest urls are root-relative (e.g. "/assets/index-xxx.js");
+        // cache.addAll handles a failed asset gracefully (it rejects the whole
+        // install only on 4xx/5xx, which never happens for hashed build files).
+        cache.addAll(urls.map((url) => new Request(url, { credentials: 'same-origin' }))),
+      )
+      .then(() => self.skipWaiting()),
+  )
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k !== SHELL_CACHE).map((k) => caches.delete(k))),
+      )
+      .then(() => self.clients.claim()),
+  )
+})
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request
+  const url = new URL(request.url)
+
+  // Navigations (page loads): network-first, fall back to the cached shell
+  // when offline — a fresh deploy should win as soon as there is network.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // Refresh the cached shell in the background.
+          const copy = response.clone()
+          caches
+            .open(SHELL_CACHE)
+            .then((cache) => cache.put('/index.html', copy))
+            .catch(() => {})
+          return response
+        })
+        .catch(() => caches.match('/index.html').then((cached) => cached || Response.error())),
+    )
+    return
+  }
+
+  // Same-origin static assets (JS/CSS/icons): cache-first, then network.
+  // Match by URL (not by the Request object) — the Cache API's Request-keyed
+  // match can miss for browser-originated requests whose mode/destination
+  // differ from the stored key, which would fall through to the network and
+  // break offline loads.
+  if (request.method === 'GET' && url.origin === self.location.origin) {
+    event.respondWith(
+      caches.match(url.href).then((cached) => {
+        if (cached) return cached
+        return fetch(request).then((response) => {
+          if (response.ok) {
+            const copy = response.clone()
+            caches
+              .open(SHELL_CACHE)
+              .then((cache) => cache.put(url.href, copy))
+              .catch(() => {})
+          }
+          return response
+        })
+      }),
+    )
+    return
+  }
+
+  // Everything else (Supabase API, Render backend, …) — network only.
+})
 
 // ── Notification Scheduling ─────────────────────────────────────────────────
 

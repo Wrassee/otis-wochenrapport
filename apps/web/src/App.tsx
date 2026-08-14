@@ -108,23 +108,31 @@ export default function App() {
           await initialize(session.user.id)
         }
 
-        try {
-          let locations = await getSupabaseLocations()
-          // The shared locations table can be empty (e.g. a sync gap) while
-          // the device's own cache still holds the technician's known lifts.
-          // An empty cloud result must never wipe the store — keep the local
-          // rows so lift suggestions everywhere (wizard, search) still work.
-          if (locations.length === 0) {
+        // Locations: the cloud is the source of truth, but only when actually
+        // online. Offline (or a dead network) must never stall the startup —
+        // fall back to the device cache, which still holds the technician's
+        // known lifts so suggestions everywhere (wizard, search) keep working.
+        if (navigator.onLine) {
+          try {
+            let locations = await getSupabaseLocations()
+            // The shared locations table can be empty (e.g. a sync gap) while
+            // the device's own cache still holds the technician's known lifts.
+            // An empty cloud result must never wipe the store — keep the local
+            // rows so lift suggestions everywhere (wizard, search) still work.
+            if (locations.length === 0) {
+              const cached = await getLocalLocations()
+              if (cached.length > 0) locations = cached
+            }
+            await cacheLocations(locations)
+            setLocations(locations)
+          } catch {
             const cached = await getLocalLocations()
-            if (cached.length > 0) locations = cached
+            if (cached.length > 0) setLocations(cached)
           }
-          await cacheLocations(locations)
-          setLocations(locations)
-        } catch {
+        } else {
           const cached = await getLocalLocations()
           if (cached.length > 0) setLocations(cached)
         }
-
         await cacheActivityCodes(ACTIVITY_CODES)
         setActivityCodes(ACTIVITY_CODES)
 

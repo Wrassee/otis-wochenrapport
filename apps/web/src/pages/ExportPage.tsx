@@ -516,6 +516,29 @@ export function ExportPage() {
     // away). The manual link below stays visible as a fallback for browsers
     // that block programmatic downloads.
     if (!isNative) {
+      // iOS Safari / installed PWA: the <a download> click cannot save a file
+      // directly, but the Web Share API can hand the REAL file to the system
+      // share sheet (Mail, Files, …). Prefer it when available — a plain
+      // anchor click on iOS just opens QuickLook instead.
+      const xlsxType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      const canShareFiles =
+        typeof navigator.share === 'function' && typeof navigator.canShare === 'function'
+      if (canShareFiles) {
+        try {
+          const file = new File([blob], filename, { type: xlsxType })
+          if (navigator.canShare({ files: [file] })) {
+            const shared = await navigator.share({ files: [file], title: filename })
+            // Share sheet completed (or was cancelled → AbortError, caught
+            // below) — the manual link stays as a fallback either way.
+            void shared
+          }
+        } catch (shareErr) {
+          // User cancelled or sharing unsupported — fall through to the
+          // anchor download + manual link.
+          console.warn('Web Share failed, falling back to download link:', shareErr)
+        }
+      }
+
       const a = document.createElement('a')
       a.href = blobUrl
       a.download = filename

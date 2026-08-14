@@ -12,9 +12,11 @@ import { defineConfig, devices } from '@playwright/test'
  *   SUPABASE_URL, SUPABASE_SERVICE_KEY   (admin API for the test user)
  *   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_RENDER_URL (the app)
  *
- * The frontend runs on port 5199 (never collides with the dev default 5173)
- * and the local backend on 8000, so the export flow can use the real
- * /generate-excel endpoint (it falls back to offline generation otherwise).
+ * The frontend runs against the PRODUCTION build (vite preview) on port 5199
+ * — never collides with the dev default 5173 — because the production bundle
+ * is what actually ships (SW, PWA, code-splitting) and the service worker
+ * only exists there. The local backend runs on 8000, so the export flow can
+ * use the real /generate-excel endpoint (it falls back to offline otherwise).
  */
 export default defineConfig({
   testDir: './e2e',
@@ -41,10 +43,10 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: 'npm run dev:frontend -- --port 5199 --strictPort',
+      command: 'npm run build && npm run preview -- --port 5199 --strictPort',
       url: 'http://localhost:5199',
       reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
+      timeout: 240_000,
     },
   ],
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
