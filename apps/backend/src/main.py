@@ -16,6 +16,22 @@ from src.excel_generator import generate_excel
 
 load_dotenv()
 
+# Sentry error monitoring — OPTIONAL. Only initializes when SENTRY_DSN is set
+# (Render dashboard), so a missing DSN (e.g. local dev) is a clean no-op. The
+# try/except also tolerates the package being absent (e.g. running the file
+# directly without installing requirements).
+try:
+    import sentry_sdk  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover
+    sentry_sdk = None
+
+if sentry_sdk and os.getenv("SENTRY_DSN"):
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        environment="production" if os.getenv("RENDER") else "development",
+        traces_sample_rate=0.1,
+    )
+
 app = FastAPI(
     title="OTIS Wochenrapport API",
     description="Backend service for generating OTIS weekly report Excel files",

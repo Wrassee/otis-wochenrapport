@@ -2,6 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { TriangleAlert, RotateCcw, RefreshCw } from 'lucide-react'
 import { useAppStore } from '@/stores/appStore'
 import { translate } from '@/lib/translations'
+import { reportError } from '@/lib/sentry'
 
 import type { TranslationKey } from '@/lib/translations'
 
@@ -38,6 +39,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   componentDidCatch(error: Error, info: ErrorInfo) {
     // Keep the error visible in devtools for diagnosis.
     console.error('[ErrorBoundary] caught error:', error, info.componentStack)
+    // Report to Sentry (no-op without a DSN) — the component stack is the
+    // most useful part for locating the failing component.
+    reportError(error, { componentStack: info.componentStack })
   }
 
   private handleRetry = () => {

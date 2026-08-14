@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 import path from 'path'
 
 // https://vite.dev/config/
@@ -9,6 +10,16 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // Source map upload to Sentry — only active in CI/deployments that set
+    // SENTRY_AUTH_TOKEN (Vercel dashboard). Without it the plugin is disabled
+    // and the build behaves exactly as before.
+    sentryVitePlugin({
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      telemetry: false,
+      disable: !process.env.SENTRY_AUTH_TOKEN,
+    }),
     VitePWA({
       strategies: 'injectManifest',
       srcDir: 'src',
@@ -40,5 +51,11 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  build: {
+    // Source maps only when they are actually uploaded to Sentry (build with
+    // SENTRY_AUTH_TOKEN) — keeps local/preview builds lean and never ships
+    // the source to the public web otherwise.
+    sourcemap: Boolean(process.env.SENTRY_AUTH_TOKEN),
   },
 })

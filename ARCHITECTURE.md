@@ -403,6 +403,29 @@ Spesenrapport sheet → row 24 "Zone 4 + 5 (variable) · CHF -.10 / km"
 
 ---
 
+## Error Monitoring (Sentry)
+
+Sentry is wired in **optionally** — without a DSN the app/backend behave exactly
+as before (no bundle size increase, no network calls):
+
+| Layer | Package | Init point | Env var |
+|---|---|---|---|
+| Frontend | `@sentry/react` (+ `@sentry/vite-plugin` for source maps) | `src/lib/sentry.ts`, imported as a side effect in `main.tsx` **before** the app renders | `VITE_SENTRY_DSN` (runtime) · `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` (build-time, source-map upload) |
+| Backend | `sentry-sdk` | `apps/backend/src/main.py` after `load_dotenv()`, guarded by `SENTRY_DSN` | `SENTRY_DSN` |
+
+Details:
+- Frontend: caught render errors are reported from the `ErrorBoundary`
+  (`reportError` in `src/lib/sentry.ts`) together with the component stack;
+  uncaught exceptions are captured automatically by `Sentry.init`.
+- The Vite Sentry plugin uploads source maps (build with `SENTRY_AUTH_TOKEN`
+  set) and tags the release with the git commit. `build.sourcemap` is only
+  enabled when a token is present, so the source never ships to the public
+  web otherwise.
+- Backend: `traces_sample_rate=0.1`, `environment` flips to `production`
+  when the `RENDER` env var is set (Render sets it automatically).
+
+---
+
 ## State Management Pattern
 
 The app uses **Zustand** for global state. Each data type follows the same pattern:
