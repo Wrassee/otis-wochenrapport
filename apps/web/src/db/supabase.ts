@@ -2,7 +2,13 @@ import { createClient } from '@supabase/supabase-js'
 import { isValidUuid, uuidFromString } from '@/lib/utils'
 
 // These will be replaced with actual values when Supabase is configured
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+//
+// Defensive: Vercel dashboards are often pasted the REST endpoint
+// (…/rest/v1) as the base URL. The SDK appends /rest/v1 and /auth/v1 itself,
+// so a suffixed value doubles the path and EVERY request 404s (login shows
+// "Anmeldung fehlgeschlagen" although the credentials are valid). Strip any
+// trailing /rest/v1 so the base URL is always correct.
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '')
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -298,7 +304,9 @@ export async function upsertLocation(location: {
         longitude: location.longitude || existing.longitude || 0,
         zone: location.zone || existing.zone || 0,
         manual_zone:
-          location.manual_zone !== undefined ? location.manual_zone : (existing.manual_zone ?? undefined),
+          location.manual_zone !== undefined
+            ? location.manual_zone
+            : (existing.manual_zone ?? undefined),
       }
     : location
 

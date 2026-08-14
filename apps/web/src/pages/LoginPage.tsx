@@ -36,7 +36,11 @@ function friendlyAuthError(
   ) {
     return t('auth.error.rate_limit')
   }
-  if (code === 'user_already_exists' || msg.includes('already registered') || msg.includes('already been registered')) {
+  if (
+    code === 'user_already_exists' ||
+    msg.includes('already registered') ||
+    msg.includes('already been registered')
+  ) {
     return t('auth.error.exists')
   }
   if (code === 'weak_password' || msg.includes('at least 6 characters')) {
@@ -83,6 +87,11 @@ export function LoginPage() {
         navigate('/dashboard')
       }
     } catch (err: any) {
+      // Surface the REAL error to the console — the friendly message below
+      // maps many different failures to the same text, so without this the
+      // actual cause (e.g. an initialize() step, a schema issue, rate limit)
+      // is invisible.
+      console.error('Login failed — raw error:', err)
       setError(friendlyAuthError(err, t, 'auth.login.failed'))
     } finally {
       setLoading(false)
@@ -151,6 +160,7 @@ export function LoginPage() {
         navigate('/settings')
       }
     } catch (err: any) {
+      console.error('Register failed — raw error:', err)
       setError(friendlyAuthError(err, t))
     } finally {
       setLoading(false)
