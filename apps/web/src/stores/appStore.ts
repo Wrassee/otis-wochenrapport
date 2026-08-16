@@ -25,6 +25,7 @@ import {
   findFirstOverlap,
 } from '@/lib/utils'
 import { ACTIVITY_CODES, PENDING_REGISTRATION_KEY } from '@/lib/constants'
+import { zoneForCoordinates } from '@/lib/zoneReference'
 import type { Language } from '@/lib/translations'
 import { DAY_NAMES } from '@/lib/translations'
 import {
@@ -516,7 +517,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   calculateWeekSummary: async () => {
-    const { timeEntries, currentWeek, language, activityCodes } = get()
+    const { timeEntries, currentWeek, language, activityCodes, locations, favoriteLocations } =
+      get()
     const dates = getWeekDates(currentWeek.year, currentWeek.week)
     const dayNames = DAY_NAMES[language]
 
@@ -589,9 +591,24 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
       }
 
-      // Calculate max zone for the day
+      // Calculate max zone for the day. Recompute from the lift's geocoded
+      // coordinates (manual override wins) — the same trust rule as the export
+      // and the Settings lift list. A stale entry.location_zone (e.g. 1DA79
+      // Effretikon stored as Z2 but really Z1) must never mislabel the day.
       const maxZone = dayEntries.reduce((max, e) => {
-        return e.location_zone ? Math.max(max, e.location_zone) : max
+        const key = e.location_anlagenummer?.toUpperCase()
+        let zone = e.location_zone ?? 0
+        if (key) {
+          const src =
+            locations.find((l) => l.anlagenummer.toUpperCase() === key) ??
+            favoriteLocations.find((f) => f.anlagenummer.toUpperCase() === key)
+          if (src?.manual_zone !== undefined) {
+            zone = src.manual_zone
+          } else if (src && Number(src.latitude) && Number(src.longitude)) {
+            zone = zoneForCoordinates(Number(src.latitude), Number(src.longitude))
+          }
+        }
+        return zone > 0 ? Math.max(max, zone) : max
       }, 0)
 
       return {
