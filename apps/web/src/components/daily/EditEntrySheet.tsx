@@ -16,6 +16,7 @@ import {
   formatOtisDuration,
   snapToQuarter,
 } from '@/lib/utils'
+import { resolveLiftZone } from '@/lib/zoneReference'
 import { Save, ChevronDown, Search, MapPin, PenLine } from 'lucide-react'
 
 interface EditEntrySheetProps {
@@ -177,7 +178,7 @@ export function EditEntrySheet({ open, entry, onClose, onSave }: EditEntrySheetP
         location_anlagenummer: liftChanged ? nr : entry.location_anlagenummer,
         location_project_id: projectId,
         location_address: address,
-        location_zone: selectedLocation?.manual_zone ?? selectedLocation?.zone ?? entry.location_zone,
+        location_zone: resolveLiftZone(selectedLocation, entry.location_zone ?? 0) || undefined,
       }
       await onSave(updatedEntry)
       onClose()
@@ -371,12 +372,7 @@ export function EditEntrySheet({ open, entry, onClose, onSave }: EditEntrySheetP
               className="sticky bottom-0 -mx-6 px-6 pt-3 flex gap-3 bg-white/95 dark:bg-stone-900/95 backdrop-blur-sm border-t border-otis-200/20 dark:border-white/5"
               style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
             >
-              <Button
-                variant="secondary"
-                onClick={onClose}
-                className="flex-1"
-                size="lg"
-              >
+              <Button variant="secondary" onClick={onClose} className="flex-1" size="lg">
                 {t('edit.cancel')}
               </Button>
               <Button

@@ -25,7 +25,7 @@ import {
   findFirstOverlap,
 } from '@/lib/utils'
 import { ACTIVITY_CODES, PENDING_REGISTRATION_KEY } from '@/lib/constants'
-import { zoneForCoordinates } from '@/lib/zoneReference'
+import { resolveLiftZone } from '@/lib/zoneReference'
 import type { Language } from '@/lib/translations'
 import { DAY_NAMES } from '@/lib/translations'
 import {
@@ -597,17 +597,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Effretikon stored as Z2 but really Z1) must never mislabel the day.
       const maxZone = dayEntries.reduce((max, e) => {
         const key = e.location_anlagenummer?.toUpperCase()
-        let zone = e.location_zone ?? 0
-        if (key) {
-          const src =
-            locations.find((l) => l.anlagenummer.toUpperCase() === key) ??
-            favoriteLocations.find((f) => f.anlagenummer.toUpperCase() === key)
-          if (src?.manual_zone !== undefined) {
-            zone = src.manual_zone
-          } else if (src && Number(src.latitude) && Number(src.longitude)) {
-            zone = zoneForCoordinates(Number(src.latitude), Number(src.longitude))
-          }
-        }
+        const src = key
+          ? (locations.find((l) => l.anlagenummer.toUpperCase() === key) ??
+            favoriteLocations.find((f) => f.anlagenummer.toUpperCase() === key))
+          : undefined
+        const zone = resolveLiftZone(src, e.location_zone ?? 0)
         return zone > 0 ? Math.max(max, zone) : max
       }, 0)
 

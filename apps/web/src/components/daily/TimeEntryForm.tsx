@@ -20,7 +20,7 @@ import {
   findLatestLiftEntry,
 } from '@/lib/utils'
 import { ensureLiftRow } from '@/lib/locationZones'
-import { zoneForCoordinates } from '@/lib/zoneReference'
+import { resolveLiftZone } from '@/lib/zoneReference'
 import { useTranslation } from '@/lib/useTranslation'
 import {
   Plus,
@@ -435,19 +435,17 @@ export function TimeEntryForm({
 
     if (dur <= 0) return
 
-    // Resolve zone: selectedLocation → manual_zone override → zone → look up from saved locations/favorites
+    // Resolve zone: manual override wins, otherwise recompute from coordinates,
+    // otherwise the stored zone — never write a stale stored zone into the entry.
     let resolvedZone: number | undefined
     if (selectedLocation) {
-      resolvedZone = selectedLocation.manual_zone ?? selectedLocation.zone
+      resolvedZone = resolveLiftZone(selectedLocation) || undefined
     } else if (searchQuery) {
       const key = searchQuery.toUpperCase()
-      const loc = locations.find((l) => l.anlagenummer.toUpperCase() === key)
-      if (loc) {
-        resolvedZone = loc.manual_zone ?? loc.zone
-      } else {
-        const fav = favoriteLocations.find((f) => f.anlagenummer.toUpperCase() === key)
-        resolvedZone = fav?.manual_zone ?? fav?.zone
-      }
+      const src =
+        locations.find((l) => l.anlagenummer.toUpperCase() === key) ??
+        favoriteLocations.find((f) => f.anlagenummer.toUpperCase() === key)
+      resolvedZone = resolveLiftZone(src) || undefined
     }
 
     const entry: Omit<TimeEntry, 'id' | 'created_at' | 'updated_at' | 'synced'> & {
@@ -693,16 +691,8 @@ export function TimeEntryForm({
                         )
                       }
                       // Trust a LIVE recomputation from the geocoded
-                      // coordinates — a stale stored zone (e.g. a leftover from
-                      // an old address) is never shown, mirroring the Settings
-                      // lift list / favorites / export zone resolution.
-                      const lat = selectedLocation.latitude
-                      const lon = selectedLocation.longitude
-                      const liveZone =
-                        Number(lat) && Number(lon)
-                          ? zoneForCoordinates(Number(lat), Number(lon))
-                          : 0
-                      const zone = liveZone > 0 ? liveZone : (selectedLocation.zone ?? 0)
+                      // coordinates — a stale stored zone is never shown.
+                      const zone = resolveLiftZone(selectedLocation)
                       // Z0 lifts behave as Zone 1
                       return zone > 0 ? `Z${zone}` : 'Z1'
                     })()}

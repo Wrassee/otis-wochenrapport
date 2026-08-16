@@ -37,3 +37,32 @@ export function zoneForCoordinates(latitude: number, longitude: number): number 
   const ref = getZoneReference()
   return calculateZone(haversineDistance(ref.lat, ref.lon, latitude, longitude))
 }
+
+/**
+ * Resolve a lift's trustworthy zone from a location/favorite row using the
+ * single shared rule used everywhere a zone is displayed or persisted:
+ *
+ *   1. a manual override always wins
+ *   2. otherwise recompute from the geocoded coordinates + current reference
+ *   3. otherwise the row's stored zone (may be 0 = unknown)
+ *   4. when there is no row at all, the caller's `fallback` value
+ *
+ * A stale stored zone must never win over coordinates — callers pass their own
+ * last-resort value (e.g. an entry's frozen location_zone) as `fallback`.
+ */
+export function resolveLiftZone(
+  src?: {
+    manual_zone?: number
+    zone?: number
+    latitude?: number
+    longitude?: number
+  } | null,
+  fallback = 0,
+): number {
+  if (!src) return fallback
+  if (src.manual_zone !== undefined && src.manual_zone > 0) return src.manual_zone
+  if (Number(src.latitude) && Number(src.longitude)) {
+    return zoneForCoordinates(Number(src.latitude), Number(src.longitude))
+  }
+  return src.zone ?? fallback
+}
