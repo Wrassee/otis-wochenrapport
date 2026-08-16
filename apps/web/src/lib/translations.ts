@@ -1414,6 +1414,20 @@ export const translations = {
     hu: 'A t\u00f6rl\u00e9s sikertelen. K\u00e9rj\u00fck, pr\u00f3b\u00e1lja \u00fajra k\u00e9s\u0151bb.',
     en: 'Deletion failed. Please try again later.',
   },
+  'settings.data.delete.show': {
+    de: 'L\u00f6schoptionen anzeigen',
+    fr: 'Afficher les options de suppression',
+    it: 'Mostra opzioni di eliminazione',
+    hu: 'T\u00f6rl\u00e9si lehet\u0151s\u00e9gek megjelen\u00edt\u00e9se',
+    en: 'Show delete options',
+  },
+  'settings.data.delete.hide': {
+    de: 'Ausblenden',
+    fr: 'Masquer',
+    it: 'Nascondi',
+    hu: 'Elrejt\u00e9s',
+    en: 'Hide',
+  },
   'settings.sync': {
     de: 'Synchronisation',
     fr: 'Synchronisation',

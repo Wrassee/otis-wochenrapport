@@ -42,6 +42,7 @@ import {
   Monitor,
   Download,
   UserX,
+  ChevronDown,
 } from 'lucide-react'
 import { forceSync } from '@/db/sync'
 import { useNavigate } from 'react-router-dom'
@@ -78,6 +79,7 @@ export function SettingsPage() {
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deleteExpanded, setDeleteExpanded] = useState(false)
 
   useEffect(() => {
     isReminderScheduled().then(setNotificationEnabled)
@@ -462,9 +464,10 @@ export function SettingsPage() {
         </Button>
       </Card>
 
-      {/* Delete account */}
+      {/* Delete account — destructive controls are collapsed by default so the
+          "delete everything" button can't be hit accidentally. */}
       <Card variant="outline">
-        <div className="flex items-center gap-2.5 mb-3">
+        <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/20">
             <AlertTriangle className="w-4 h-4 text-white" />
           </div>
@@ -476,69 +479,99 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <p className="text-xs text-gray-600 dark:text-stone-200 mb-4">
-          {t('settings.data.delete.desc')}
-        </p>
-
-        {!deleteArmed ? (
-          <Button
-            onClick={() => {
-              setDeleteArmed(true)
+        <button
+          type="button"
+          onClick={() => {
+            const next = !deleteExpanded
+            setDeleteExpanded(next)
+            if (!next) {
+              setDeleteArmed(false)
+              setDeleteConfirmEmail('')
               setDeleteError(null)
-            }}
-            variant="danger"
-            fullWidth
-          >
-            <Trash2 className="w-4 h-4" />
-            {t('settings.data.delete.button')}
-          </Button>
-        ) : (
-          <div className="space-y-3 p-3.5 bg-red-50/60 dark:bg-red-900/10 rounded-2xl border border-red-200/50 dark:border-red-700/30">
-            <p className="text-xs text-red-600 dark:text-red-300 font-medium">
-              {t('settings.data.delete.confirm.desc')}
+            }
+          }}
+          className="mt-3 w-full flex items-center justify-between gap-2 p-3 rounded-2xl text-xs font-semibold text-gray-500 dark:text-stone-200 bg-otis-50/40 dark:bg-white/3 border border-otis-200/20 dark:border-white/5 hover:bg-otis-50 dark:hover:bg-white/5 transition-colors"
+        >
+          <span>
+            {deleteExpanded ? t('settings.data.delete.hide') : t('settings.data.delete.show')}
+          </span>
+          <ChevronDown
+            className={cn('w-4 h-4 transition-transform', deleteExpanded && 'rotate-180')}
+          />
+        </button>
+
+        {deleteExpanded && (
+          <div className="mt-3 space-y-4">
+            <p className="text-xs text-gray-600 dark:text-stone-200">
+              {t('settings.data.delete.desc')}
             </p>
-            <Input
-              id="delete-confirm-email"
-              label={t('settings.data.delete.confirm.label')}
-              type="email"
-              placeholder={user?.email || ''}
-              value={deleteConfirmEmail}
-              onChange={(e) => setDeleteConfirmEmail(e.target.value)}
-              autoComplete="off"
-            />
-            {deleteError && (
-              <div className="flex items-start gap-2 p-3 bg-red-50/80 dark:bg-red-900/20 rounded-2xl border border-red-200/60 dark:border-red-700/40">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
-                <p className="text-xs text-red-500">{deleteError}</p>
-              </div>
-            )}
-            <div className="flex gap-3">
+
+            {!deleteArmed ? (
               <Button
                 onClick={() => {
-                  setDeleteArmed(false)
-                  setDeleteConfirmEmail('')
+                  setDeleteArmed(true)
                   setDeleteError(null)
                 }}
-                variant="secondary"
+                variant="danger"
                 fullWidth
-                disabled={deleting}
               >
-                {t('common.cancel')}
+                <Trash2 className="w-4 h-4" />
+                {t('settings.data.delete.button')}
               </Button>
-              <Button onClick={handleDeleteAccount} variant="danger" fullWidth disabled={deleting}>
-                {deleting ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    {t('settings.data.delete.deleting')}
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <UserX className="w-4 h-4" />
-                    {t('settings.data.delete.confirm.button')}
-                  </span>
+            ) : (
+              <div className="space-y-3 p-3.5 bg-red-50/60 dark:bg-red-900/10 rounded-2xl border border-red-200/50 dark:border-red-700/30">
+                <p className="text-xs text-red-600 dark:text-red-300 font-medium">
+                  {t('settings.data.delete.confirm.desc')}
+                </p>
+                <Input
+                  id="delete-confirm-email"
+                  label={t('settings.data.delete.confirm.label')}
+                  type="email"
+                  placeholder={user?.email || ''}
+                  value={deleteConfirmEmail}
+                  onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+                  autoComplete="off"
+                />
+                {deleteError && (
+                  <div className="flex items-start gap-2 p-3 bg-red-50/80 dark:bg-red-900/20 rounded-2xl border border-red-200/60 dark:border-red-700/40">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
+                    <p className="text-xs text-red-500">{deleteError}</p>
+                  </div>
                 )}
-              </Button>
-            </div>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => {
+                      setDeleteArmed(false)
+                      setDeleteConfirmEmail('')
+                      setDeleteError(null)
+                    }}
+                    variant="secondary"
+                    fullWidth
+                    disabled={deleting}
+                  >
+                    {t('common.cancel')}
+                  </Button>
+                  <Button
+                    onClick={handleDeleteAccount}
+                    variant="danger"
+                    fullWidth
+                    disabled={deleting}
+                  >
+                    {deleting ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        {t('settings.data.delete.deleting')}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <UserX className="w-4 h-4" />
+                        {t('settings.data.delete.confirm.button')}
+                      </span>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Card>
