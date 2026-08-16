@@ -20,6 +20,7 @@ import {
   findLatestLiftEntry,
 } from '@/lib/utils'
 import { ensureLiftRow } from '@/lib/locationZones'
+import { zoneForCoordinates } from '@/lib/zoneReference'
 import { useTranslation } from '@/lib/useTranslation'
 import {
   Plus,
@@ -30,6 +31,7 @@ import {
   ChevronDown,
   PenLine,
   Clock,
+  X,
 } from 'lucide-react'
 
 interface TimeEntryFormProps {
@@ -95,6 +97,36 @@ export function TimeEntryForm({
   /** True once the user manually picked a start time — the auto-sync of the
    *  chained default must not override a deliberate manual choice. */
   const startTimeTouchedRef = useRef(false)
+
+  // Containers for the two autocomplete dropdowns — used to close them when
+  // the user taps/clicks outside, so a suggestion list can never trap the form.
+  const liftSearchRef = useRef<HTMLDivElement>(null)
+  const addressSearchRef = useRef<HTMLDivElement>(null)
+
+  // Dismiss both suggestion dropdowns on click-outside or Esc.
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null
+      if (target && liftSearchRef.current && !liftSearchRef.current.contains(target)) {
+        setShowSearchResults(false)
+      }
+      if (target && addressSearchRef.current && !addressSearchRef.current.contains(target)) {
+        setShowAddressResults(false)
+      }
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowSearchResults(false)
+        setShowAddressResults(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [])
 
   // Keep the start time in sync with the chained default once the day's entries
   // load asynchronously — the form mounts BEFORE loadWeek() resolves, so it
@@ -504,7 +536,7 @@ export function TimeEntryForm({
           {!isLunch && (
             <>
               {/* Anlagenummer search */}
-              <div className="relative">
+              <div className="relative" ref={liftSearchRef}>
                 <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
                   {t('entry.anlagenummer')} <span className="text-red-400">*</span>
                 </label>
@@ -522,6 +554,16 @@ export function TimeEntryForm({
                 {/* Search results dropdown */}
                 {showSearchResults && searchResults.length > 0 && (
                   <div className="absolute z-20 mt-1.5 w-full glass-card dark:glass-card-dark rounded-2xl shadow-xl max-h-48 overflow-y-auto animate-slide-down border border-otis-200/30 dark:border-white/5">
+                    <div className="flex justify-end p-1.5 sticky top-0 bg-white/70 dark:bg-otis-900/70 backdrop-blur">
+                      <button
+                        type="button"
+                        onClick={() => setShowSearchResults(false)}
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-gray-400 dark:text-stone-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                        aria-label="Close"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                     {searchResults.map((loc) => (
                       <button
                         key={loc.id}
@@ -576,7 +618,7 @@ export function TimeEntryForm({
                   <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
                     {t('entry.address')} <span className="text-red-400">*</span>
                   </label>
-                  <div className="relative">
+                  <div className="relative" ref={addressSearchRef}>
                     <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-stone-200" />
                     <input
                       type="text"
@@ -589,6 +631,16 @@ export function TimeEntryForm({
                     {/* Address search results dropdown */}
                     {showAddressResults && addressResults.length > 0 && (
                       <div className="absolute z-20 mt-1.5 w-full glass-card dark:glass-card-dark rounded-2xl shadow-xl max-h-48 overflow-y-auto animate-slide-down border border-otis-200/30 dark:border-white/5">
+                        <div className="flex justify-end p-1.5 sticky top-0 bg-white/70 dark:bg-otis-900/70 backdrop-blur">
+                          <button
+                            type="button"
+                            onClick={() => setShowAddressResults(false)}
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-gray-400 dark:text-stone-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                            aria-label="Close"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                         {addressResults.map((loc) => (
                           <button
                             key={loc.id}
@@ -630,13 +682,30 @@ export function TimeEntryForm({
                     </span>
                   </div>
                   <Badge variant="zone" size="sm">
-                    {/* Z0 lifts behave as Zone 1 */}
-                    {(selectedLocation.manual_zone ?? selectedLocation.zone) > 0
-                      ? `Z${selectedLocation.manual_zone ?? selectedLocation.zone}`
-                      : 'Z1'}
-                    {selectedLocation.manual_zone !== undefined && (
-                      <span className="ml-0.5 text-[9px]">✦</span>
-                    )}
+                    {(() => {
+                      const manual = selectedLocation.manual_zone
+                      if (manual !== undefined && manual > 0) {
+                        return (
+                          <>
+                            Z{manual}
+                            <span className="ml-0.5 text-[9px]">✦</span>
+                          </>
+                        )
+                      }
+                      // Trust a LIVE recomputation from the geocoded
+                      // coordinates — a stale stored zone (e.g. a leftover from
+                      // an old address) is never shown, mirroring the Settings
+                      // lift list / favorites / export zone resolution.
+                      const lat = selectedLocation.latitude
+                      const lon = selectedLocation.longitude
+                      const liveZone =
+                        Number(lat) && Number(lon)
+                          ? zoneForCoordinates(Number(lat), Number(lon))
+                          : 0
+                      const zone = liveZone > 0 ? liveZone : (selectedLocation.zone ?? 0)
+                      // Z0 lifts behave as Zone 1
+                      return zone > 0 ? `Z${zone}` : 'Z1'
+                    })()}
                   </Badge>
                 </div>
               )}

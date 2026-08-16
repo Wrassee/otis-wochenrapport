@@ -298,7 +298,7 @@ export function TimelineView({
           keeps bars clear of the button zone, so buttons never cover bars or
           labels. Row-aligned: ruler spacer = h-7, one cell per entry. */}
       {showActions && (onEditEntry || onDeleteEntry) && (
-        <div className="absolute right-0 top-0 bottom-0 w-[84px] flex flex-col pointer-events-none bg-transparent">
+        <div className="absolute right-0 top-0 bottom-0 w-[84px] flex flex-col pointer-events-none bg-transparent z-20">
           {/* Ruler spacer — matches the h-7 hour axis */}
           <div className="h-7 shrink-0" />
           {entries.map((entry) => (
@@ -309,7 +309,11 @@ export function TimelineView({
             >
               {onEditEntry && (
                 <button
-                  onClick={() => onEditEntry(entry)}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onEditEntry(entry)
+                  }}
                   className="pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center bg-otis-600 hover:bg-otis-700 text-white shadow-md transition-all active:scale-90"
                   title={t('timeline.edit')}
                 >
@@ -318,7 +322,11 @@ export function TimelineView({
               )}
               {onDeleteEntry && (
                 <button
-                  onClick={() => onDeleteEntry(entry.id)}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDeleteEntry(entry.id)
+                  }}
                   className="pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white shadow-md transition-all active:scale-90"
                   title={t('timeline.delete')}
                 >
