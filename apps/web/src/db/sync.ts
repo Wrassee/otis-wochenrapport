@@ -236,7 +236,7 @@ export async function performSync() {
         } else if (item.type === 'location_delete' && item.locationDeleteAnlagenummer) {
           await deleteLocationByAnlagenummer(item.locationDeleteAnlagenummer)
         } else if (item.type === 'expenses_sync' && item.expenses && item.userId) {
-          await syncExpensesToSupabase(item.userId, item.expenses)
+          await syncExpensesToSupabase(item.userId, item.expenses, item.dates)
         } else if (item.type === 'language_sync' && item.language && item.userId) {
           await updateProfileLanguage(item.userId, item.language)
         }

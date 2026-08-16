@@ -96,7 +96,9 @@ function queueAllExpensesSync(dailyExpenses: Record<string, DailyExpense[]>, use
       all.push({ date: d, expense_type: exp.expense_type, value: exp.value })
     }
   }
-  queueExpensesSync(all, userId)
+  // Pass every managed date key — including days whose last expense was just
+  // removed — so the cloud full-replace deletes their stale rows too.
+  queueExpensesSync(all, userId, 2000, Object.keys(dailyExpenses))
 }
 
 /**

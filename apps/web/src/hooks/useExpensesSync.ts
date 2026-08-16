@@ -38,7 +38,7 @@ export function useExpensesSync(delayMs = 2000): () => void {
       }
     }
 
-    doSync(all, state.user.id, delayRef.current)
+    doSync(all, state.user.id, delayRef.current, Object.keys(state.dailyExpenses))
   }, [])
 
   return sync

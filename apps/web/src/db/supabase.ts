@@ -408,14 +408,21 @@ export async function deleteFavorite(userId: string, anlagenummer: string) {
 export async function syncExpensesToSupabase(
   userId: string,
   expenses: Array<{ date: string; expense_type: string; value: number }>,
+  trackedDates?: string[],
 ): Promise<void> {
-  if (expenses.length === 0) return
+  // Full-replace strategy: delete every cloud row for the tracked dates, then
+  // re-insert what currently exists. `trackedDates` is the set of date keys the
+  // device is managing — it must include days whose last expense was just
+  // removed, otherwise their stale cloud rows survive and "reappear" on the
+  // next reload/realtime merge.
+  const dates = [...new Set([...expenses.map((e) => e.date), ...(trackedDates ?? [])])]
 
-  // Collect all distinct dates involved
-  const dates = [...new Set(expenses.map((e) => e.date))]
+  if (dates.length === 0) return
 
   // Delete all existing rows for those dates
   await supabase.from('daily_expenses').delete().eq('user_id', userId).in('date', dates)
+
+  if (expenses.length === 0) return
 
   // Insert fresh rows
   const rows = expenses.map((e) => ({

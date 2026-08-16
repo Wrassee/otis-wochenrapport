@@ -30,7 +30,7 @@ export default defineConfig({
       // precaches the app shell (index.html, hashed bundles, the Excel
       // template) and deliberately leaves API calls (Supabase / Render) on the
       // network, because the app has its own IndexedDB sync layer.
-      includeAssets: ['favicon.svg', 'icons.svg', 'templates/template.xlsx'],
+      includeAssets: ['favicon.svg', 'templates/template.xlsx'],
       manifest: {
         name: 'OTIS Wochenrapport',
         short_name: 'OTIS Rapport',
@@ -41,8 +41,14 @@ export default defineConfig({
         orientation: 'portrait',
         start_url: '/',
         icons: [
-          { src: '/favicon.svg', sizes: '192x192', type: 'image/svg+xml' },
-          { src: '/favicon.svg', sizes: '512x512', type: 'image/svg+xml' },
+          { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          {
+            src: '/maskable-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
         ],
       },
     }),

@@ -565,6 +565,7 @@ export async function addToSyncQueue(item: {
   userId?: string
   entryId?: string
   expenses?: Array<{ date: string; expense_type: string; value: number }>
+  dates?: string[]
   locationData?: any
   locationDeleteAnlagenummer?: string
   language?: string

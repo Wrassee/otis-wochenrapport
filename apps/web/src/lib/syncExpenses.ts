@@ -21,14 +21,17 @@ let timer: ReturnType<typeof setTimeout> | null = null
  * Safe to call from anywhere (store, hook, component, module init).
  * Only the last call in a burst actually pushes to the sync queue.
  *
- * @param all     - Flat array of { date, expense_type, value } triples.
- * @param userId  - Owner of the expenses.
- * @param ms      - Debounce delay (default 2000).
+ * @param all    - Flat array of { date, expense_type, value } triples.
+ * @param userId - Owner of the expenses.
+ * @param ms     - Debounce delay (default 2000).
+ * @param dates  - Every date key the device manages (including days that just
+ *                 became empty) so the cloud full-replace deletes them too.
  */
 export function syncExpenses(
   all: Array<{ date: string; expense_type: string; value: number }>,
   userId: string,
   ms = 2000,
+  dates?: string[],
 ): void {
   if (timer) clearTimeout(timer)
 
@@ -39,6 +42,7 @@ export function syncExpenses(
       type: 'expenses_sync',
       userId,
       expenses: all,
+      dates,
       timestamp: Date.now(),
     }).catch((e) => {
       console.warn('Failed to add expense sync to queue:', e)
