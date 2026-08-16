@@ -117,15 +117,15 @@ def create_launcher_icon(size, round_=False):
         inner_corner = corner_radius * 0.6
         draw.rounded_rectangle(inner_rect, radius=inner_corner, fill=OTIS_BLUE)
 
-    # Draw the OTIS "O" logo
+    # Draw the OTIS "O" logo (upper part, clear of the wordmark below)
     cx = size / 2
-    cy = size * 0.42 if size >= 48 else size / 2
-    logo_radius = size * 0.22
+    cy = size * 0.36 if size >= 48 else size / 2
+    logo_radius = size * 0.20
     draw_otis_logo(draw, cx, cy, logo_radius, WHITE)
 
-    # Draw "OTIS" text
+    # Draw "OTIS" text — larger and lower, so it never overlaps the "O" logo
     if size >= 48:
-        text_size = max(8, int(size * 0.10))
+        text_size = max(9, int(size * 0.14))
         font = find_font(text_size)
         text = "OTIS"
         try:
@@ -134,7 +134,7 @@ def create_launcher_icon(size, round_=False):
         except AttributeError:
             tw, _ = draw.textsize(text, font=font)
         tx = (size - tw) / 2
-        ty = size * 0.62
+        ty = size * 0.63
         shadow_off = max(1, size * 0.008)
         draw.text((tx + shadow_off, ty + shadow_off), text, fill=(0, 0, 0, 60), font=font)
         draw.text((tx, ty), text, fill=WHITE, font=font)
@@ -149,14 +149,14 @@ def create_foreground_icon(size):
 
     safe_ratio = 0.667
     cx = size / 2
-    cy = size * 0.44
-    logo_radius = size * 0.22
+    cy = size * 0.38
+    logo_radius = size * 0.20
 
     draw_otis_logo(draw, cx, cy, logo_radius, WHITE)
 
-    # Draw "OTIS" text
+    # Draw "OTIS" text — larger and lower, so it never overlaps the "O" logo
     if size >= 108:
-        text_size = max(10, int(size * 0.09))
+        text_size = max(11, int(size * 0.11))
         font = find_font(text_size)
         text = "OTIS"
         try:
@@ -165,7 +165,7 @@ def create_foreground_icon(size):
         except AttributeError:
             tw, _ = draw.textsize(text, font=font)
         tx = (size - tw) / 2
-        ty = size * 0.60
+        ty = size * 0.63
         draw.text((tx, ty), text, fill=WHITE, font=font)
 
     return img
