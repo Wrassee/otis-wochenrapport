@@ -181,3 +181,45 @@ export function locationsMissingZone(
     return Number(l.zone) !== computed
   })
 }
+
+/**
+ * Recompute/geocode every lift whose zone is not trustworthy (see
+ * `locationsMissingZone`): lifts WITH coordinates get their zone recomputed
+ * from the current reference point; lifts WITHOUT coordinates get geocoded
+ * from their address. Returns how many lifts were updated.
+ *
+ * Shared by the Settings "recalculate" button (with live progress) and as a
+ * fire-and-forget self-heal at app startup, so old lifts that were never
+ * geocoded (or carry a stale zone) fix themselves without the technician
+ * touching anything. Callers refresh the store mirrors after it resolves.
+ */
+export async function recalculateMissingZones(opts?: {
+  onProgress?: (done: number, total: number, updated: number) => void
+}): Promise<number> {
+  const allLocs = await localDb.getAllLocations()
+  const candidates = locationsMissingZone(allLocs)
+  if (candidates.length === 0) return 0
+
+  let updated = 0
+  let done = 0
+  for (const loc of candidates) {
+    if (Number(loc.latitude) && Number(loc.longitude)) {
+      // Already geocoded → just recompute the zone from the coordinates and
+      // the current reference point (no rate-limited geocode needed).
+      const zone = zoneForCoordinates(Number(loc.latitude), Number(loc.longitude))
+      await localDb.updateLocationZone(loc.anlagenummer, zone, undefined)
+      updated++
+    } else {
+      const addr = loc.full_address || ''
+      if (addr.trim().length >= 5) {
+        const result = await geocodeAndApplyZone(loc.anlagenummer, addr.trim(), loc)
+        if (result) updated++
+      }
+      // Cannot geocode (no address / no result) → the lift stays unknown
+      // (Z0/'Auto') instead of being silently mislabelled Zone 1.
+    }
+    done++
+    opts?.onProgress?.(done, candidates.length, updated)
+  }
+  return updated
+}

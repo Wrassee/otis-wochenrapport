@@ -20,7 +20,7 @@ import {
   findLatestLiftEntry,
 } from '@/lib/utils'
 import { ensureLiftRow } from '@/lib/locationZones'
-import { resolveLiftZone } from '@/lib/zoneReference'
+import { resolveLiftZone, zoneForCoordinates } from '@/lib/zoneReference'
 import { useTranslation } from '@/lib/useTranslation'
 import {
   Plus,
@@ -90,6 +90,9 @@ export function TimeEntryForm({
   const [isLunch, setIsLunch] = useState(false)
   const [overlapWarning, setOverlapWarning] = useState<string | null>(null)
   const [conflictingEntryIds, setConflictingEntryIds] = useState<string[]>([])
+  /** True when the last background geocode of the address failed — surfaced as
+   *  an inline warning under the address field (zone stays unknown). */
+  const [geocodeFailed, setGeocodeFailed] = useState(false)
   /** Values of the form at submit time — keeps overlap checks skipped until
    *  the chained (next) start time lands, surviving multiple intermediate
    *  renders caused by addEntry + loadWeek. */
@@ -212,6 +215,7 @@ export function TimeEntryForm({
   /** Search by address — same location pool, matched on address/project/nr. */
   const handleAddressSearch = async (query: string) => {
     setSelectedAddress(query)
+    setGeocodeFailed(false)
     if (selectedLocation && query.toUpperCase() !== selectedLocation.full_address.toUpperCase()) {
       setSelectedLocation(null)
     }
@@ -231,6 +235,7 @@ export function TimeEntryForm({
     setSelectedProjectId(loc.project_id)
     setSelectedAddress(loc.full_address)
     setSelectedLocation(loc)
+    setGeocodeFailed(false)
     setSearchQuery(loc.anlagenummer)
     setShowSearchResults(false)
     setShowAddressResults(false)
@@ -316,6 +321,7 @@ export function TimeEntryForm({
       const { geocoded } = await ensureLiftRow(anlagenummer, projectId, address, {
         geocode: true,
       })
+      setGeocodeFailed(!geocoded)
       if (geocoded) {
         // Mirror the geocoded coords into the store's location slice.
         const store = useAppStore.getState()
@@ -341,8 +347,48 @@ export function TimeEntryForm({
       }
     } catch (err) {
       console.warn('Background geocoding failed:', err)
+      setGeocodeFailed(true)
     }
   }
+
+  // Self-heal: when a lift is picked from the database with an address but no
+  // geocoded coordinates (e.g. an older row whose background geocode failed),
+  // geocode it now so the zone badge reflects the real distance instead of a
+  // stale/unknown stored zone. Existing-lift selection is the one path that
+  // never re-geocoded, which left such lifts stuck on the old Z1 default.
+  useEffect(() => {
+    const loc = selectedLocation
+    if (!loc) return
+    const addr = loc.full_address?.trim()
+    if (!addr) return
+    if (Number(loc.latitude) && Number(loc.longitude)) return
+
+    let cancelled = false
+    const heal = async () => {
+      const { geocoded } = await ensureLiftRow(loc.anlagenummer, loc.project_id, addr, {
+        geocode: true,
+      })
+      if (!cancelled) {
+        if (geocoded) {
+          setSelectedLocation({
+            ...loc,
+            latitude: geocoded.latitude,
+            longitude: geocoded.longitude,
+            zone: geocoded.zone,
+          })
+          setGeocodeFailed(false)
+        } else {
+          setGeocodeFailed(true)
+        }
+      }
+    }
+    heal().catch(() => {})
+    return () => {
+      cancelled = true
+    }
+    // Only re-run when a different lift gets selected — never on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLocation?.id])
 
   const handleSelectFavorite = (fav: FavoriteLocation) => {
     // Resolve project/address from the richest available source. Favorites can
@@ -362,6 +408,7 @@ export function TimeEntryForm({
     setSelectedAnlagenummer(fav.anlagenummer)
     setSelectedProjectId(projectId)
     setSelectedAddress(address)
+    setGeocodeFailed(false)
     setSearchQuery(fav.anlagenummer)
     setShowSearchResults(false)
     if (loc) {
@@ -665,6 +712,12 @@ export function TimeEntryForm({
                   <p className="text-[10px] text-gray-500 dark:text-stone-200 mt-1 pl-1">
                     {t('entry.address.hint')}
                   </p>
+                  {geocodeFailed && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-300 mt-1 pl-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {t('entry.address.geocode.failed')}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -690,11 +743,19 @@ export function TimeEntryForm({
                           </>
                         )
                       }
-                      // Trust a LIVE recomputation from the geocoded
-                      // coordinates — a stale stored zone is never shown.
-                      const zone = resolveLiftZone(selectedLocation)
-                      // Z0 lifts behave as Zone 1
-                      return zone > 0 ? `Z${zone}` : 'Z1'
+                      // A zone is only trustworthy with coordinates (or a
+                      // manual override) — a stale stored zone, or an unknown
+                      // zone left over from a failed geocode (e.g. a typo in
+                      // the address), is NEVER shown as a confident "Z1".
+                      const hasCoords =
+                        Number(selectedLocation.latitude) && Number(selectedLocation.longitude)
+                      const zone = hasCoords
+                        ? zoneForCoordinates(
+                            Number(selectedLocation.latitude),
+                            Number(selectedLocation.longitude),
+                          )
+                        : 0
+                      return zone > 0 ? `Z${zone}` : t('lifts.zone.auto.short')
                     })()}
                   </Badge>
                 </div>

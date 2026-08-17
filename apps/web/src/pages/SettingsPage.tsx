@@ -10,7 +10,11 @@ import { upsertProfile, supabase, signOut } from '@/db/supabase'
 import * as localDb from '@/db/indexeddb'
 import { reportError } from '@/lib/sentry'
 import { Input } from '@/components/ui/Input'
-import { geocodeAndApplyZone, locationsMissingZone } from '@/lib/locationZones'
+import {
+  geocodeAndApplyZone,
+  locationsMissingZone,
+  recalculateMissingZones,
+} from '@/lib/locationZones'
 import { geocodeAddress } from '@/lib/geocode'
 import { REFERENCE_LAT, REFERENCE_LON } from '@/lib/constants'
 import { zoneForCoordinates } from '@/lib/zoneReference'
@@ -969,26 +973,9 @@ function LiftZoneManager() {
         return
       }
       setGeoProgress({ done: 0, total: candidates.length, updated: 0 })
-      let updated = 0
-      for (const loc of candidates) {
-        if (Number(loc.latitude) && Number(loc.longitude)) {
-          // Already geocoded → just recompute the zone from the coordinates
-          // and the current reference point (no rate-limited geocode needed).
-          const zone = zoneForCoordinates(Number(loc.latitude), Number(loc.longitude))
-          await localDb.updateLocationZone(loc.anlagenummer, zone, undefined)
-          updated++
-        } else {
-          const addr = loc.full_address || ''
-          if (addr.trim().length >= 5) {
-            const result = await geocodeAndApplyZone(loc.anlagenummer, addr.trim(), loc)
-            if (result) updated++
-          }
-          // Cannot geocode (no address / no result) → the lift stays unknown
-          // (Z0/'Auto') instead of being silently mislabelled Zone 1 — an
-          // honest empty zone beats a fabricated one.
-        }
-        setGeoProgress((p) => (p ? { ...p, done: p.done + 1, updated } : p))
-      }
+      const updated = await recalculateMissingZones({
+        onProgress: (done, total, updated) => setGeoProgress({ done, total, updated }),
+      })
       // Refresh store + list so the new zones show immediately
       const updatedLocs = await localDb.getAllLocations()
       setLocations(updatedLocs)

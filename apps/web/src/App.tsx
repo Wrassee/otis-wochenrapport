@@ -20,6 +20,7 @@ import {
 } from '@/db/indexeddb'
 import { getLocations as getSupabaseLocations } from '@/db/supabase'
 import { ACTIVITY_CODES } from '@/lib/constants'
+import { recalculateMissingZones } from '@/lib/locationZones'
 import { scheduleMondayReminder, isReminderScheduled } from '@/db/notifications'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { useTranslation } from '@/lib/useTranslation'
@@ -136,6 +137,17 @@ export default function App() {
         }
         await cacheActivityCodes(ACTIVITY_CODES)
         setActivityCodes(ACTIVITY_CODES)
+
+        // Self-heal old lifts in the background: recompute/geocode every
+        // location still missing a trustworthy zone so stale Z1 defaults fix
+        // themselves on startup. Fire-and-forget — never delays the app from
+        // becoming interactive.
+        recalculateMissingZones()
+          .then(async () => {
+            const refreshed = await getLocalLocations()
+            if (refreshed.length > 0) setLocations(refreshed)
+          })
+          .catch((e) => console.warn('Startup zone recalculation failed:', e))
 
         // Schedule Monday morning notification if user has it enabled
         const reminderEnabled = await isReminderScheduled()

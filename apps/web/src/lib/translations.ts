@@ -637,6 +637,13 @@ export const translations = {
     hu: 'Helysz\u00edn \u00e9s utca \u2014 automatikusan kit\u00f6ltve lift kiv\u00e1laszt\u00e1sakor',
     en: 'Location and street — filled automatically when a lift is selected',
   },
+  'entry.address.geocode.failed': {
+    de: 'Adresse nicht geokodierbar — Zone kann nicht berechnet werden',
+    fr: 'Adresse non géocodable — zone non calculable',
+    it: 'Indirizzo non geocodificabile — zona non calcolabile',
+    hu: 'A cím nem geokódolható — a zóna nem számítható ki',
+    en: 'Address not geocodable — zone cannot be calculated',
+  },
   'entry.from.database': {
     de: 'Aus Datenbank:',
     fr: 'De la base de donn\u00e9es:',
