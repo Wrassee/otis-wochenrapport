@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TimeEntryForm } from '@/components/daily/TimeEntryForm'
 import { EditEntrySheet } from '@/components/daily/EditEntrySheet'
@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
+  AlertTriangle,
   UtensilsCrossed,
   Building2,
   Euro,
@@ -53,6 +54,11 @@ export function DashboardPage() {
   const [showExpenseEditor, setShowExpenseEditor] = useState(false)
   /** In-progress wizard draft for the active week (visible resume banner). */
   const [wizardDraft, setWizardDraft] = useState<{ dayIndex: number } | null>(null)
+  /** Transient toast (success/error) after an entry save attempt. */
+  const [saveToast, setSaveToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(
+    null,
+  )
+  const saveToastTimer = useRef<number | null>(null)
   const syncExpensesOnClose = useExpensesSync()
 
   useEffect(() => {
@@ -60,6 +66,13 @@ export function DashboardPage() {
     // Reset conflict highlights when day changes
     setConflictEntryIds([])
   }, [currentDate, loadWeek])
+
+  // Clear any pending toast timer when the page unmounts.
+  useEffect(() => {
+    return () => {
+      if (saveToastTimer.current !== null) window.clearTimeout(saveToastTimer.current)
+    }
+  }, [])
 
   // Show a resume banner when the wizard holds an unfinished draft for the
   // active week — the draft only becomes visible after a block or absence was
@@ -136,9 +149,21 @@ export function DashboardPage() {
     setCurrentDate(d.toISOString().split('T')[0])
   }
 
+  const showSaveToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setSaveToast({ msg, type })
+    if (saveToastTimer.current !== null) window.clearTimeout(saveToastTimer.current)
+    saveToastTimer.current = window.setTimeout(() => setSaveToast(null), 2500)
+  }
+
   const handleSaveEntry = async (entry: any) => {
-    await addEntry(entry)
-    await loadWeek()
+    try {
+      await addEntry(entry)
+      await loadWeek()
+      showSaveToast(t('entry.saved'))
+    } catch (e) {
+      console.warn('Failed to save entry:', e)
+      showSaveToast(t('entry.save.error'), 'error')
+    }
   }
 
   const handleQuickAdd = async (entry: any, extraHours: number) => {
@@ -187,6 +212,25 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4">
+      {/* Save toast — fixed so it pops above the content without shifting it */}
+      {saveToast && (
+        <div
+          className={cn(
+            'fixed top-20 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2.5 rounded-2xl text-white shadow-lg animate-slide-down',
+            saveToast.type === 'success'
+              ? 'bg-emerald-600 shadow-emerald-600/30'
+              : 'bg-red-600 shadow-red-600/30',
+          )}
+        >
+          {saveToast.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          )}
+          <span className="text-sm font-medium">{saveToast.msg}</span>
+        </div>
+      )}
+
       {/* Wizard resume banner — the unfinished draft is kept, never lost */}
       {wizardDraft && (
         <div className="rounded-3xl border border-emerald-500/40 bg-emerald-500/10 p-4 space-y-3">

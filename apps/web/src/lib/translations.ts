@@ -644,6 +644,20 @@ export const translations = {
     hu: 'A cím nem geokódolható — a zóna nem számítható ki',
     en: 'Address not geocodable — zone cannot be calculated',
   },
+  'entry.saved': {
+    de: 'Arbeit erfasst',
+    fr: 'Travail enregistré',
+    it: 'Lavoro registrato',
+    hu: 'A munka rögzítve',
+    en: 'Work recorded',
+  },
+  'entry.save.error': {
+    de: 'Eintrag konnte nicht gespeichert werden',
+    fr: "Impossible d'enregistrer la saisie",
+    it: 'Impossibile salvare la voce',
+    hu: 'A bejegyzést nem sikerült menteni',
+    en: 'Could not save the entry',
+  },
   'entry.from.database': {
     de: 'Aus Datenbank:',
     fr: 'De la base de donn\u00e9es:',
@@ -1433,6 +1447,20 @@ export const translations = {
     fr: 'Masquer',
     it: 'Nascondi',
     hu: 'Elrejt\u00e9s',
+    en: 'Hide',
+  },
+  'settings.data.show': {
+    de: 'Exportoptionen anzeigen',
+    fr: "Afficher les options d'export",
+    it: 'Mostra opzioni di esportazione',
+    hu: 'Exportlehetőségek megjelenítése',
+    en: 'Show export options',
+  },
+  'settings.data.hide': {
+    de: 'Ausblenden',
+    fr: 'Masquer',
+    it: 'Nascondi',
+    hu: 'Elrejtés',
     en: 'Hide',
   },
   'settings.sync': {

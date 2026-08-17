@@ -84,6 +84,7 @@ export function SettingsPage() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deleteExpanded, setDeleteExpanded] = useState(false)
+  const [dataExpanded, setDataExpanded] = useState(false)
 
   useEffect(() => {
     isReminderScheduled().then(setNotificationEnabled)
@@ -429,9 +430,9 @@ export function SettingsPage() {
         </Button>
       </Card>
 
-      {/* Data export */}
+      {/* Data export — collapsed by default so it stays out of the way */}
       <Card>
-        <div className="flex items-center gap-2.5 mb-3">
+        <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
             <Download className="w-4 h-4 text-white" />
           </div>
@@ -443,29 +444,51 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <p className="text-xs text-gray-600 dark:text-stone-200 mb-4">
-          {t('settings.data.export.desc')}
-        </p>
+        <button
+          type="button"
+          onClick={() => {
+            const next = !dataExpanded
+            setDataExpanded(next)
+            if (!next) {
+              setExportError(null)
+              setExportDone(false)
+            }
+          }}
+          className="mt-3 w-full flex items-center justify-between gap-2 p-3 rounded-2xl text-xs font-semibold text-gray-500 dark:text-stone-200 bg-otis-50/40 dark:bg-white/3 border border-otis-200/20 dark:border-white/5 hover:bg-otis-50 dark:hover:bg-white/5 transition-colors"
+        >
+          <span>{dataExpanded ? t('settings.data.hide') : t('settings.data.show')}</span>
+          <ChevronDown
+            className={cn('w-4 h-4 transition-transform', dataExpanded && 'rotate-180')}
+          />
+        </button>
 
-        {exportDone && (
-          <div className="flex items-start gap-2 p-3 bg-emerald-50/80 dark:bg-emerald-900/20 backdrop-blur rounded-2xl border border-emerald-200/60 dark:border-emerald-700/40 mb-4">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />
-            <p className="text-xs text-emerald-600 dark:text-emerald-300">
-              {t('settings.data.export.done')}
+        {dataExpanded && (
+          <div className="mt-3 space-y-4">
+            <p className="text-xs text-gray-600 dark:text-stone-200">
+              {t('settings.data.export.desc')}
             </p>
-          </div>
-        )}
-        {exportError && (
-          <div className="flex items-start gap-2 p-3 bg-red-50/80 dark:bg-red-900/20 backdrop-blur rounded-2xl border border-red-200/60 dark:border-red-700/40 mb-4">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
-            <p className="text-xs text-red-500">{exportError}</p>
-          </div>
-        )}
 
-        <Button onClick={handleExportData} variant="secondary" fullWidth disabled={exporting}>
-          <Download className="w-4 h-4" />
-          {exporting ? t('settings.data.export.exporting') : t('settings.data.export.button')}
-        </Button>
+            {exportDone && (
+              <div className="flex items-start gap-2 p-3 bg-emerald-50/80 dark:bg-emerald-900/20 backdrop-blur rounded-2xl border border-emerald-200/60 dark:border-emerald-700/40">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />
+                <p className="text-xs text-emerald-600 dark:text-emerald-300">
+                  {t('settings.data.export.done')}
+                </p>
+              </div>
+            )}
+            {exportError && (
+              <div className="flex items-start gap-2 p-3 bg-red-50/80 dark:bg-red-900/20 backdrop-blur rounded-2xl border border-red-200/60 dark:border-red-700/40">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
+                <p className="text-xs text-red-500">{exportError}</p>
+              </div>
+            )}
+
+            <Button onClick={handleExportData} variant="secondary" fullWidth disabled={exporting}>
+              <Download className="w-4 h-4" />
+              {exporting ? t('settings.data.export.exporting') : t('settings.data.export.button')}
+            </Button>
+          </div>
+        )}
       </Card>
 
       {/* Delete account — destructive controls are collapsed by default so the

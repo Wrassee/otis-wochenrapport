@@ -141,13 +141,19 @@ export default function App() {
         // Self-heal old lifts in the background: recompute/geocode every
         // location still missing a trustworthy zone so stale Z1 defaults fix
         // themselves on startup. Fire-and-forget — never delays the app from
-        // becoming interactive.
-        recalculateMissingZones()
-          .then(async () => {
-            const refreshed = await getLocalLocations()
-            if (refreshed.length > 0) setLocations(refreshed)
-          })
-          .catch((e) => console.warn('Startup zone recalculation failed:', e))
+        // becoming interactive. Only runs online (offline it would just make
+        // pointless failed network requests), and the helper already no-ops
+        // (returns 0) when every lift already has a trustworthy zone.
+        if (navigator.onLine) {
+          recalculateMissingZones()
+            .then(async (updated) => {
+              if (updated > 0) {
+                const refreshed = await getLocalLocations()
+                if (refreshed.length > 0) setLocations(refreshed)
+              }
+            })
+            .catch((e) => console.warn('Startup zone recalculation failed:', e))
+        }
 
         // Schedule Monday morning notification if user has it enabled
         const reminderEnabled = await isReminderScheduled()
