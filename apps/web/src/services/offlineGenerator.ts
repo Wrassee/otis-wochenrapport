@@ -285,6 +285,8 @@ export interface OfflineEntry {
   is_lunch?: boolean
   zone?: number
   location_zone?: number
+  /** Optional free-text remark — written into column O (VM) when present. */
+  notes?: string
 }
 
 export interface OfflineExpense {
@@ -412,6 +414,13 @@ function fillStundenrapport(
       xml = setCellNum(xml, `I${row}`, standardToOtis(entry.duration))
     }
 
+    // Custom free-text remark — written into column O (VM) when the technician
+    // entered one, so their own note travels with the activity line.
+    const remark = (entry.notes || '').trim()
+    if (remark) {
+      textRefs.push(['O', row, remark])
+    }
+
     // Activity marker / text code (J-R) — applied later once the styles exist.
     // Work entries without an explicit activity default to NK so every line
     // of the protocol gets a checkmark (the template requires one per row).
@@ -420,7 +429,9 @@ function fillStundenrapport(
     const activityCode = entry.activity_code || 'NK'
     if (activityCode && ACTIVITY_COLUMNS[activityCode]) {
       const colLetter = ACTIVITY_COLUMNS[activityCode]
-      if (TEXT_ACTIVITY_CODES.has(activityCode)) {
+      if (remark && colLetter === 'O') {
+        // Column O already carries the remark above.
+      } else if (TEXT_ACTIVITY_CODES.has(activityCode)) {
         textRefs.push([colLetter, row, activityCode])
       } else {
         markerRefs.push(`${colLetter}${row}`)

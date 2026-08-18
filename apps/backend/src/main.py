@@ -96,6 +96,7 @@ class TimeEntryInput(BaseModel):
     activity_code: Optional[str] = None
     is_lunch: bool = False
     zone: Optional[int] = None
+    notes: Optional[str] = None
 
 
 class ExpenseInput(BaseModel):
@@ -158,6 +159,7 @@ async def generate_excel_endpoint(request: GenerateRequest):
                 "activity_code": e.activity_code or "",
                 "is_lunch": e.is_lunch,
                 "zone": e.zone or 0,
+                "notes": e.notes or "",
             }
             for e in request.entries
         ]
@@ -233,6 +235,7 @@ async def send_email_endpoint(request: SendEmailRequest):
                 "activity_code": e.activity_code or "",
                 "is_lunch": e.is_lunch,
                 "zone": e.zone or 0,
+                "notes": e.notes or "",
             }
             for e in request.entries
         ]
@@ -302,6 +305,7 @@ async def _fetch_entries_from_supabase(user_id: str, year: int, week_number: int
                 "activity_code": item.get("activity_code", ""),
                 "is_lunch": item.get("is_lunch", False),
                 "zone": item.get("locations", {}).get("zone", 0),
+                "notes": item.get("notes", ""),
             })
 
         return entries

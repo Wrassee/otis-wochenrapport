@@ -447,7 +447,7 @@ export async function removeFavoriteLocation(anlagenummer: string): Promise<void
 /**
  * Delete a location (and its favorite counterpart) by anlagenummer.
  */
-export async function deleteLocation(anlagenummer: string): Promise<void> {
+export async function deleteLocation(anlagenummer: string, userId?: string): Promise<void> {
   const db = await getDb()
   const key = anlagenummer.toUpperCase()
 
@@ -461,11 +461,14 @@ export async function deleteLocation(anlagenummer: string): Promise<void> {
   // Delete from favorites store (keyed by anlagenummer)
   await db.delete('favorites', key)
 
-  // Queue sync — only if the location existed
+  // Queue sync — the userId lets the background sync also delete the lift's
+  // user_favorites cloud row, otherwise "Meine Lifte" resurrects it on the
+  // next init (getFavorites pulls it back from the cloud).
   await db.add('sync_queue', {
     type: 'location_delete',
     entryId: key, // anlagenummer as the identifier for delete
     locationDeleteAnlagenummer: key,
+    userId,
     timestamp: Date.now(),
   })
 }

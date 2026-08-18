@@ -725,10 +725,11 @@ function liftEffectiveZone(loc: {
 
 function LiftZoneManager() {
   const { t } = useTranslation()
-  const { setLocations, setFavoriteLocations } = useAppStore(
+  const { setLocations, setFavoriteLocations, user } = useAppStore(
     useShallow((s) => ({
       setLocations: s.setLocations,
       setFavoriteLocations: s.setFavoriteLocations,
+      user: s.user,
     })),
   )
   const [liftList, setLiftList] = useState<LiftItem[]>([])
@@ -896,7 +897,7 @@ function LiftZoneManager() {
 
   const deleteLift = async (anlagenummer: string) => {
     try {
-      await localDb.deleteLocation(anlagenummer)
+      await localDb.deleteLocation(anlagenummer, user?.id)
 
       // Refresh store locations and favorites
       const updatedLocs = await localDb.getAllLocations()

@@ -47,6 +47,8 @@ export function EditEntrySheet({ open, entry, onClose, onSave }: EditEntrySheetP
   const [editActivityCode, setEditActivityCode] = useState<ActivityCode | null>(null)
   const [showEditActivityPicker, setShowEditActivityPicker] = useState(false)
   const [editIsSaving, setEditIsSaving] = useState(false)
+  /** Free-text remark (own note) — written into column O of the Excel. */
+  const [editRemark, setEditRemark] = useState('')
 
   // Lift fields
   const [searchQuery, setSearchQuery] = useState('')
@@ -77,6 +79,7 @@ export function EditEntrySheet({ open, entry, onClose, onSave }: EditEntrySheetP
     setEditDuration(formatOtisDuration(entry.duration))
     const foundCode = activityCodes.find((c) => c.code === entry.activity_code)
     setEditActivityCode(foundCode || null)
+    setEditRemark(entry.notes || '')
     setSearchQuery(entry.location_anlagenummer || '')
     const loc = locations.find(
       (l) => l.anlagenummer.toUpperCase() === (entry.location_anlagenummer || '').toUpperCase(),
@@ -179,6 +182,7 @@ export function EditEntrySheet({ open, entry, onClose, onSave }: EditEntrySheetP
         location_project_id: projectId,
         location_address: address,
         location_zone: resolveLiftZone(selectedLocation, entry.location_zone ?? 0) || undefined,
+        notes: editRemark.trim(),
       }
       await onSave(updatedEntry)
       onClose()
@@ -313,31 +317,45 @@ export function EditEntrySheet({ open, entry, onClose, onSave }: EditEntrySheetP
               </>
             )}
 
-            {/* Tätigkeit — Activity code picker */}
+            {/* Tätigkeit — Activity code picker + free-text remark */}
             {!isLunch && (
-              <div>
-                <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
-                  {t('entry.activity')}
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowEditActivityPicker(true)}
-                  className="w-full flex items-center justify-between h-14 px-4 rounded-2xl glass-input dark:glass-input-dark text-otis-900 dark:text-white hover:border-otis-400/40 transition-all"
-                >
-                  {editActivityCode ? (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="info">{editActivityCode.code}</Badge>
-                      <span className="text-sm text-gray-600 dark:text-stone-200">
-                        {editActivityCode.description_de}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
+                    {t('entry.activity')}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowEditActivityPicker(true)}
+                    className="w-full flex items-center justify-between h-14 px-4 rounded-2xl glass-input dark:glass-input-dark text-otis-900 dark:text-white hover:border-otis-400/40 transition-all"
+                  >
+                    {editActivityCode ? (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="info">{editActivityCode.code}</Badge>
+                        <span className="text-sm text-gray-600 dark:text-stone-200">
+                          {editActivityCode.description_de}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-500 dark:text-stone-200">
+                        {t('entry.activity.select')}
                       </span>
-                    </div>
-                  ) : (
-                    <span className="text-gray-500 dark:text-stone-200">
-                      {t('entry.activity.select')}
-                    </span>
-                  )}
-                  <ChevronDown className="w-5 h-5 text-gray-500 dark:text-stone-200" />
-                </button>
+                    )}
+                    <ChevronDown className="w-5 h-5 text-gray-500 dark:text-stone-200" />
+                  </button>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
+                    {t('entry.remark')}
+                  </label>
+                  <input
+                    type="text"
+                    value={editRemark}
+                    onChange={(e) => setEditRemark(e.target.value)}
+                    placeholder={t('entry.remark.placeholder')}
+                    className="w-full h-12 px-4 rounded-2xl text-sm glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none transition-all"
+                  />
+                </div>
               </div>
             )}
 

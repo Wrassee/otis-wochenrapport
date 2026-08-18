@@ -82,6 +82,8 @@ export function TimeEntryForm({
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
   const [selectedActivityCode, setSelectedActivityCode] = useState<ActivityCode | null>(null)
   const [showActivityPicker, setShowActivityPicker] = useState(false)
+  /** Free-text remark (own note) — written into column O of the Excel. */
+  const [remark, setRemark] = useState('')
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [searchResults, setSearchResults] = useState<Location[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -452,6 +454,8 @@ export function TimeEntryForm({
     } else {
       setIsLunch(false)
     }
+    // A lunch break has no remark — clear it so a stale note never rides along.
+    setRemark('')
     // Reset any open search dropdowns
     setShowSearchResults(false)
     setShowAddressResults(false)
@@ -510,7 +514,7 @@ export function TimeEntryForm({
       activity_code_id: selectedActivityCode?.id || null,
       activity_code: selectedActivityCode?.code || null,
       is_lunch: isLunch,
-      notes: '',
+      notes: remark.trim(),
     }
 
     await onSave(entry)
@@ -534,6 +538,7 @@ export function TimeEntryForm({
     setDuration('1.00')
     setIsLunch(false)
     setSelectedActivityCode(null)
+    setRemark('')
     setOverlapWarning(null)
     setConflictingEntryIds([])
   }
@@ -788,31 +793,45 @@ export function TimeEntryForm({
             />
           </div>
 
-          {/* Activity code button */}
+          {/* Activity code button + free-text remark */}
           {!isLunch && (
-            <div>
-              <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
-                {t('entry.activity')}
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowActivityPicker(true)}
-                className="w-full flex items-center justify-between h-14 px-4 rounded-2xl glass-input dark:glass-input-dark text-otis-900 dark:text-white hover:border-otis-400/40 transition-all"
-              >
-                {selectedActivityCode ? (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="info">{selectedActivityCode.code}</Badge>
-                    <span className="text-sm text-gray-600 dark:text-stone-200">
-                      {selectedActivityCode.description_de}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
+                  {t('entry.activity')}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowActivityPicker(true)}
+                  className="w-full flex items-center justify-between h-14 px-4 rounded-2xl glass-input dark:glass-input-dark text-otis-900 dark:text-white hover:border-otis-400/40 transition-all"
+                >
+                  {selectedActivityCode ? (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="info">{selectedActivityCode.code}</Badge>
+                      <span className="text-sm text-gray-600 dark:text-stone-200">
+                        {selectedActivityCode.description_de}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-gray-500 dark:text-stone-200">
+                      {t('entry.activity.select')}
                     </span>
-                  </div>
-                ) : (
-                  <span className="text-gray-500 dark:text-stone-200">
-                    {t('entry.activity.select')}
-                  </span>
-                )}
-                <ChevronDown className="w-5 h-5 text-gray-500 dark:text-stone-200" />
-              </button>
+                  )}
+                  <ChevronDown className="w-5 h-5 text-gray-500 dark:text-stone-200" />
+                </button>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-otis-700 dark:text-otis-200 mb-1.5">
+                  {t('entry.remark')}
+                </label>
+                <input
+                  type="text"
+                  value={remark}
+                  onChange={(e) => setRemark(e.target.value)}
+                  placeholder={t('entry.remark.placeholder')}
+                  className="w-full h-12 px-4 rounded-2xl text-sm glass-input dark:glass-input-dark text-otis-900 dark:text-white focus:outline-none transition-all"
+                />
+              </div>
             </div>
           )}
 

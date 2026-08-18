@@ -13,6 +13,7 @@ import {
   deleteLocationByAnlagenummer,
   syncExpensesToSupabase,
   updateProfileLanguage,
+  deleteFavorite,
 } from './supabase'
 import { isValidUuid, uuidFromString } from '@/lib/utils'
 import { useAppStore } from '@/stores/appStore'
@@ -234,7 +235,20 @@ export async function performSync() {
         } else if (item.type === 'location_upsert' && item.locationData) {
           await upsertLocation(item.locationData)
         } else if (item.type === 'location_delete' && item.locationDeleteAnlagenummer) {
-          await deleteLocationByAnlagenummer(item.locationDeleteAnlagenummer)
+          // Delete BOTH the shared locations row and the user's favorite row
+          // independently: the favorite is the half that resurrects the lift in
+          // "Meine Lifte"/"Letzte Anlagen" on the next getFavorites() pull, and
+          // a failing locations DELETE (e.g. missing RLS policy) must not block
+          // the favorite from being removed. If either fails, keep the item
+          // queued so both retry on the next sync.
+          const ownerId = item.userId || userId
+          const results = await Promise.allSettled([
+            deleteLocationByAnlagenummer(item.locationDeleteAnlagenummer),
+            ownerId ? deleteFavorite(ownerId, item.locationDeleteAnlagenummer) : Promise.resolve(),
+          ])
+          const failed = results.find((r) => r.status === 'rejected') as
+            PromiseRejectedResult | undefined
+          if (failed) throw failed.reason
         } else if (item.type === 'expenses_sync' && item.expenses && item.userId) {
           await syncExpensesToSupabase(item.userId, item.expenses, item.dates)
         } else if (item.type === 'language_sync' && item.language && item.userId) {

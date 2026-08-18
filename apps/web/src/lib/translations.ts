@@ -701,6 +701,20 @@ export const translations = {
     hu: 'Tev\u00e9kenys\u00e9g kiv\u00e1laszt\u00e1sa',
     en: 'Select activity',
   },
+  'entry.remark': {
+    de: 'Bemerkung (optional)',
+    fr: 'Remarque (optionnel)',
+    it: 'Nota (opzionale)',
+    hu: 'Megjegyz\u00e9s (opcion\u00e1lis)',
+    en: 'Remark (optional)',
+  },
+  'entry.remark.placeholder': {
+    de: 'Eigene Notiz \u2014 erscheint in Spalte O',
+    fr: 'Note personnelle \u2014 appara\u00eet en colonne O',
+    it: 'Nota personale \u2014 appare nella colonna O',
+    hu: 'Saj\u00e1t megjegyz\u00e9s \u2014 az O oszlopba ker\u00fcl',
+    en: 'Own note \u2014 appears in column O',
+  },
   'entry.spesen': {
     de: 'Spesen (optional)',
     fr: 'Frais (optionnel)',

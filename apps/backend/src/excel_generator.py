@@ -323,6 +323,13 @@ def _fill_stundenrapport(
         if duration is not None:
             xml = _set_cell_num(xml, f"I{row}", _standard_to_otis(float(duration)))
 
+        # Custom free-text remark — written into column O (VM) when the
+        # technician entered one, so their own note travels with the activity
+        # line.
+        remark = (entry.get("notes") or entry.get("remark") or "").strip()
+        if remark:
+            text_refs.append(("O", row, remark))
+
         # Activity marker / text code (J-R) — applied later once the styles
         # exist. Work entries without an explicit activity default to NK so
         # every line of the protocol gets a checkmark (the template requires
@@ -331,7 +338,9 @@ def _fill_stundenrapport(
         activity_code = entry.get("activity_code", "") or "NK"
         if activity_code and activity_code in ACTIVITY_COLUMNS:
             col_letter = ACTIVITY_COLUMNS[activity_code]
-            if activity_code in TEXT_ACTIVITY_CODES:
+            if remark and col_letter == "O":
+                pass  # column O already carries the free-text remark
+            elif activity_code in TEXT_ACTIVITY_CODES:
                 text_refs.append((col_letter, row, activity_code))
             else:
                 marker_refs.append(f"{col_letter}{row}")

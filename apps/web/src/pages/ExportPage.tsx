@@ -202,8 +202,7 @@ export function ExportPage() {
    * immediately by buildEntriesData and collectKmAllowances.
    */
   const resolveEntryZone = (e: TimeEntry): { zone: number; lat: number; lon: number } => {
-    const { locations: liveLocations, favoriteLocations: liveFavorites } =
-      useAppStore.getState()
+    const { locations: liveLocations, favoriteLocations: liveFavorites } = useAppStore.getState()
     let manualZone: number | undefined
     let lat = 0
     let lon = 0
@@ -264,6 +263,8 @@ export function ExportPage() {
         activity_code: e.activity_code || (e.is_lunch ? '' : 'NK'),
         is_lunch: e.is_lunch,
         zone: effectiveZone,
+        // Free-text remark (Tätigkeit note) — written into column O (VM).
+        notes: e.notes || '',
       }
     })
   }
@@ -285,7 +286,11 @@ export function ExportPage() {
     const result: Record<number, number> = {}
 
     // Per-day candidates: { weekday, home→lift } for the max-zone lift.
-    const candidates: { weekday: number; from: { lat: number; lon: number }; to: { lat: number; lon: number } }[] = []
+    const candidates: {
+      weekday: number
+      from: { lat: number; lon: number }
+      to: { lat: number; lon: number }
+    }[] = []
 
     weekDates.forEach((date, weekday) => {
       const dayEntries = timeEntries.filter((e) => e.date === date && !e.is_lunch)
@@ -304,9 +309,7 @@ export function ExportPage() {
           best = lat && lon ? { lat, lon } : null
         } else if (zone === maxZone && zone > 0 && lat && lon) {
           const d1 = haversineDistance(zoneRef.lat, zoneRef.lon, lat, lon)
-          const d0 = best
-            ? haversineDistance(zoneRef.lat, zoneRef.lon, best.lat, best.lon)
-            : 0
+          const d0 = best ? haversineDistance(zoneRef.lat, zoneRef.lon, best.lat, best.lon) : 0
           if (d1 > d0) best = { lat, lon }
         }
       }
@@ -331,9 +334,7 @@ export function ExportPage() {
     for (const { c, r } of routes) {
       // Driven route when available, else straight-line as fallback.
       const oneWayKm =
-        r !== null && r > 0
-          ? r
-          : haversineDistance(c.from.lat, c.from.lon, c.to.lat, c.to.lon)
+        r !== null && r > 0 ? r : haversineDistance(c.from.lat, c.from.lon, c.to.lat, c.to.lon)
       const roundTripKm = 2 * oneWayKm
       const chf = Math.round(roundTripKm * 0.1 * 100) / 100
       if (chf > 0) result[c.weekday] = chf
