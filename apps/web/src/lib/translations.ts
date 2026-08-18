@@ -2559,6 +2559,13 @@ export const translations = {
     hu: 'Tov\u00e1bb',
     en: 'Continue',
   },
+  'wizard.skip': {
+    de: '\u00dcberspringen',
+    fr: 'Ignorer',
+    it: 'Salta',
+    hu: 'Kihagy\u00e1s',
+    en: 'Skip',
+  },
   'wizard.back': {
     de: 'Zur\u00fcck',
     fr: 'Retour',

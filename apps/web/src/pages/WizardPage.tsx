@@ -1767,7 +1767,7 @@ function TextStep({
         disabled={!canSubmit}
         className="mt-4 w-full py-4 rounded-2xl bg-gradient-to-r from-otis-500 to-emerald-500 text-white font-bold text-lg shadow-lg shadow-otis-500/25 hover:shadow-otis-500/40 hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:pointer-events-none"
       >
-        {t('wizard.next')}
+        {allowEmpty && value.trim().length === 0 ? t('wizard.skip') : t('wizard.next')}
       </button>
     </div>
   )
