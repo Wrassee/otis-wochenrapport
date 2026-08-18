@@ -37,6 +37,8 @@ interface WorkBlock {
   projektnummer: string
   adresse: string
   activityCode: string // e.g. 'NK', 'I04', 'I5S'
+  /** Free-text remark (own note) — written into column O of the Excel. */
+  remark: string
   start: number
   duration: number
 }
@@ -122,6 +124,7 @@ type Phase =
   | 'adresse'
   | 'activity'
   | 'officeActivity'
+  | 'remark'
   | 'start'
   | 'duration'
   | 'lunchQ'
@@ -157,25 +160,26 @@ const PHASE_RANK: Record<Phase, number> = {
   adresse: 4,
   activity: 5,
   officeActivity: 5,
-  start: 6,
-  duration: 7,
-  lunchQ: 8,
-  lunchStart: 9,
-  lunchDuration: 10,
-  moreLifts: 11,
-  spesen: 12,
-  expenses: 13,
-  quickAnlage: 14,
-  quickProjekt: 15,
-  quickAdresse: 16,
-  quickDays: 17,
-  quickLunch: 18,
-  spesenAny: 19,
-  spesenDay: 20,
-  spesenMore: 21,
+  remark: 6,
+  start: 7,
+  duration: 8,
+  lunchQ: 9,
+  lunchStart: 10,
+  lunchDuration: 11,
+  moreLifts: 12,
+  spesen: 13,
+  expenses: 14,
+  quickAnlage: 15,
+  quickProjekt: 16,
+  quickAdresse: 17,
+  quickDays: 18,
+  quickLunch: 19,
+  spesenAny: 20,
+  spesenDay: 21,
+  spesenMore: 22,
 }
 
-const PHASES_PER_DAY = 22
+const PHASES_PER_DAY = 23
 
 /** Week-level phases (not tied to a single day's entry flow). */
 const WEEK_LEVEL_PHASES: Phase[] = ['spesenAny', 'spesenDay', 'spesenMore']
@@ -188,6 +192,7 @@ const BLOCK_BADGE_PHASES: Phase[] = [
   'adresse',
   'activity',
   'officeActivity',
+  'remark',
   'start',
   'duration',
 ]
@@ -488,6 +493,7 @@ export function WizardPage() {
     projektnummer: '',
     adresse: '',
     activityCode: 'NK',
+    remark: '',
     start: 0,
     duration: 0,
   })
@@ -545,6 +551,7 @@ export function WizardPage() {
           projektnummer,
           adresse,
           activityCode: 'NK',
+          remark: '',
           start: 7.5,
           duration: 4.5,
         },
@@ -554,6 +561,7 @@ export function WizardPage() {
           projektnummer,
           adresse,
           activityCode: 'NK',
+          remark: '',
           start: 12 + lunchDuration / 60,
           duration: 4.0,
         },
@@ -777,7 +785,8 @@ export function WizardPage() {
         activity_code_id: block.activityCode,
         activity_code: block.activityCode,
         is_lunch: false,
-        notes: '',
+        // `?? ''` guards drafts saved before the remark field existed.
+        notes: (block.remark ?? '').trim(),
         location_anlagenummer: block.anlagenummer.trim().toUpperCase(),
         location_project_id: block.projektnummer.trim(),
         location_address: block.adresse.trim(),
@@ -994,6 +1003,8 @@ export function WizardPage() {
       case 'activity':
       case 'officeActivity':
         return t('wizard.activity')
+      case 'remark':
+        return t('wizard.remark')
       case 'start':
         return t('wizard.start')
       case 'duration':
@@ -1327,7 +1338,7 @@ export function WizardPage() {
               nonProductiveLabel={t('activity.nonproductive')}
               onSelect={(code) => {
                 setBlockField({ activityCode: code })
-                goTo('start')
+                goTo('remark')
               }}
             />
           )}
@@ -1340,6 +1351,19 @@ export function WizardPage() {
               nonProductiveLabel={t('activity.nonproductive')}
               onSelect={(code) => {
                 setBlockField({ activityCode: code })
+                goTo('remark')
+              }}
+            />
+          )}
+
+          {phase === 'remark' && (
+            <TextStep
+              key="remark"
+              initialValue={day!.blocks[blockIndex]?.remark ?? ''}
+              placeholder={t('wizard.remark.placeholder')}
+              allowEmpty
+              onNext={(v) => {
+                setBlockField({ remark: v })
                 goTo('start')
               }}
             />
@@ -1689,17 +1713,21 @@ function TextStep({
   placeholder,
   autoCapitalize,
   suggestionsFor,
+  allowEmpty,
   onNext,
 }: {
   initialValue: string
   placeholder?: string
   autoCapitalize?: 'characters' | 'words' | 'none'
   suggestionsFor?: (value: string) => Suggestion[]
+  /** When true the input is optional — Next stays enabled and Enter skips. */
+  allowEmpty?: boolean
   onNext: (value: string) => void
 }) {
   const { t } = useTranslation()
   const [value, setValue] = useState(initialValue)
   const suggestions = suggestionsFor ? suggestionsFor(value) : []
+  const canSubmit = allowEmpty || value.trim().length > 0
 
   return (
     <div>
@@ -1707,7 +1735,7 @@ function TextStep({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && value.trim().length > 0) {
+          if (e.key === 'Enter' && canSubmit) {
             e.preventDefault()
             onNext(value.trim())
           }
@@ -1735,8 +1763,8 @@ function TextStep({
       )}
 
       <button
-        onClick={() => value.trim().length > 0 && onNext(value.trim())}
-        disabled={value.trim().length === 0}
+        onClick={() => canSubmit && onNext(value.trim())}
+        disabled={!canSubmit}
         className="mt-4 w-full py-4 rounded-2xl bg-gradient-to-r from-otis-500 to-emerald-500 text-white font-bold text-lg shadow-lg shadow-otis-500/25 hover:shadow-otis-500/40 hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:pointer-events-none"
       >
         {t('wizard.next')}

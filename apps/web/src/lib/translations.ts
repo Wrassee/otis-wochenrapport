@@ -2438,6 +2438,20 @@ export const translations = {
     hu: 'Milyen k\u00f3dra sz\u00e1molj\u00e1k el?',
     en: 'Which code is billed to?',
   },
+  'wizard.remark': {
+    de: 'Eigene Bemerkung? (optional)',
+    fr: 'Remarque personnelle ? (optionnel)',
+    it: 'Nota personale? (opzionale)',
+    hu: 'Saj\u00e1t megjegyz\u00e9s? (opcion\u00e1lis)',
+    en: 'Own remark? (optional)',
+  },
+  'wizard.remark.placeholder': {
+    de: 'Bemerkung \u2014 erscheint in Spalte O',
+    fr: 'Remarque \u2014 appara\u00eet en colonne O',
+    it: 'Nota \u2014 appare nella colonna O',
+    hu: 'Megjegyz\u00e9s \u2014 az O oszlopba ker\u00fcl',
+    en: 'Remark \u2014 appears in column O',
+  },
   'wizard.start': {
     de: 'Wann hast du begonnen?',
     fr: '\u00c0 quelle heure as-tu commenc\u00e9?',

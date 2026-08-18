@@ -3,7 +3,7 @@ import type { TimeEntry } from '@/lib/types'
 import { decimalToTime, formatOtisDuration } from '@/lib/utils'
 import { cn } from '@/lib/cn'
 import { useTranslation } from '@/lib/useTranslation'
-import { UtensilsCrossed, Building2, Pencil, Trash2 } from 'lucide-react'
+import { UtensilsCrossed, Building2, Pencil, Trash2, StickyNote } from 'lucide-react'
 
 interface TimelineViewProps {
   entries: TimeEntry[]
@@ -169,6 +169,9 @@ export function TimelineView({
                 const endTime = entry.start_time + entry.duration
                 const bar = barStyle(entry.start_time, entry.duration)
                 const isConflict = conflictEntryIds.includes(entry.id)
+                // Free-text remark (Tätigkeit note) — surfaced inline so the
+                // technician can read it without opening the edit sheet.
+                const remark = (entry.notes || '').trim()
                 // The label pill must NEVER be wider than the bar itself — a
                 // wider pill visually bleeds into the next entry's bar (two
                 // adjacent entries like 07:30–08:30 / 08:30–11:30 then look
@@ -177,7 +180,7 @@ export function TimelineView({
                 // the tooltip.
                 const label = isLunch
                   ? `${t('timeline.lunch')} ${decimalToTime(entry.start_time)}–${decimalToTime(endTime)} (${(entry.duration * 60).toFixed(0)} Min.)`
-                  : `${entry.location_anlagenummer || '—'} ${decimalToTime(entry.start_time)}–${decimalToTime(endTime)} · ${formatOtisDuration(entry.duration)}`
+                  : `${entry.location_anlagenummer || '—'} ${decimalToTime(entry.start_time)}–${decimalToTime(endTime)} · ${formatOtisDuration(entry.duration)}${remark ? ` · ${remark}` : ''}`
                 return (
                   <div
                     key={entry.id}
@@ -278,6 +281,12 @@ export function TimelineView({
                           <span className="text-[11px] font-bold whitespace-nowrap px-2 py-0.5 rounded-full bg-white/25 shrink-0">
                             {formatOtisDuration(entry.duration)}
                           </span>
+                          {remark && (
+                            <span className="flex items-center gap-1 text-[11px] font-medium whitespace-nowrap max-w-[120px] border-l border-white/30 pl-1.5 pr-1 shrink">
+                              <StickyNote className="w-3 h-3 shrink-0 opacity-80" />
+                              <span className="truncate">{remark}</span>
+                            </span>
+                          )}
                         </span>
                       )}
                     </div>
